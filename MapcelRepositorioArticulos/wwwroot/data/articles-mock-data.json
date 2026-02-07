@@ -1,0 +1,465 @@
+{
+  "tags": [
+    { "id": "tag-001", "name": "Urgente", "color": "#ef4444", "description": "Requiere atención inmediata", "companyId": "co-01" },
+    { "id": "tag-002", "name": "Bug", "color": "#f97316", "description": "Error en el sistema", "companyId": "co-01" },
+    { "id": "tag-003", "name": "Feature", "color": "#3b82f6", "description": "Nueva funcionalidad", "companyId": "co-01" },
+    { "id": "tag-004", "name": "Documentación", "color": "#22c55e", "description": "Relacionado con documentación", "companyId": "co-01" },
+    { "id": "tag-005", "name": "Critical", "color": "#dc2626", "description": "Problema crítico del sistema", "companyId": "co-01" },
+    { "id": "tag-006", "name": "Integration", "color": "#0ea5e9", "description": "Integraciones con terceros", "companyId": "co-01" },
+    { "id": "tag-007", "name": "Access", "color": "#14b8a6", "description": "Permisos y accesos", "companyId": "co-02" },
+    { "id": "tag-008", "name": "High Priority", "color": "#ef4444", "description": "Alta prioridad", "companyId": "co-02" },
+    { "id": "tag-009", "name": "Bug", "color": "#f97316", "description": "Error en el sistema", "companyId": "co-02" },
+    { "id": "tag-010", "name": "Permissions", "color": "#8b5cf6", "description": "Gestión de permisos", "companyId": "co-02" },
+    { "id": "tag-011", "name": "Documentation", "color": "#22c55e", "description": "Relacionado con documentación", "companyId": "co-02" },
+    { "id": "tag-012", "name": "Performance", "color": "#f59e0b", "description": "Optimización de rendimiento", "companyId": "co-02" },
+    { "id": "tag-013", "name": "Feature", "color": "#3b82f6", "description": "Nueva funcionalidad", "companyId": "co-03" },
+    { "id": "tag-014", "name": "Enhancement", "color": "#10b981", "description": "Mejora de funcionalidad existente", "companyId": "co-03" },
+    { "id": "tag-015", "name": "Performance", "color": "#f59e0b", "description": "Optimización de rendimiento", "companyId": "co-03" },
+    { "id": "tag-016", "name": "Bug", "color": "#f97316", "description": "Error en el sistema", "companyId": "co-03" },
+    { "id": "tag-017", "name": "High Priority", "color": "#ef4444", "description": "Alta prioridad", "companyId": "co-03" }
+  ],
+  "companies": [
+    { 
+      "id": "co-01", 
+      "name": "Acme Corporation",
+      "settings": {
+        "allow_user_uploads": true,
+        "allow_user_tag_creation": true,
+        "require_client_comments": false
+      }
+    },
+    { 
+      "id": "co-02", 
+      "name": "Global Tech Solutions",
+      "settings": {
+        "allow_user_uploads": false,
+        "allow_user_tag_creation": false,
+        "require_client_comments": true
+      }
+    },
+    { 
+      "id": "co-03", 
+      "name": "Innovation Labs Inc.",
+      "settings": {
+        "allow_user_uploads": true,
+        "allow_user_tag_creation": false,
+        "require_client_comments": false
+      }
+    }
+  ],
+  "articles": [
+    {
+      "id": "issue-0001",
+      "companyId": "co-01",
+      "title": "No se puede iniciar sesión en la cuenta después de cambiar la contraseña",
+      "description": "Descripción detallada del problema: Los usuarios reportan que después de cambiar su contraseña utilizando el flujo de recuperación, no pueden iniciar sesión con la nueva contraseña. El sistema muestra un error genérico 'Credenciales inválidas' sin proporcionar más detalles. Este issue afecta múltiples áreas del sistema y está impactando la experiencia del usuario de manera significativa.",
+      "externalLink": "https://external-tracker.com/issue-0001",
+      "clientComments": "Cliente reportó: 'No se puede iniciar sesión después del cambio de contraseña. Ya intentamos con múltiples usuarios y todos tienen el mismo problema'. Mencionaron que esto ha estado afectando su flujo de trabajo durante los últimos 3 días y están perdiendo productividad. Solicitan una solución urgente ya que tienen empleados bloqueados.",
+      "status": "Producción",
+      "tags": ["tag-001", "tag-002"],
+      "createdAt": "2026-01-02",
+      "updatedAt": "2026-01-20"
+    },
+    {
+      "id": "issue-0002",
+      "companyId": "co-01",
+      "title": "La configuración de SSO no funciona con Okta",
+      "description": "Error al intentar sincronizar usuarios vía SAML. El sistema no reconoce los atributos enviados por el proveedor de identidad Okta, lo que impide que los usuarios puedan autenticarse mediante Single Sign-On. Se requiere revisar la configuración de mapeo de atributos SAML.",
+      "externalLink": "https://external-tracker.com/issue-0002",
+      "clientComments": "El departamento de IT requiere asistencia técnica inmediata. Han intentado múltiples configuraciones sin éxito y necesitan soporte especializado para resolver la integración con Okta.",
+      "status": "Borrador",
+      "tags": ["tag-004", "tag-003"],
+      "createdAt": "2025-07-27",
+      "updatedAt": "2026-01-18"
+    },
+    {
+      "id": "issue-0003",
+      "companyId": "co-02",
+      "title": "Solicitud de acceso al entorno sandbox",
+      "description": "El cliente necesita acceso al entorno de pruebas para realizar validaciones antes del despliegue en producción. Requieren permisos completos de administrador para poder probar todas las funcionalidades que implementarán en su entorno productivo. El acceso debe incluir la posibilidad de crear usuarios de prueba y simular diferentes escenarios de uso.",
+      "externalLink": "https://external-tracker.com/issue-0003",
+      "clientComments": "Solicitud urgente para el equipo de QA. Necesitamos comenzar las pruebas lo antes posible ya que tenemos un deadline ajustado para el lanzamiento a producción. Por favor, priorizar esta solicitud.",
+      "status": "Borrador",
+      "tags": ["tag-007", "tag-008"],
+      "createdAt": "2026-01-08",
+      "updatedAt": "2026-01-19"
+    },
+    {
+      "id": "issue-0004",
+      "companyId": "co-02",
+      "title": "Error de permisos al agregar miembros al equipo",
+      "description": "Los administradores no pueden agregar nuevos miembros al equipo debido a un error de permisos en el sistema. Al intentar enviar la invitación, el sistema responde con un error 403 Forbidden. Se ha verificado que los administradores tienen los roles correctos asignados. Parece ser un problema con la validación de permisos en el backend.",
+      "externalLink": "https://external-tracker.com/issue-0004",
+      "clientComments": "Este problema está bloqueando la incorporación de nuevos empleados. Tenemos 5 nuevos colaboradores que deben empezar esta semana y no podemos darles acceso al sistema. La situación es crítica para nuestras operaciones.",
+      "status": "Cerrado",
+      "tags": ["tag-009", "tag-010"],
+      "createdAt": "2025-12-10",
+      "updatedAt": "2026-01-15"
+    },
+    {
+      "id": "issue-0005",
+      "companyId": "co-01",
+      "title": "Integración con sistema de pagos no funciona",
+      "description": "La integración con Stripe está fallando intermitentemente, causando errores en las transacciones de los clientes. Los errores ocurren aproximadamente en el 30% de los intentos de pago. Los logs muestran timeouts al conectar con la API de Stripe. Se necesita investigar si el problema es de configuración, de red, o si Stripe está experimentando problemas en su infraestructura.",
+      "externalLink": "https://external-tracker.com/issue-0005",
+      "clientComments": "Los clientes reportan errores al procesar pagos. Esto está causando pérdida de ventas y una muy mala experiencia para nuestros usuarios finales. Necesitamos una solución inmediata o consideraremos cambiar de proveedor de pagos. Este es un issue crítico para nuestro negocio.",
+      "status": "Producción",
+      "tags": ["tag-005", "tag-006", "tag-002"],
+      "createdAt": "2026-01-15",
+      "updatedAt": "2026-01-21"
+    },
+    {
+      "id": "issue-0006",
+      "companyId": "co-02",
+      "title": "Actualización de documentación del API",
+      "description": "Necesitamos actualizar la documentación del API para reflejar los cambios recientes en los endpoints. Se han agregado nuevos parámetros opcionales y algunos endpoints deprecados necesitan ser marcados como tal. También se requiere incluir ejemplos de código actualizados en diferentes lenguajes de programación (JavaScript, Python, Ruby).",
+      "externalLink": "https://external-tracker.com/issue-0006",
+      "clientComments": "La documentación actual está desactualizada y está causando confusión en nuestro equipo de desarrollo. Varios desarrolladores han perdido tiempo intentando usar endpoints que ya no funcionan como se describe. Por favor, actualizar lo antes posible.",
+      "status": "Borrador",
+      "tags": ["tag-011"],
+      "createdAt": "2026-01-10",
+      "updatedAt": "2026-01-18"
+    },
+    {
+      "id": "issue-0007",
+      "companyId": "co-03",
+      "title": "Solicitud de nueva funcionalidad: Exportar reportes a Excel",
+      "description": "Los usuarios necesitan poder exportar los reportes del sistema a formato Excel para análisis offline. La funcionalidad debe permitir exportar tanto datos crudos como reportes con gráficos. Se requiere que el formato sea compatible con Excel 2016 y versiones posteriores.",
+      "externalLink": "",
+      "clientComments": "Esta funcionalidad es muy importante para nuestro equipo de análisis. Actualmente tienen que copiar y pegar datos manualmente, lo cual es muy ineficiente y propenso a errores. Una solución automatizada mejoraría significativamente su productividad.",
+      "status": "Producción",
+      "tags": ["tag-013", "tag-014"],
+      "createdAt": "2026-01-12",
+      "updatedAt": "2026-01-19"
+    },
+    {
+      "id": "issue-0008",
+      "companyId": "co-03",
+      "title": "Problema de rendimiento en dashboard con muchos widgets",
+      "description": "El dashboard se vuelve muy lento cuando se agregan más de 10 widgets. La carga inicial puede tomar hasta 30 segundos y la interacción con los widgets es muy lenta. Se necesita optimizar las consultas a la base de datos y posiblemente implementar paginación o carga lazy de widgets.",
+      "externalLink": "https://external-tracker.com/issue-0008",
+      "clientComments": "El rendimiento es inaceptable. Nuestros usuarios se quejan constantemente de la lentitud del dashboard. Algunos han dejado de usarlo completamente. Necesitamos una solución urgente o el producto perderá adopción.",
+      "status": "Borrador",
+      "tags": ["tag-015", "tag-016", "tag-017"],
+      "createdAt": "2026-01-05",
+      "updatedAt": "2026-01-20"
+    }
+  ],
+  "files": [
+    {
+      "id": "file-001",
+      "name": "test-results.csv",
+      "size": "32.0 KB",
+      "description": "test-results para Acme Corporation",
+      "upload_date": "2026-01-26",
+      "companyId": "co-01",
+      "linked_articles": ["issue-0001"]
+    },
+    {
+      "id": "file-002",
+      "name": "api-response.json",
+      "size": "4.0 KB",
+      "description": "api-response para Acme Corporation",
+      "upload_date": "2026-01-22",
+      "companyId": "co-01",
+      "linked_articles": ["issue-0002"]
+    },
+    {
+      "id": "file-003",
+      "name": "screenshot-bug.png",
+      "size": "500.0 KB",
+      "description": "screenshot-bug para Acme Corporation",
+      "upload_date": "2026-01-04",
+      "companyId": "co-01",
+      "linked_articles": ["issue-0001", "issue-0003"]
+    },
+    {
+      "id": "file-004",
+      "name": "error-log.txt",
+      "size": "2.0 KB",
+      "description": "error-log para Acme Corporation",
+      "upload_date": "2025-12-30",
+      "companyId": "co-01",
+      "linked_articles": []
+    },
+    {
+      "id": "file-005",
+      "name": "user-manual.docx",
+      "size": "2.0 MB",
+      "description": "user-manual para Acme Corporation",
+      "upload_date": "2025-11-27",
+      "companyId": "co-01",
+      "linked_articles": []
+    },
+    {
+      "id": "file-006",
+      "name": "config-backup.xml",
+      "size": "16.0 KB",
+      "description": "config-backup para Acme Corporation",
+      "upload_date": "2025-11-05",
+      "companyId": "co-01",
+      "linked_articles": []
+    },
+    {
+      "id": "file-007",
+      "name": "requirements.pdf",
+      "size": "1.0 MB",
+      "description": "requirements para Acme Corporation",
+      "upload_date": "2025-10-25",
+      "companyId": "co-01",
+      "linked_articles": []
+    },
+    {
+      "id": "file-008",
+      "name": "database-schema.sql",
+      "size": "8.0 KB",
+      "description": "database-schema para Acme Corporation",
+      "upload_date": "2025-10-14",
+      "companyId": "co-01",
+      "linked_articles": []
+    },
+    {
+      "id": "file-009",
+      "name": "access-logs.txt",
+      "size": "125.0 KB",
+      "description": "access-logs para Global Tech Solutions",
+      "upload_date": "2026-01-20",
+      "companyId": "co-02",
+      "linked_articles": ["issue-0004"]
+    },
+    {
+      "id": "file-010",
+      "name": "permissions-matrix.xlsx",
+      "size": "45.0 KB",
+      "description": "permissions-matrix para Global Tech Solutions",
+      "upload_date": "2026-01-15",
+      "companyId": "co-02",
+      "linked_articles": ["issue-0005"]
+    },
+    {
+      "id": "file-011",
+      "name": "security-audit.pdf",
+      "size": "3.5 MB",
+      "description": "security-audit para Global Tech Solutions",
+      "upload_date": "2026-01-10",
+      "companyId": "co-02",
+      "linked_articles": []
+    },
+    {
+      "id": "file-012",
+      "name": "api-documentation.md",
+      "size": "87.0 KB",
+      "description": "api-documentation para Innovation Labs Inc.",
+      "upload_date": "2026-01-18",
+      "companyId": "co-03",
+      "linked_articles": ["issue-0007"]
+    },
+    {
+      "id": "file-013",
+      "name": "performance-report.pdf",
+      "size": "2.8 MB",
+      "description": "performance-report para Innovation Labs Inc.",
+      "upload_date": "2026-01-12",
+      "companyId": "co-03",
+      "linked_articles": ["issue-0008"]
+    },
+    {
+      "id": "file-014",
+      "name": "widget-specs.docx",
+      "size": "156.0 KB",
+      "description": "widget-specs para Innovation Labs Inc.",
+      "upload_date": "2026-01-08",
+      "companyId": "co-03",
+      "linked_articles": []
+    }
+  ],
+  "images": [
+    {
+      "id": "img-001",
+      "name": "ui-mockup.png",
+      "dimensions": "1920x1080",
+      "size": "426.6 KB",
+      "description": "UI mockup para la página principal de Acme Corporation",
+      "upload_date": "2026-01-14",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img001/400/225",
+      "linked_articles": ["issue-0001"]
+    },
+    {
+      "id": "img-002",
+      "name": "screenshot-error.png",
+      "dimensions": "1280x720",
+      "size": "312.4 KB",
+      "description": "Captura del error de autenticación reportado",
+      "upload_date": "2026-01-12",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img002/400/225",
+      "linked_articles": ["issue-0001", "issue-0002"]
+    },
+    {
+      "id": "img-003",
+      "name": "dashboard-design.jpg",
+      "dimensions": "2560x1440",
+      "size": "1.2 MB",
+      "description": "Diseño del dashboard para el nuevo módulo de reportes",
+      "upload_date": "2026-01-10",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img003/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-004",
+      "name": "logo-variaciones.png",
+      "dimensions": "800x600",
+      "size": "156.2 KB",
+      "description": "Variaciones del logo corporativo para diferentes fondos",
+      "upload_date": "2026-01-08",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img004/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-005",
+      "name": "workflow-diagram.png",
+      "dimensions": "1600x900",
+      "size": "287.3 KB",
+      "description": "Diagrama de flujo del proceso de aprobación",
+      "upload_date": "2026-01-05",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img005/400/225",
+      "linked_articles": ["issue-0002"]
+    },
+    {
+      "id": "img-006",
+      "name": "mobile-app-screens.jpg",
+      "dimensions": "1440x2560",
+      "size": "845.1 KB",
+      "description": "Pantallas de la aplicación móvil versión 2.0",
+      "upload_date": "2025-12-28",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img006/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-007",
+      "name": "infographic-stats.png",
+      "dimensions": "1200x800",
+      "size": "523.7 KB",
+      "description": "Infografía de estadísticas del Q4 2025",
+      "upload_date": "2025-12-20",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img007/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-008",
+      "name": "team-photo.jpg",
+      "dimensions": "3000x2000",
+      "size": "2.1 MB",
+      "description": "Foto del equipo de desarrollo 2025",
+      "upload_date": "2025-12-15",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img008/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-009",
+      "name": "permission-matrix-screenshot.png",
+      "dimensions": "1920x1080",
+      "size": "398.5 KB",
+      "description": "Captura de la matriz de permisos actual",
+      "upload_date": "2026-01-18",
+      "companyId": "co-02",
+      "thumbnail_url": "https://picsum.photos/seed/img009/400/225",
+      "linked_articles": ["issue-0003", "issue-0004"]
+    },
+    {
+      "id": "img-010",
+      "name": "api-architecture.png",
+      "dimensions": "2400x1350",
+      "size": "567.2 KB",
+      "description": "Diagrama de arquitectura de la API REST",
+      "upload_date": "2026-01-15",
+      "companyId": "co-02",
+      "thumbnail_url": "https://picsum.photos/seed/img010/400/225",
+      "linked_articles": ["issue-0006"]
+    },
+    {
+      "id": "img-011",
+      "name": "security-audit-chart.jpg",
+      "dimensions": "1600x1200",
+      "size": "445.8 KB",
+      "description": "Gráfico de resultados de auditoría de seguridad",
+      "upload_date": "2026-01-10",
+      "companyId": "co-02",
+      "thumbnail_url": "https://picsum.photos/seed/img011/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-012",
+      "name": "user-flow-diagram.png",
+      "dimensions": "1800x1000",
+      "size": "312.9 KB",
+      "description": "Diagrama de flujo de usuario para onboarding",
+      "upload_date": "2026-01-05",
+      "companyId": "co-02",
+      "thumbnail_url": "https://picsum.photos/seed/img012/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-013",
+      "name": "performance-dashboard.png",
+      "dimensions": "1920x1080",
+      "size": "478.3 KB",
+      "description": "Dashboard de métricas de rendimiento",
+      "upload_date": "2026-01-20",
+      "companyId": "co-03",
+      "thumbnail_url": "https://picsum.photos/seed/img013/400/225",
+      "linked_articles": ["issue-0008"]
+    },
+    {
+      "id": "img-014",
+      "name": "feature-wireframe.jpg",
+      "dimensions": "1440x900",
+      "size": "234.6 KB",
+      "description": "Wireframe para la nueva funcionalidad de exportación",
+      "upload_date": "2026-01-17",
+      "companyId": "co-03",
+      "thumbnail_url": "https://picsum.photos/seed/img014/400/225",
+      "linked_articles": ["issue-0007"]
+    },
+    {
+      "id": "img-015",
+      "name": "widget-mockups.png",
+      "dimensions": "2560x1440",
+      "size": "892.4 KB",
+      "description": "Mockups de los nuevos widgets del dashboard",
+      "upload_date": "2026-01-12",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img015/400/225",
+      "linked_articles": ["issue-0008"]
+    },
+    {
+      "id": "img-016",
+      "name": "brand-guidelines.png",
+      "dimensions": "1200x800",
+      "size": "356.1 KB",
+      "description": "Guía de identidad visual de la marca",
+      "upload_date": "2026-01-08",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img016/400/225",
+      "linked_articles": []
+    },
+    {
+      "id": "img-017",
+      "name": "team-collaboration.jpg",
+      "dimensions": "3000x2000",
+      "size": "1.9 MB",
+      "description": "Foto del equipo colaborando en el proyecto",
+      "upload_date": "2026-01-02",
+      "companyId": "co-01",
+      "thumbnail_url": "https://picsum.photos/seed/img017/400/225",
+      "linked_articles": []
+    }
+  ]
+}

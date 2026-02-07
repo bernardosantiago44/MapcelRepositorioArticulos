@@ -1,0 +1,55 @@
+## --- .NET / Visual Studio ---
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+.buildlog
+*.user
+*.userosscache
+*.sln.docstates
+
+## --- User-specific / Secrets ---
+# Never check in appsettings.json secrets or local overrides
+appsettings.Development.json
+appsettings.Local.json
+*.secrets.json
+.microsoft.visualstudio.azure.user.json
+
+## --- VS Code ---
+.vscode/
+! .vscode/extensions.json
+! .vscode/launch.json
+! .vscode/tasks.json
+*.code-workspace
+
+## --- IntelliJ / JetBrains (Rider/IDEA) ---
+.idea/
+*.iws
+*.iml
+*.ipr
+# Ignore specific Rider/IntelliJ build caches
+atlassian-ide-plugin.xml
+.idea/shelf/
+.idea/contentModel.xml
+
+## --- Client-Side (MVC / Web) ---
+# If using LibMan or NPM for front-end assets
+node_modules/
+bower_components/
+wwwroot/lib/
+.package-lock.json
+dist/
+
+## --- Database / Entity Framework ---
+*.db
+*.db-shm
+*.db-wal
+# Don't ignore migrations, but ignore specific designer files if needed
+# Migrations/*.designer.cs
+
+## --- OS / Misc ---
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.log

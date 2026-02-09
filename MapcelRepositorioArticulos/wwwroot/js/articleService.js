@@ -251,68 +251,67 @@ const ArticleService = (function() {
   /**
    * Get articles filtered by company ID
    * Articles will have their tag IDs resolved to full tag objects
-   * @param {string} companyId - The company ID to filter articles by
+   * @param {object} params - Parameters for filtering articles
    * @returns {Promise<Array<Article>>} Promise resolving to array of filtered articles
    */
-  function getArticles(companyId) {
-    return loadMockData().then(data => {
-      const articles = data.articles || [];
-      const tags = data.tags || [];
-      
-      // Filter articles by company
-      const filteredArticles = articles.filter(article => article.companyId === companyId);
-      
-      // Resolve tag IDs to full tag objects for each article
-      const articlesWithResolvedTags = filteredArticles.map(article => {
-        if (article.tags && Array.isArray(article.tags)) {
-          const resolvedTags = article.tags.map(tagId => {
-            const tag = tags.find(t => t.id === tagId);
-            if (tag) {
-              return tag;
-            }
-            return null;
-          }).filter(tag => tag !== null);
-          
-          return Object.assign({}, article, { tags: resolvedTags });
-        }
-        return article;
-      });
-      
-      return articlesWithResolvedTags;
+  async function getArticles(params = {}) {
+    const qs = new URLSearchParams();
+
+    if (params.companyId) qs.set("companyId", params.companyId);
+
+    // FIX: ensure search is string, not function
+    const searchValue =
+      typeof params.search === "function"
+        ? params.search()              // if caller passed function
+        : params.search;
+
+    if (searchValue && String(searchValue).trim() !== "")
+      qs.set("search", String(searchValue).trim());
+
+    if (params.status && params.status !== "Todos")
+      qs.set("status", params.status);
+
+    if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+    if (params.dateTo) qs.set("dateTo", params.dateTo);
+
+    if (params.tagId && params.tagId !== "Todas")
+      qs.set("tagId", params.tagId);
+
+    qs.set("page", String(params.page ?? 1));
+    qs.set("pageSize", String(params.pageSize ?? 50));
+
+    const url = `/api/articles?${qs.toString()}`;
+
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json" }
     });
+
+    if (!res.ok) throw new Error(`getArticles failed: ${res.status}`);
+    return await res.json();
   }
+
   
-  /**
-   * Get a single article by ID with resolved tag objects
-   * @param {string} articleId - The article ID
-   * @returns {Promise<Article|null>} Promise resolving to article object or null
-   */
-  function getArticleById(articleId) {
-    return loadMockData().then(data => {
-      const articles = data.articles || [];
-      const tags = data.tags || [];
-      const article = articles.find(article => article.id === articleId);
-      
-      if (!article) {
-        return null;
-      }
-      
-      // Resolve tag IDs to full tag objects
-      if (article.tags && Array.isArray(article.tags)) {
-        const resolvedTags = article.tags.map(tagId => {
-          const tag = tags.find(t => t.id === tagId);
-          if (tag) {
-            return tag;
-          }
-          return null;
-        }).filter(tag => tag !== null);
-        
-        return Object.assign({}, article, { tags: resolvedTags });
-      }
-      
-      return article;
+/**
+ * Get a single article from backend
+ * Server already resolves tag names (no client mapping)
+ * @param {string} articleId
+ * @returns {Promise<Object|null>}
+ */
+  async function getArticleById(articleId) {
+    if (!articleId) return null;
+
+    const res = await fetch(`/api/articles/${encodeURIComponent(articleId)}`, {
+      headers: { "Accept": "application/json" }
     });
+
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`getArticleById failed: ${res.status}`);
+
+    const article = await res.json();
+
+    return article;
   }
+
   
   /**
    * Get multiple articles by their IDs (bulk fetch)

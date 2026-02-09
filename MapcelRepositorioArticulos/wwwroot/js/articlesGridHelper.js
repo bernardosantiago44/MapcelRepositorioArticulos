@@ -95,7 +95,7 @@ function initializeArticlesGrid(gridCell, articlesData) {
   articlesGrid.setPagingSkin('bricks', 'dhx_skyblue');
   
   // Populate grid with article data
-  articlesData.forEach(article => {
+  articlesData.data.forEach(article => {
     const statusConfig = getStatusConfiguration(article.status);
     const rowId = article.id;
     

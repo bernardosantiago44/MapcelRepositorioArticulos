@@ -1,4 +1,5 @@
-using System.Data;
+using MapcelRepositorioArticulos.Models;
+using MapcelRepositorioArticulos.Repository;
 using Microsoft.Data.SqlClient;
 using Serilog;
 
@@ -10,40 +11,50 @@ Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
     .WriteTo.Console()
     .WriteTo.File(
-        path:"logs/log-.txt",
+        path: "logs/log-.txt",
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 14,
         shared: true
     )
     .CreateLogger();
+
 builder.Host.UseSerilog();
 
-// Add services to the container.
+// MVC + API controllers
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddTransient<SqlConnection>(_ => new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
+// DB connection factory (keep for later SQL repo)
+builder.Services.AddTransient<SqlConnection>(_ =>
+    new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// In-memory mock store (server-side)
+builder.Services.AddSingleton<RepositoryStore>();
+
+// In-memory repositories (swap to SQL later)
+builder.Services.AddSingleton<IArticleRepository, InMemoryArticleRepository>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+
 app.UseRouting();
 
 app.UseAuthorization();
 
-app.MapStaticAssets();
+// Map API controllers (/api/...)
+app.MapControllers();
 
+// Existing MVC route
 app.MapControllerRoute(
-        name: "default",
-        pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}"
+);
 
 app.Run();

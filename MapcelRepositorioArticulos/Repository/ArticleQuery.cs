@@ -22,9 +22,11 @@ public record ArticleQuery(
 
 public interface IArticleRepository
 {
+    // Articles
     PagedResult<ArticleRowDto> GetArticles(ArticleQuery query);
-    ArticleRowDto? GetArticleById(string id);
+    ArticleDetailsDto? GetArticleById(string id);
     
+    // Tags
     IReadOnlyList<TagDto> GetTagsByCompany(string companyId);
     TagDto? GetTagById(string tagId);
 }

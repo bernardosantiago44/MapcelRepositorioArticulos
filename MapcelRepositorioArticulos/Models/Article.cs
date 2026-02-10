@@ -1,5 +1,7 @@
 
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace MapcelRepositorioArticulos.Models;
 
 public class Article
@@ -73,15 +75,33 @@ public sealed class ArticleDetailsDto
 {
     public required string Id { get; init; }
     public required string CompanyId { get; init; }
-    public required string Title { get; init; }
+    public required string CompanyName { get; init; }
+    public string Title { get; init; }
     public string? Description { get; init; }
     public string? ExternalLink { get; init; }
     public string? ClientComments { get; init; }
     public required string Status { get; init; }
 
-    public IReadOnlyList<string> Tags { get; init; } = [];
-    public IReadOnlyList<string> TagNames { get; init; } = [];
+    public IReadOnlyList<string> Tags { get; init; }
+    public IReadOnlyList<string> TagNames { get; init; }
 
     public required DateOnly CreatedAt { get; init; }
     public required DateOnly UpdatedAt { get; init; }
+
+    [SetsRequiredMembers]
+    public ArticleDetailsDto(Article article, string companyName, List<string> tagNames)
+    {
+        Id = article.Id;
+        CompanyId = article.CompanyId;
+        CompanyName = companyName;
+        Title = article.Title;
+        Description = article.Description;
+        ExternalLink = article.ExternalLink;
+        ClientComments = article.ClientComments;
+        Status = article.Status;
+        Tags = article.Tags;
+        TagNames = tagNames;
+        CreatedAt = article.CreatedAt;
+        UpdatedAt = article.UpdatedAt;
+    }
 }

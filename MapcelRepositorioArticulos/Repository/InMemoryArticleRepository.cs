@@ -1,4 +1,5 @@
 using MapcelRepositorioArticulos.Models;
+using Microsoft.JSInterop.Infrastructure;
 
 namespace MapcelRepositorioArticulos.Repository;
 
@@ -69,9 +70,9 @@ public class InMemoryArticleRepository: IArticleRepository
         return new PagedResult<ArticleRowDto> { Data = pageItems, Total = total };
     }
 
-    public ArticleRowDto? GetArticleById(string id)
+    public ArticleDetailsDto? GetArticleById(string id)
     {
-        var article = _store.Articles.FirstOrDefault(a => a.Id == id);
+        Article? article = _store.Articles.FirstOrDefault(a => a.Id == id);
         if (article is null)
             return null;
 
@@ -85,18 +86,7 @@ public class InMemoryArticleRepository: IArticleRepository
             )
             .ToList();
 
-        return new ArticleRowDto
-        {
-            Id = article.Id,
-            CompanyId = article.CompanyId,
-            CompanyName = companyName,
-            Title = article.Title,
-            Description = article.Description,
-            Status = article.Status,
-            Tags = article.Tags,
-            CreatedAt = article.CreatedAt,
-            UpdatedAt = article.UpdatedAt
-        };
+        return new ArticleDetailsDto(article, companyName, tagNames);
     }
     
     public IReadOnlyList<TagDto> GetTagsByCompany(string companyId)

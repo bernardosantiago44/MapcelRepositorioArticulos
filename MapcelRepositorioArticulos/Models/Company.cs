@@ -13,5 +13,4 @@ public class Company
         Settings = settings;
     }
 
-    public Company() { }
 }

@@ -6,6 +6,10 @@ namespace MapcelRepositorioArticulos.Repository;
 public class InMemoryArticleRepository: IArticleRepository
 {
     private readonly RepositoryStore _store;
+    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase) 
+    { 
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg" 
+    };
     
     public InMemoryArticleRepository(RepositoryStore store) => _store = store;
 
@@ -15,8 +19,8 @@ public class InMemoryArticleRepository: IArticleRepository
         var page = query.Page < 1 ? 1 : query.Page;
         var pageSize = query.PageSize is < 1 or > 500 ? 50 : query.PageSize;
 
-        var companiesById = _store.Companies.ToDictionary(x => x.Id, x => x.Name);
-        var tagsById = _store.Tags.ToDictionary(x => x.Id, x => x.Name);
+        var companiesById = _store.Companies.ToDictionary(company => company.Id, company => company.Name);
+        var tagsById = _store.Tags.ToDictionary(tag => tag.Id, tag => tag.Name);
 
         IEnumerable<Article> articles = _store.Articles;
 
@@ -68,7 +72,7 @@ public class InMemoryArticleRepository: IArticleRepository
             })
             .ToList();
 
-        return new PagedResult<ArticleRowDto> { Data = pageItems, Total = total };
+        return new PagedResult<ArticleRowDto> { Data = pageItems, Total = total, Page = page, PageSize = pageSize };
     }
 
     public ArticleDetailsDto? GetArticleById(string id)
@@ -140,5 +144,87 @@ public class InMemoryArticleRepository: IArticleRepository
         if (string.IsNullOrWhiteSpace(id)) return null;
         
         return _store.Companies.FirstOrDefault(c => c.Id == id);
+    }
+    
+    // Files and Images
+    public PagedResult<FileAsset> GetImages(FileQuery query)
+    {
+        // Force the ImagesOnly flag to true and reuse the main logic
+        return GetFiles(query with { ImagesOnly = true });
+    }
+    
+    public PagedResult<FileAsset> GetFiles(FileQuery query)
+    {
+        IQueryable<FileAsset> queryable;
+        if (query.ImagesOnly)
+        {
+            queryable = _store.Images.AsQueryable();
+        }
+        else
+        {
+            queryable = _store.Files.AsQueryable();
+        }
+
+        // 1. Filter by Company
+        if (!string.IsNullOrWhiteSpace(query.CompanyId))
+        {
+            queryable = queryable.Where(f => f.CompanyId == query.CompanyId);
+        }
+
+        // 2. Filter by Search Term
+        if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+        {
+            queryable = queryable.Where(f => 
+                f.Name.Contains(query.SearchTerm, StringComparison.OrdinalIgnoreCase) || 
+                f.Description.Contains(query.SearchTerm, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // 3. Filter by specific extensions (Safe lookup against the new property)
+        if (query.IncludeFileExtensions is { Length: > 0 })
+        {
+            // Normalize query extensions to include the dot (e.g., "pdf" -> ".pdf")
+            var targetExtensions = query.IncludeFileExtensions
+                .Select(e => e.StartsWith('.') ? e : $".{e}")
+                .ToList();
+
+            // Check if the file's extension is in the list
+            queryable = queryable.Where(f => targetExtensions.Contains(f.Extension, StringComparer.OrdinalIgnoreCase));
+        }
+
+        // 5. Date Filters
+        if (query.DateFrom.HasValue)
+        {
+            queryable = queryable.Where(f => f.UploadDate >= query.DateFrom.Value);
+        }
+
+        if (query.DateTo.HasValue)
+        {
+            queryable = queryable.Where(f => f.UploadDate <= query.DateTo.Value);
+        }
+
+        // 6. Pagination
+        var totalCount = queryable.Count();
+        var pageIndex = Math.Max(1, query.Page) - 1;
+
+        var items = queryable
+            .Skip(pageIndex * query.PageSize)
+            .Take(query.PageSize)
+            .ToList();
+
+        return new PagedResult<FileAsset> { Data = items, Total = totalCount, Page = query.Page, PageSize = query.PageSize};
+    }
+    
+    public FileAsset? GetFileById(string id)
+    {
+        var files = _store.Files.AsQueryable();
+        return files.FirstOrDefault(f => f.Id == id);
+    }
+
+    public FileAsset? GetImageById(string id)
+    {
+        var files = _store.Files.AsQueryable();
+        return files.FirstOrDefault(f => 
+            f.Id == id && 
+            ImageExtensions.Contains(f.Extension));
     }
 }

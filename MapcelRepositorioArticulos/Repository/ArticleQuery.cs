@@ -6,8 +6,22 @@ public sealed class PagedResult<T>
 {
     public required IReadOnlyList<T> Data { get; init; }
     public required int Total { get; init; }
+    
+    public required int Page { get; init; }
+    
+    public required int PageSize { get; init; }
 }
 
+public record FileQuery(
+    string? CompanyId,
+    string? SearchTerm,
+    bool ImagesOnly,
+    string[]? IncludeFileExtensions,
+    DateOnly? DateFrom,
+    DateOnly? DateTo,
+    int Page,
+    int PageSize
+);
 
 public record ArticleQuery(
     string? CompanyId,
@@ -33,4 +47,10 @@ public interface IArticleRepository
     // Companies
     IEnumerable<Company> GetCompanies();
     Company? GetCompanyById(string id);
+    
+    // Images
+    PagedResult<FileAsset> GetImages(FileQuery query);
+    PagedResult<FileAsset> GetFiles(FileQuery query);
+    FileAsset? GetFileById(string id);
+    FileAsset? GetImageById(string id);
 }

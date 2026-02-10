@@ -72,21 +72,25 @@ const ArticleService = (function() {
     if (tagCache && tagCache[companyId]) {
       return Promise.resolve(tagCache[companyId]);
     }
-    
-    return loadMockData().then(data => {
-      const tags = data.tags || [];
-      
-      // Filter tags by company
-      const companyTags = tags.filter(tag => tag.companyId === companyId);
-      
+
+    return fetch(`/api/tags?companyId=${encodeURIComponent(companyId)}`, {
+      headers: { "Accept": "application/json" }
+    })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error("Failed to load tags: " + res.status);
+      }
+
+      const companyTags = res.json();
+
       // Initialize cache if needed
       if (!tagCache) {
         tagCache = {};
       }
-      
+
       // Cache the tags for this company
       tagCache[companyId] = companyTags;
-      
+
       return companyTags;
     });
   }
@@ -97,10 +101,29 @@ const ArticleService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to tag object or null
    */
   function getTagById(tagId) {
-    return loadMockData().then(data => {
-      const tags = data.tags || [];
-      const tag = tags.find(t => t.id === tagId);
-      return tag || null;
+    // Check if tag is in cache
+    if (tagCache) {
+      for (const companyId in tagCache) {
+        const tags = tagCache[companyId];
+        const tag = tags.find(t => t.id === tagId);
+        if (tag) {
+          return Promise.resolve(tag);
+        }
+      }
+    }
+
+    // Otherwise, fetch specific one from server
+    return fetch(`/api/tags/${encodeURIComponent(tagId)}`, {
+      headers: { "Accept": "application/json" }
+    })
+    .then(function (res) {
+      if (res.status === 404) return null;
+
+      if (!res.ok) {
+        throw new Error("Failed to load tag: " + res.status);
+      }
+
+      return res.json();
     });
   }
   
@@ -213,42 +236,6 @@ const ArticleService = (function() {
   }
   
   /**
-   * Get tags specific to a company (LEGACY method for backward compatibility)
-   * Tags are extracted from articles belonging to the company and deduplicated
-   * @param {string} companyId - The company ID to filter tags by
-   * @returns {Promise<Array<{label: string, color: string}>>} Promise resolving to array of unique tags
-   * @deprecated Use getTags() instead for the new centralized tag management
-   */
-  function getTagsByCompany(companyId) {
-    return loadMockData().then(data => {
-      const articles = data.articles || [];
-      
-      // Filter articles by company
-      const companyArticles = articles.filter(article => article.companyId === companyId);
-      
-      // Extract all tags from company articles
-      const allTags = [];
-      companyArticles.forEach(article => {
-        if (article.tags && Array.isArray(article.tags)) {
-          article.tags.forEach(tag => {
-            allTags.push(tag);
-          });
-        }
-      });
-      
-      // Deduplicate tags by label
-      const uniqueTagsMap = new Map();
-      allTags.forEach(tag => {
-        if (!uniqueTagsMap.has(tag.label)) {
-          uniqueTagsMap.set(tag.label, tag);
-        }
-      });
-      
-      return Array.from(uniqueTagsMap.values());
-    });
-  }
-  
-  /**
    * Get articles filtered by company ID
    * Articles will have their tag IDs resolved to full tag objects
    * @param {object} params - Parameters for filtering articles
@@ -287,7 +274,28 @@ const ArticleService = (function() {
     });
 
     if (!res.ok) throw new Error(`getArticles failed: ${res.status}`);
-    return await res.json();
+
+    const response = await res.json();
+    const allArticles = response.data || [];
+
+    const tags = await getTags(params.companyId);
+
+    // Resolve tag IDs to full tag objects
+    const articlesWithResolvedTags = allArticles.map(article => {
+      // Check if article.tags exists and is an array
+      if (Array.isArray(article.tags)) {
+        const resolvedTags = article.tags
+          .map(tagId => tags.find(t => t.id === tagId))
+          .filter(tag => tag !== undefined && tag !== null); // Remove unfound tags
+        
+        // Use spread operator for cleaner immutable update
+        return { ...article, tags: resolvedTags };
+      }
+      
+      return article;
+    });
+
+    return articlesWithResolvedTags;
   }
 
   
@@ -308,6 +316,19 @@ const ArticleService = (function() {
     if (!res.ok) throw new Error(`getArticleById failed: ${res.status}`);
 
     const article = await res.json();
+    const tags = await getTags(article.companyId);  // Get tags for the company to resolve tag IDs
+
+    if (article.tags && Array.isArray(article.tags)) {
+      const resolvedTags = article.tags.map(tagId => {
+        const tag = tags.find(t => t.id === tagId);
+        if (tag) {
+          return tag;
+        }
+        return null;
+      }).filter(tag => tag !== null);
+
+      return Object.assign({}, article, { tags: resolvedTags });
+    }
 
     return article;
   }
@@ -498,7 +519,6 @@ const ArticleService = (function() {
     createTag: createTag,
     updateTag: updateTag,
     deleteTag: deleteTag,
-    getTagsByCompany: getTagsByCompany,  // Legacy method for backward compatibility
     getArticles: getArticles,
     getArticleById: getArticleById,
     getArticlesByIds: getArticlesByIds,  // Bulk fetch for multiple articles

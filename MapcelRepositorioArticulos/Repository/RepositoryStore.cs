@@ -1,4 +1,6 @@
-namespace MapcelRepositorioArticulos.Models;
+using MapcelRepositorioArticulos.Models;
+
+namespace MapcelRepositorioArticulos.Repository;
 
 /// <summary>
 /// For testing purposes only, do NOT use elsewhere.

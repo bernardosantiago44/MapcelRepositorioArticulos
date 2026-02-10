@@ -60,9 +60,7 @@ public class InMemoryArticleRepository: IArticleRepository
                 Title = a.Title,
                 Description = a.Description,
                 Status = a.Status,
-                TagIds = string.Join(",", a.Tags),
-                TagNames = string.Join(",",
-                    a.Tags.Select(tid => tagsById.TryGetValue(tid, out var tn) ? tn : tid)),
+                Tags = a.Tags,
                 CreatedAt = a.CreatedAt,
                 UpdatedAt = a.UpdatedAt
             })
@@ -95,10 +93,48 @@ public class InMemoryArticleRepository: IArticleRepository
             Title = article.Title,
             Description = article.Description,
             Status = article.Status,
-            TagIds = string.Join(",", article.Tags),
-            TagNames = string.Join(",", tagNames),
+            Tags = article.Tags,
             CreatedAt = article.CreatedAt,
             UpdatedAt = article.UpdatedAt
         };
     }
+    
+    public IReadOnlyList<TagDto> GetTagsByCompany(string companyId)
+    {
+        if (string.IsNullOrWhiteSpace(companyId))
+            return Array.Empty<TagDto>();
+
+        return _store.Tags
+            .Where(t => t.CompanyId == companyId)
+            .OrderBy(t => t.Name)
+            .Select(t => new TagDto
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Color = t.Color,
+                Description = t.Description,
+                CompanyId = t.CompanyId
+            })
+            .ToList();
+    }
+
+    public TagDto? GetTagById(string tagId)
+    {
+        if (string.IsNullOrWhiteSpace(tagId))
+            return null;
+
+        var tag = _store.Tags.FirstOrDefault(t => t.Id == tagId);
+        if (tag is null)
+            return null;
+
+        return new TagDto
+        {
+            Id = tag.Id,
+            Name = tag.Name,
+            Color = tag.Color,
+            Description = tag.Description,
+            CompanyId = tag.CompanyId
+        };
+    }
+
 }

@@ -24,4 +24,7 @@ public interface IArticleRepository
 {
     PagedResult<ArticleRowDto> GetArticles(ArticleQuery query);
     ArticleRowDto? GetArticleById(string id);
+    
+    IReadOnlyList<TagDto> GetTagsByCompany(string companyId);
+    TagDto? GetTagById(string tagId);
 }

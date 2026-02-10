@@ -40,15 +40,20 @@ const FileService = (function() {
    * @param {string} companyId - The company ID to filter files by
    * @returns {Promise<Array<Object>>} Promise resolving to array of file objects
    */
-  function getFiles(companyId) {
-    return loadMockData().then(data => {
-      const files = data.files || [];
-      
-      // Filter files by company
-      const companyFiles = files.filter(file => file.companyId === companyId);
-      
-      return companyFiles;
+  function getFiles(companyId, page = 1, pageSize = 10) {
+    const params = new URLSearchParams({
+      companyId,
+      imagesOnly: false,
+      page,
+      pageSize
     });
+
+    return fetch(`/api/files?${params}`)
+      .then(response => {
+        if (!response.ok) throw new Error("API Error");
+        return response.json();
+      })
+      .then(pagedResult => pagedResult.items);
   }
   
   /**
@@ -57,12 +62,22 @@ const FileService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to file object or null
    */
   function getFileById(fileId) {
-    return loadMockData().then(data => {
-      const files = data.files || [];
-      const file = files.find(f => f.id === fileId);
-      
-      return file || null;
-    });
+    return fetch(`/api/files/${fileId}`)
+      .then(response => {
+        if (response.status === 404) {
+          return null;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.statusText}`);
+        }
+
+        return response.json();
+      })
+      .catch(error => {
+        console.error("Error fetching file:", error);
+        return null;
+      });
   }
   
   /**

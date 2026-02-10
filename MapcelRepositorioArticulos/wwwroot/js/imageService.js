@@ -30,15 +30,20 @@ const ImageService = (function() {
    * @param {string} companyId - The company ID to filter images by
    * @returns {Promise<Array<Object>>} Promise resolving to array of image objects
    */
-  function getImages(companyId) {
-    return loadMockData().then(data => {
-      const images = data.images || [];
-      
-      // Filter images by company
-      const companyImages = images.filter(image => image.companyId === companyId);
-      
-      return companyImages;
+  function getImages(companyId, page = 1, pageSize = 10) {
+    const params = new URLSearchParams({
+      companyId,
+      imagesOnly: true,
+      page,
+      pageSize
     });
+
+    return fetch(`/api/files?${params}`)
+      .then(response => {
+        if (!response.ok) throw new Error("API Error");
+        return response.json();
+      })
+      .then(pagedResult => pagedResult.items);
   }
   
   /**
@@ -47,12 +52,24 @@ const ImageService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to image object or null
    */
   function getImageById(imageId) {
-    return loadMockData().then(data => {
-      const images = data.images || [];
-      const image = images.find(img => img.id === imageId);
-      
-      return image || null;
-    });
+    // We call the specific endpoint for an image by ID
+    return fetch(`/api/files/images/${imageId}`)
+      .then(response => {
+        // If the server returns 404, we return null to match your original logic
+        if (response.status === 404) {
+          return null;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.statusText}`);
+        }
+
+        return response.json();
+      })
+      .catch(error => {
+        console.error("Error fetching image:", error);
+        return null; 
+      });
   }
   
   /**

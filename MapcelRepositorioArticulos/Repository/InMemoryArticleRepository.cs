@@ -9,6 +9,7 @@ public class InMemoryArticleRepository: IArticleRepository
     
     public InMemoryArticleRepository(RepositoryStore store) => _store = store;
 
+    // Artuckes
     public PagedResult<ArticleRowDto> GetArticles(ArticleQuery query)
     {
         var page = query.Page < 1 ? 1 : query.Page;
@@ -89,6 +90,7 @@ public class InMemoryArticleRepository: IArticleRepository
         return new ArticleDetailsDto(article, companyName, tagNames);
     }
     
+    // Tags
     public IReadOnlyList<TagDto> GetTagsByCompany(string companyId)
     {
         if (string.IsNullOrWhiteSpace(companyId))
@@ -127,4 +129,16 @@ public class InMemoryArticleRepository: IArticleRepository
         };
     }
 
+    // Companies
+    public IEnumerable<Company> GetCompanies()
+    {
+        return  _store.Companies;
+    }
+
+    public Company? GetCompanyById(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return null;
+        
+        return _store.Companies.FirstOrDefault(c => c.Id == id);
+    }
 }

@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace MapcelRepositorioArticulos.Models;
-using MapcelRepositorioArticulos.Repository;
+using Repository;
 
 public static class ArticlesRepositoryParser
 {

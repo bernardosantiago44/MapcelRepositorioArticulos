@@ -29,4 +29,8 @@ public interface IArticleRepository
     // Tags
     IReadOnlyList<TagDto> GetTagsByCompany(string companyId);
     TagDto? GetTagById(string tagId);
+    
+    // Companies
+    IEnumerable<Company> GetCompanies();
+    Company? GetCompanyById(string id);
 }

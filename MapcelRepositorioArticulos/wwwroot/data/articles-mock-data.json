@@ -45,6 +45,15 @@
         "allowUserTagCreation": false,
         "requireClientComments": false
       }
+    },
+    {
+      "id": "co-04",
+      "name": "ABC Labs Inc.",
+      "settings": {
+        "allowUserUploads": true,
+        "allowUserTagCreation": false,
+        "requireClientComments": false
+      }
     }
   ],
   "articles": [

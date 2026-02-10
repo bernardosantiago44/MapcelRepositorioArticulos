@@ -9,6 +9,7 @@ const ArticleService = (function() {
   // Cache for mock data to avoid multiple file loads
   let mockDataCache = null;
   let tagCache = null;  // Separate cache for tags by company
+  let companiesCache = new Map(); // Company map cache
   
   /**
    * Clear the data cache (useful for development/testing)
@@ -16,6 +17,7 @@ const ArticleService = (function() {
   function clearCache() {
     mockDataCache = null;
     tagCache = null;
+    companiesCache.clear();
   }
   
   /**
@@ -23,6 +25,10 @@ const ArticleService = (function() {
    */
   function clearTagCache() {
     tagCache = null;
+  }
+
+  function clearCompaniesCache() {
+    companiesCache.clear();
   }
   
   /**
@@ -57,9 +63,29 @@ const ArticleService = (function() {
    * @returns {Promise<Array<Company>>} Promise resolving to array of company objects
    */
   function getCompanies() {
-    return loadMockData().then(data => {
-      return data.companies || [];
+    if (companiesCache.size > 0) {
+      return Promise.resolve(Array.from(companiesCache.values()));
+    }
+
+    const companies =  fetch(`/api/companies`, {
+      headers: { "Accept": "application/json" }
+    })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error("Failed to load companies: " + res.status);
+      }
+
+      return res.json();
+    })
+    .then(function(data) {
+      // Cache companies in map for quick access
+      data.forEach(company => {
+        companiesCache.set(company.id, company);
+      });
+      return data;
     });
+
+    return companies;
   }
   
   /**

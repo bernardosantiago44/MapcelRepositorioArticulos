@@ -51,6 +51,7 @@ public class ArticleRowDto
     public required string CompanyId { get; init; }
     public required string CompanyName { get; init; }
     public required string Title { get; init; }
+    public required string Description { get; init; }
     public required string Status { get; init; }
     public required string TagIds { get; init; } 
     public required string TagNames { get; init; }

@@ -8,20 +8,20 @@ public class FileAsset(
     DateOnly uploadDate, 
     string companyId, 
     IReadOnlyList<string> linkedArticles,
-    Uri? thumbnailUri,
+    Uri? thumbnailUrl,
     long? width,
     long? height
 )
 {
-    private string Id { get; set; } = id;
-    string Name { get; set; } = name;
-    long SizeBytes { get; set; } = sizeBytes;
-    string Description { get; set; } = description;
-    private DateOnly UploadDate { get; set; } = uploadDate;
-    string CompanyId { get; set; }  = companyId;
-    IReadOnlyList<string> LinkedArticles { get; set; } = linkedArticles;
-    Uri? ThumbnailUrl { get; set; } = thumbnailUri;
-    long? Width { get; set; } = width;
-    long? Height { get; set; } = height;
-
+    public string Id { get; set; } = id;
+    public string Name { get; set; } = name;
+    public long SizeBytes { get; set; } = sizeBytes;
+    public string Description { get; set; } = description;
+    public DateOnly UploadDate { get; set; } = uploadDate;
+    public string CompanyId { get; set; }  = companyId;
+    public IReadOnlyList<string> LinkedArticles { get; set; } = linkedArticles;
+    public Uri? ThumbnailUrl { get; set; } = thumbnailUrl;
+    public long? Width { get; set; } = width;
+    public long? Height { get; set; } = height;
+    
 }

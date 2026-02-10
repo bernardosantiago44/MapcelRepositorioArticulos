@@ -12,4 +12,6 @@ public class Company
         Name = name;
         Settings = settings;
     }
+
+    public Company() { }
 }

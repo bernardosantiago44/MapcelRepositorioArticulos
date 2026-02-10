@@ -21,7 +21,7 @@ public class InMemoryArticleRepository: IArticleRepository
         if (query.CompanyId is not null)
             articles = articles.Where(a => a.CompanyId == query.CompanyId);
 
-        if (query.Status is not null && query.Status != ArticleStatus.All)
+        if (query.Status is not null && query.Status != "all")
             articles = articles.Where(a => a.Status.Equals(query.Status));
 
         if (query.DateFrom is not null)
@@ -38,7 +38,7 @@ public class InMemoryArticleRepository: IArticleRepository
                 a.Title.Contains(searchQuery) ||
                 a.Description.Contains(searchQuery) ||
                 (a.ClientComments?.Contains(searchQuery) ?? true) ||
-                a.TagIds.Any(tid => tagsById.TryGetValue(tid, out var tn) && tn.Contains(searchQuery)) ||
+                a.Tags.Any(tid => tagsById.TryGetValue(tid, out var tn) && tn.Contains(searchQuery)) ||
                 (companiesById.TryGetValue(a.CompanyId, out var cn) && cn.Contains(searchQuery))
             );
         }
@@ -58,10 +58,10 @@ public class InMemoryArticleRepository: IArticleRepository
                 CompanyId = a.CompanyId,
                 CompanyName = companiesById.TryGetValue(a.CompanyId, out var cn) ? cn : a.CompanyId.ToString(),
                 Title = a.Title,
-                Status = StatusToString(a.Status),
-                TagIds = string.Join(",", a.TagIds),
+                Status = a.Status,
+                TagIds = string.Join(",", a.Tags),
                 TagNames = string.Join(",",
-                    a.TagIds.Select(tid => tagsById.TryGetValue(tid, out var tn) ? tn : tid)),
+                    a.Tags.Select(tid => tagsById.TryGetValue(tid, out var tn) ? tn : tid)),
                 CreatedAt = a.CreatedAt,
                 UpdatedAt = a.UpdatedAt
             })
@@ -80,7 +80,7 @@ public class InMemoryArticleRepository: IArticleRepository
                               .FirstOrDefault(c => c.Id == article.CompanyId)?.Name
                           ?? article.CompanyId;
 
-        var tagNames = article.TagIds
+        var tagNames = article.Tags
             .Select(tagId =>
                 _store.Tags.FirstOrDefault(t => t.Id == tagId)?.Name ?? tagId
             )
@@ -92,23 +92,11 @@ public class InMemoryArticleRepository: IArticleRepository
             CompanyId = article.CompanyId,
             CompanyName = companyName,
             Title = article.Title,
-            Status = StatusToString(article.Status),
-            TagIds = string.Join(",", article.TagIds),
+            Status = article.Status,
+            TagIds = string.Join(",", article.Tags),
             TagNames = string.Join(",", tagNames),
             CreatedAt = article.CreatedAt,
             UpdatedAt = article.UpdatedAt
         };
-    }
-    
-    static string StatusToString(ArticleStatus status)
-    {
-        switch(status)
-        {
-            case ArticleStatus.Production: return "Producción";
-            case ArticleStatus.All: return "Todos";
-            case ArticleStatus.Closed: return "Cerrado";
-            case ArticleStatus.Draft: return "Borrador";
-            default: return "Todos";
-        }
     }
 }

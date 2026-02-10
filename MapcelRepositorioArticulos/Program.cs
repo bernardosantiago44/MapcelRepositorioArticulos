@@ -28,7 +28,19 @@ builder.Services.AddTransient<SqlConnection>(_ =>
     new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // In-memory mock store (server-side)
-builder.Services.AddSingleton<RepositoryStore>();
+builder.Services.AddSingleton<RepositoryStore>(sp =>
+{
+    var env = sp.GetRequiredService<IWebHostEnvironment>();
+
+    var path = Path.Combine(
+        env.ContentRootPath,
+        "wwwroot",
+        "data",
+        "articles-mock-data.json"
+    );
+
+    return ArticlesRepositoryParser.FromFile(path);
+});
 
 // In-memory repositories (swap to SQL later)
 builder.Services.AddSingleton<IArticleRepository, InMemoryArticleRepository>();

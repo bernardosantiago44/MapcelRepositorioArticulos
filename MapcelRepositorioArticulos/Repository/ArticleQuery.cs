@@ -12,7 +12,7 @@ public sealed class PagedResult<T>
 public record ArticleQuery(
     string? CompanyId,
     string? Search,
-    ArticleStatus? Status,
+    string? Status,
     DateOnly? DateFrom,
     DateOnly? DateTo,
     string[]? TagIds,

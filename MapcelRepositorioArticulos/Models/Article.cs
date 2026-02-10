@@ -10,8 +10,8 @@ public class Article
     public string Description { get; set; }
     public string ExternalLink { get; set; }
     public string? ClientComments { get; set; }
-    public ArticleStatus Status { get; set; }
-    public IReadOnlyList<string> TagIds { get; set; }
+    public string Status { get; set; }
+    public IReadOnlyList<string> Tags { get; set; }
     public DateOnly CreatedAt { get; set; }
     public DateOnly UpdatedAt { get; set; }
 
@@ -22,8 +22,8 @@ public class Article
         string description,
         string externalLink,
         string clientComments,
-        ArticleStatus status,
-        IReadOnlyList<string> tagIds,
+        string status,
+        IReadOnlyList<string> tags,
         DateOnly createdAt,
         DateOnly updatedAt 
     )
@@ -35,7 +35,7 @@ public class Article
         ExternalLink = externalLink;
         ClientComments = clientComments;
         Status = status;
-        TagIds = tagIds;
+        Tags = tags;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
     }

@@ -173,7 +173,7 @@ const ArticleDetailUI = (function() {
   function renderImageThumbnail(image) {
     const escapedId = Utils.escapeHtml(image.id);
     const escapedName = Utils.escapeHtml(image.name);
-    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnail_url);
+    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     
     return `
       <div 

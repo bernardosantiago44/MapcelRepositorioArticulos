@@ -158,6 +158,7 @@
     {
       "id": "file-001",
       "name": "test-results.csv",
+      "extension": ".csv",
       "sizeBytes": 32000,
       "description": "test-results para Acme Corporation",
       "uploadDate": "2026-01-26",
@@ -167,6 +168,7 @@
     {
       "id": "file-002",
       "name": "api-response.json",
+      "extension": ".json",
       "sizeBytes": 4000,
       "description": "api-response para Acme Corporation",
       "uploadDate": "2026-01-22",
@@ -176,6 +178,7 @@
     {
       "id": "file-003",
       "name": "screenshot-bug.png",
+      "extension": ".png",
       "sizeBytes": 500000,
       "description": "screenshot-bug para Acme Corporation",
       "uploadDate": "2026-01-04",
@@ -185,6 +188,7 @@
     {
       "id": "file-004",
       "name": "error-log.txt",
+      "extension": ".txt",
       "sizeBytes": 2000,
       "description": "error-log para Acme Corporation",
       "uploadDate": "2025-12-30",
@@ -194,6 +198,7 @@
     {
       "id": "file-005",
       "name": "user-manual.docx",
+      "extension": ".docx",
       "sizeBytes": 2000000,
       "description": "user-manual para Acme Corporation",
       "uploadDate": "2025-11-27",
@@ -203,6 +208,7 @@
     {
       "id": "file-006",
       "name": "config-backup.xml",
+      "extension": ".xml",
       "sizeBytes": 16000,
       "description": "config-backup para Acme Corporation",
       "uploadDate": "2025-11-05",
@@ -212,6 +218,7 @@
     {
       "id": "file-007",
       "name": "requirements.pdf",
+      "extension": ".pdf",
       "sizeBytes": 1000000,
       "description": "requirements para Acme Corporation",
       "uploadDate": "2025-10-25",
@@ -221,6 +228,7 @@
     {
       "id": "file-008",
       "name": "database-schema.sql",
+      "extension": ".sql",
       "sizeBytes": 8000,
       "description": "database-schema para Acme Corporation",
       "uploadDate": "2025-10-14",
@@ -230,6 +238,7 @@
     {
       "id": "file-009",
       "name": "access-logs.txt",
+      "extension": ".txt",
       "sizeBytes": 125000,
       "description": "access-logs para Global Tech Solutions",
       "uploadDate": "2026-01-20",
@@ -239,6 +248,7 @@
     {
       "id": "file-010",
       "name": "permissions-matrix.xlsx",
+      "extension": ".xlsx",
       "sizeBytes": 45000,
       "description": "permissions-matrix para Global Tech Solutions",
       "uploadDate": "2026-01-15",
@@ -248,6 +258,7 @@
     {
       "id": "file-011",
       "name": "security-audit.pdf",
+      "extension": ".pdf",
       "sizeBytes": 3500000,
       "description": "security-audit para Global Tech Solutions",
       "uploadDate": "2026-01-10",
@@ -257,6 +268,7 @@
     {
       "id": "file-012",
       "name": "api-documentation.md",
+      "extension": ".md",
       "sizeBytes": 87000,
       "description": "api-documentation para Innovation Labs Inc.",
       "uploadDate": "2026-01-18",
@@ -266,6 +278,7 @@
     {
       "id": "file-013",
       "name": "performance-report.pdf",
+      "extension": ".pdf",
       "sizeBytes": 2800000,
       "description": "performance-report para Innovation Labs Inc.",
       "uploadDate": "2026-01-12",
@@ -275,6 +288,7 @@
     {
       "id": "file-014",
       "name": "widget-specs.docx",
+      "extension": ".docx",
       "sizeBytes": 156000,
       "description": "widget-specs para Innovation Labs Inc.",
       "uploadDate": "2026-01-08",
@@ -286,6 +300,9 @@
     {
       "id": "img-001",
       "name": "ui-mockup.png",
+      "extension": ".png",
+      "width": 1920,
+      "height": 1080,
       "dimensions": "1920x1080",
       "size": 426600,
       "description": "UI mockup para la página principal de Acme Corporation",
@@ -297,6 +314,9 @@
     {
       "id": "img-002",
       "name": "screenshot-error.png",
+      "extension": ".png",
+      "width": 1280,
+      "height": 720,
       "dimensions": "1280x720",
       "size": 31240,
       "description": "Captura del error de autenticación reportado",
@@ -308,166 +328,15 @@
     {
       "id": "img-003",
       "name": "dashboard-design.jpg",
+      "extension": ".jpg",
+      "width": 2560,
+      "height": 1440,
       "dimensions": "2560x1440",
       "size": 1200000,
       "description": "Diseño del dashboard para el nuevo módulo de reportes",
       "uploadDate": "2026-01-10",
       "companyId": "co-01",
       "thumbnailUrl": "https://picsum.photos/seed/img003/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-004",
-      "name": "logo-variaciones.png",
-      "dimensions": "800x600",
-      "size": 156200,
-      "description": "Variaciones del logo corporativo para diferentes fondos",
-      "uploadDate": "2026-01-08",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img004/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-005",
-      "name": "workflow-diagram.png",
-      "dimensions": "1600x900",
-      "size": 287300,
-      "description": "Diagrama de flujo del proceso de aprobación",
-      "uploadDate": "2026-01-05",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img005/400/225",
-      "linkedArticles": ["issue-0002"]
-    },
-    {
-      "id": "img-006",
-      "name": "mobile-app-screens.jpg",
-      "dimensions": "1440x2560",
-      "size": 845100,
-      "description": "Pantallas de la aplicación móvil versión 2.0",
-      "uploadDate": "2025-12-28",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img006/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-007",
-      "name": "infographic-stats.png",
-      "dimensions": "1200x800",
-      "size": 523700,
-      "description": "Infografía de estadísticas del Q4 2025",
-      "uploadDate": "2025-12-20",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img007/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-008",
-      "name": "team-photo.jpg",
-      "dimensions": "3000x2000",
-      "size": 2100000,
-      "description": "Foto del equipo de desarrollo 2025",
-      "uploadDate": "2025-12-15",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img008/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-009",
-      "name": "permission-matrix-screenshot.png",
-      "dimensions": "1920x1080",
-      "size": 398500,
-      "description": "Captura de la matriz de permisos actual",
-      "uploadDate": "2026-01-18",
-      "companyId": "co-02",
-      "thumbnailUrl": "https://picsum.photos/seed/img009/400/225",
-      "linkedArticles": ["issue-0003", "issue-0004"]
-    },
-    {
-      "id": "img-010",
-      "name": "api-architecture.png",
-      "dimensions": "2400x1350",
-      "size": 567200,
-      "description": "Diagrama de arquitectura de la API REST",
-      "uploadDate": "2026-01-15",
-      "companyId": "co-02",
-      "thumbnailUrl": "https://picsum.photos/seed/img010/400/225",
-      "linkedArticles": ["issue-0006"]
-    },
-    {
-      "id": "img-011",
-      "name": "security-audit-chart.jpg",
-      "dimensions": "1600x1200",
-      "size": 445800,
-      "description": "Gráfico de resultados de auditoría de seguridad",
-      "uploadDate": "2026-01-10",
-      "companyId": "co-02",
-      "thumbnailUrl": "https://picsum.photos/seed/img011/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-012",
-      "name": "user-flow-diagram.png",
-      "dimensions": "1800x1000",
-      "size": 312900,
-      "description": "Diagrama de flujo de usuario para onboarding",
-      "uploadDate": "2026-01-05",
-      "companyId": "co-02",
-      "thumbnailUrl": "https://picsum.photos/seed/img012/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-013",
-      "name": "performance-dashboard.png",
-      "dimensions": "1920x1080",
-      "size": 478300,
-      "description": "Dashboard de métricas de rendimiento",
-      "uploadDate": "2026-01-20",
-      "companyId": "co-03",
-      "thumbnailUrl": "https://picsum.photos/seed/img013/400/225",
-      "linkedArticles": ["issue-0008"]
-    },
-    {
-      "id": "img-014",
-      "name": "feature-wireframe.jpg",
-      "dimensions": "1440x900",
-      "size": 234600,
-      "description": "Wireframe para la nueva funcionalidad de exportación",
-      "uploadDate": "2026-01-17",
-      "companyId": "co-03",
-      "thumbnailUrl": "https://picsum.photos/seed/img014/400/225",
-      "linkedArticles": ["issue-0007"]
-    },
-    {
-      "id": "img-015",
-      "name": "widget-mockups.png",
-      "dimensions": "2560x1440",
-      "size": 892400,
-      "description": "Mockups de los nuevos widgets del dashboard",
-      "uploadDate": "2026-01-12",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img015/400/225",
-      "linkedArticles": ["issue-0008"]
-    },
-    {
-      "id": "img-016",
-      "name": "brand-guidelines.png",
-      "dimensions": "1200x800",
-      "size": 356100,
-      "description": "Guía de identidad visual de la marca",
-      "uploadDate": "2026-01-08",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img016/400/225",
-      "linkedArticles": []
-    },
-    {
-      "id": "img-017",
-      "name": "team-collaboration.jpg",
-      "dimensions": "3000x2000",
-      "size": 1900000,
-      "description": "Foto del equipo colaborando en el proyecto",
-      "uploadDate": "2026-01-02",
-      "companyId": "co-01",
-      "thumbnailUrl": "https://picsum.photos/seed/img017/400/225",
       "linkedArticles": []
     }
   ]

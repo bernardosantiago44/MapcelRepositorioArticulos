@@ -43,7 +43,7 @@ const ImageService = (function() {
         if (!response.ok) throw new Error("API Error");
         return response.json();
       })
-      .then(pagedResult => pagedResult.items);
+      .then(pagedResult => pagedResult.data);
   }
   
   /**
@@ -141,7 +141,7 @@ const ImageService = (function() {
       const images = data.images || [];
       const urls = images
         .filter(img => imageIds.includes(img.id))
-        .map(img => ({ id: img.id, url: img.thumbnail_url }));
+        .map(img => ({ id: img.id, url: img.thumbnailUrl }));
       return urls;
     });
   }
@@ -266,7 +266,7 @@ const ImageService = (function() {
               description: description || '',
               upload_date: currentDate,
               companyId: companyId,
-              thumbnail_url: 'https://picsum.photos/seed/' + imageId + '/400/225',
+              thumbnailUrl: 'https://picsum.photos/seed/' + imageId + '/400/225',
               linked_articles: []
             };
             

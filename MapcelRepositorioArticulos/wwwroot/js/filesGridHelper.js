@@ -63,7 +63,7 @@ const FilesGridHelper = (function() {
     
     dataPromise
       .then(files => {
-        files.data.forEach(file => {
+        files.forEach(file => {
           const rowId = file.id;
           
           grid.addRow(rowId, [

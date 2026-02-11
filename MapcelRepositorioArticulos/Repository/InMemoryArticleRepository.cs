@@ -222,7 +222,7 @@ public class InMemoryArticleRepository: IArticleRepository
 
     public FileAsset? GetImageById(string id)
     {
-        var files = _store.Files.AsQueryable();
+        var files = _store.Images.AsQueryable();
         return files.FirstOrDefault(f => 
             f.Id == id && 
             ImageExtensions.Contains(f.Extension));

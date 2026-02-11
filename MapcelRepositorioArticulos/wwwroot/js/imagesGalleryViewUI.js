@@ -49,7 +49,7 @@ const ImagesGalleryViewUI = (function() {
     const escapedDescription = Utils.escapeHtml(image.description);
     const escapedDimensions = Utils.escapeHtml(image.dimensions);
     const escapedSize = Utils.escapeHtml(image.size);
-    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnail_url);
+    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     const escapedId = Utils.escapeHtml(image.id);
     
     return `

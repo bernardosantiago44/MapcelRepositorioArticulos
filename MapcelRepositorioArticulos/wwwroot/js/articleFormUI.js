@@ -677,7 +677,7 @@ var ArticleFormUI = (function() {
    * @returns {string} HTML string
    */
   function renderAvailableImageItem(img) {
-    var safeUrl = sanitizeUrl(img.thumbnail_url);
+    var safeUrl = sanitizeUrl(img.thumbnailUrl);
     return `
       <div class="flex items-center p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
         <img 
@@ -844,7 +844,7 @@ var ArticleFormUI = (function() {
       <div class="text-xs font-medium text-gray-500 mb-2">Imágenes adjuntas:</div>
       <div class="flex flex-wrap gap-2">
         ${attachedImageObjects.map(function(img) {
-          var safeUrl = sanitizeUrl(img.thumbnail_url);
+          var safeUrl = sanitizeUrl(img.thumbnailUrl);
           return `
             <div class="relative group">
               <img 

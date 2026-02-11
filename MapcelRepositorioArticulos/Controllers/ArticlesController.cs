@@ -17,7 +17,7 @@ public class ArticlesController(IArticleRepository repository) : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = _articleRepository.GetArticles(new ArticleQuery(companyId, null, null, null, null, null, page, pageSize));
+        var result = _articleRepository.GetArticles(new ArticleQuery(companyId, null, null, null, null, null, page, pageSize) );
         return Ok(result);
     }
 

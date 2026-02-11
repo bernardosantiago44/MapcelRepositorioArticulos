@@ -14,7 +14,7 @@ public class InMemoryArticleRepository: IArticleRepository
     public InMemoryArticleRepository(RepositoryStore store) => _store = store;
 
     // Artuckes
-    public PagedResult<ArticleRowDto> GetArticles(ArticleQuery query)
+    public PagedResult<ArticleRowDto> GetArticles(ArticleQuery query, CancellationToken cancellationToken = default)
     {
         var page = query.Page < 1 ? 1 : query.Page;
         var pageSize = query.PageSize is < 1 or > 500 ? 50 : query.PageSize;
@@ -72,7 +72,7 @@ public class InMemoryArticleRepository: IArticleRepository
             })
             .ToList();
 
-        return new PagedResult<ArticleRowDto> { Data = pageItems, Total = total, Page = page, PageSize = pageSize };
+        return new PagedResult<ArticleRowDto>(pageItems, total, page, pageSize );
     }
 
     public ArticleDetailsDto? GetArticleById(string id)

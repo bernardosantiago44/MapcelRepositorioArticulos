@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using MapcelRepositorioArticulos.Models;
 
 namespace MapcelRepositorioArticulos.Repository;
@@ -10,6 +11,19 @@ public sealed class PagedResult<T>
     public required int Page { get; init; }
     
     public required int PageSize { get; init; }
+
+    [SetsRequiredMembers]
+    public PagedResult(List<T> data, int total, int page, int pageSize)
+    {
+        Data = data;
+        Total = total;
+        Page = page;
+        PageSize = pageSize;
+    }
+
+    public PagedResult()
+    {
+    }
 }
 
 public record FileQuery(
@@ -37,7 +51,7 @@ public record ArticleQuery(
 public interface IArticleRepository
 {
     // Articles
-    PagedResult<ArticleRowDto> GetArticles(ArticleQuery query);
+    PagedResult<ArticleRowDto> GetArticles(ArticleQuery query, CancellationToken cancellationToken = default);
     ArticleDetailsDto? GetArticleById(string id);
     
     // Tags

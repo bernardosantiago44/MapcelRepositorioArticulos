@@ -1,9 +1,6 @@
 using System.Data;
 using MapcelRepositorioArticulos.Models;
-using MapcelRepositorioArticulos.Repository;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.DataService;
@@ -13,35 +10,8 @@ public interface IArticlesService
     public Task<PagedResult<ArticleRowDto>> GetAllAsync(ArticleQuery query, CancellationToken cancellationToken);
 }
 
-
-public sealed class ArticlesService : ControllerBase, IArticlesService
+public sealed class ArticlesService(IConfiguration configuration) : BaseService(configuration), IArticlesService
 {
-    private readonly IConfiguration _configuration;
-    private string _connectionString;
-
-    public ArticlesService(IConfiguration configuration)
-    {
-        _configuration = configuration;
-        _connectionString = string.Empty;
-        try
-        {
-            this.SetupConnectionString("DefaultConnection");
-        } catch (Exception error)
-        {
-            Log.Fatal($"CustomersService - ${error.Message}");
-        }
-    }
-
-    private void SetupConnectionString(string connectionName) 
-    {
-        var connection = _configuration.GetConnectionString(connectionName);
-        if (string.IsNullOrEmpty(connection))
-        {
-            throw new Exception("Could not find connection string in appsettings.json"); 
-        }
-        _connectionString = connection;
-    }
-
     public async Task<PagedResult<ArticleRowDto>> GetAllAsync(ArticleQuery query, CancellationToken cancellationToken)
     {
         var rows = new List<ArticleRowDto>();
@@ -169,6 +139,6 @@ public sealed class ArticlesService : ControllerBase, IArticlesService
             }
             // Return: offset is fine to return (or use query.Page). Use total for real paging.
             return new PagedResult<ArticleRowDto>(rows, offset, query.PageSize, total);
-        };
+        }
     }
 }

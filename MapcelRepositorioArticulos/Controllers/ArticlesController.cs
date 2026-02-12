@@ -2,7 +2,6 @@ using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using MapcelRepositorioArticulos.Repository;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;

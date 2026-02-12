@@ -24,5 +24,4 @@ public sealed class TagDto
     public required string Name { get; init; }
     public string? Color { get; init; }
     public string? Description { get; init; }
-    public required string CompanyId { get; init; }
 }

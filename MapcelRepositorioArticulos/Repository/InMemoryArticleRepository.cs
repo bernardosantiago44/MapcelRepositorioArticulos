@@ -1,8 +1,28 @@
+using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.JSInterop.Infrastructure;
 
 namespace MapcelRepositorioArticulos.Repository;
-
+public interface IArticleRepository
+{
+    // Articles
+    PagedResult<ArticleRowDto> GetArticles(ArticleQuery query, CancellationToken cancellationToken = default);
+    ArticleDetailsDto? GetArticleById(string id);
+    
+    // Tags
+    IReadOnlyList<TagDto> GetTagsByCompany(string companyId);
+    TagDto? GetTagById(string tagId);
+    
+    // Companies
+    IEnumerable<Company> GetCompanies();
+    Company? GetCompanyById(string id);
+    
+    // Images
+    PagedResult<FileAsset> GetImages(FileQuery query);
+    PagedResult<FileAsset> GetFiles(FileQuery query);
+    FileAsset? GetFileById(string id);
+    FileAsset? GetImageById(string id);
+}
 public class InMemoryArticleRepository: IArticleRepository
 {
     private readonly RepositoryStore _store;
@@ -108,17 +128,13 @@ public class InMemoryArticleRepository: IArticleRepository
                 Id = t.Id,
                 Name = t.Name,
                 Color = t.Color,
-                Description = t.Description,
-                CompanyId = t.CompanyId
+                Description = t.Description
             })
             .ToList();
     }
 
     public TagDto? GetTagById(string tagId)
     {
-        if (string.IsNullOrWhiteSpace(tagId))
-            return null;
-
         var tag = _store.Tags.FirstOrDefault(t => t.Id == tagId);
         if (tag is null)
             return null;
@@ -128,8 +144,7 @@ public class InMemoryArticleRepository: IArticleRepository
             Id = tag.Id,
             Name = tag.Name,
             Color = tag.Color,
-            Description = tag.Description,
-            CompanyId = tag.CompanyId
+            Description = tag.Description
         };
     }
 

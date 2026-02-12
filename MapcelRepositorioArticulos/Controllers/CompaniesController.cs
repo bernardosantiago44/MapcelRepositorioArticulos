@@ -6,10 +6,9 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/companies")]
-public class CompaniesController : ControllerBase
+public class CompaniesController(IArticleRepository repo) : ControllerBase
 {
-    private readonly IArticleRepository _repo;
-    public CompaniesController(IArticleRepository repo) => _repo = repo;
+    private readonly IArticleRepository _repo = repo;
 
     [HttpGet]
     public ActionResult<IEnumerable<Company>> GetAllCompanies()

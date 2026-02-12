@@ -1,5 +1,5 @@
+using MapcelRepositorioArticulos.DataService;
 using Microsoft.AspNetCore.Mvc;
-using MapcelRepositorioArticulos.Models;
 using MapcelRepositorioArticulos.Repository;
 
 namespace MapcelRepositorioArticulos.Controllers;

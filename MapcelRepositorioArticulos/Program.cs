@@ -28,8 +28,9 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddTransient<SqlConnection>(_ =>
     new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Add the ArticlesService
+// Add all the needed services
 builder.Services.AddScoped<IArticlesService, ArticlesService>();
+builder.Services.AddScoped<ITagsService, TagsService>();
 
 // In-memory mock store (server-side)
 builder.Services.AddSingleton<RepositoryStore>(sp =>

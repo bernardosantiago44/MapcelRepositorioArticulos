@@ -1,3 +1,4 @@
+using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using MapcelRepositorioArticulos.Repository;
 using Microsoft.AspNetCore.Mvc;
@@ -6,24 +7,26 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/tags")]
-public sealed class TagsController : ControllerBase
+public sealed class TagsController(ITagsService service) : ControllerBase
 {
-    private readonly IArticleRepository _repo;
-    public TagsController(IArticleRepository repo) => _repo = repo;
+    private readonly ITagsService _service = service;
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<TagDto>> Get([FromQuery] string companyId)
+    public async Task<ActionResult<IReadOnlyList<TagDto>>> Get(
+        [FromQuery] string companyId,
+        [FromQuery] string? searchString = null,
+        CancellationToken cancellationToken = default
+    )
     {
-        var tags = _repo.GetTagsByCompany(companyId);
+        var query = new TagsQuery { CompanyCode = companyId,  Search = searchString };
+        var tags = await _service.GetTagsAsync(query, cancellationToken);
         return Ok(tags);
     }
     
     [HttpGet("{id}")]
     public ActionResult<TagDto> GetById(string id)
     {
-        var tag = _repo.GetTagById(id);
-        if (tag is null) return NotFound();
-        return Ok(tag);
+        return Ok(new TagDto {Id = "0",Name = id, Color = "blue", Description = ""});
     }
 
 }

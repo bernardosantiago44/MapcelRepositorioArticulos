@@ -1,3 +1,4 @@
+using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using MapcelRepositorioArticulos.Repository;
 using Microsoft.Data.SqlClient;
@@ -26,6 +27,9 @@ builder.Services.AddControllersWithViews();
 // DB connection factory (keep for later SQL repo)
 builder.Services.AddTransient<SqlConnection>(_ =>
     new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Add the ArticlesService
+builder.Services.AddScoped<IArticlesService, ArticlesService>();
 
 // In-memory mock store (server-side)
 builder.Services.AddSingleton<RepositoryStore>(sp =>

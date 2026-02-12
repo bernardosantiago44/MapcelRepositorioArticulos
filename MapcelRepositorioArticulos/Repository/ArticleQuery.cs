@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using MapcelRepositorioArticulos.Models;
+using Serilog.Debugging;
 
 namespace MapcelRepositorioArticulos.Repository;
 
@@ -37,16 +38,32 @@ public record FileQuery(
     int PageSize
 );
 
-public record ArticleQuery(
-    string? CompanyId,
-    string? Search,
-    string? Status,
-    DateOnly? DateFrom,
-    DateOnly? DateTo,
-    string[]? TagIds,
-    int Page,
-    int PageSize
-);
+public interface IQueryObject {}
+
+public class ArticleQuery(int page = 1, int pageSize = 20) : IQueryObject
+{
+    public string? CompanyId { get; init; } //
+    public string? Search { get; init; } //
+    public string? Status { get; init; } //
+    public DateOnly? DateFrom  { get; init; }
+    public DateOnly? DateTo { get; init; }
+    public string[]? TagIds { get; init; }
+    public required int Page = page;
+    public required int PageSize = pageSize;
+
+    public bool IsTagsFilterAvailable()
+    {
+        return this.TagIds != null && this.TagIds.Any();
+    }
+
+    public string? CleanTagFiltersString()
+    {
+        if (!this.IsTagsFilterAvailable()) return "";
+        var clean = this.TagIds!
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        return string.Join(",", clean);
+    }
+}
 
 public interface IArticleRepository
 {

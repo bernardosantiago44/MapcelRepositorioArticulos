@@ -550,7 +550,7 @@ function buildGridWithArticles(articles) {
   
   // Attach row selection event
   appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-    onArticleSelect(rowId);
+    onArticleSelect(rowId, appState.selectedCompanyId);
   });
   
   // Clear sidebar if the selected article is no longer visible
@@ -725,7 +725,7 @@ function loadArticlesForCompany(companyId) {
       
       // Attach row selection event
       appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-        onArticleSelect(rowId);
+        onArticleSelect(rowId, companyId);
       });
       
       // Initialize Files tab with current company
@@ -742,13 +742,14 @@ function loadArticlesForCompany(companyId) {
 /**
  * Handle article selection in the grid
  * @param {string} articleId - Selected article ID
+ * @param {string} companyId
  */
-function onArticleSelect(articleId) {
+function onArticleSelect(articleId, companyId) {
   appState.selectedArticleId = articleId;
   
   // Fetch article details and company info
   Promise.all([
-    ArticleService.getArticleById(articleId),
+    ArticleService.getArticleById(articleId, companyId),
     ArticleService.getCompanyById(appState.selectedCompanyId)
   ])
     .then(function(results) {
@@ -896,7 +897,7 @@ function openBulkTagEditor() {
           .then(function() {
             // If the currently selected article is one of the edited ones, refresh sidebar
             if (appState.selectedArticleId && selectedIdsArray.indexOf(appState.selectedArticleId) !== -1) {
-              onArticleSelect(appState.selectedArticleId);
+              onArticleSelect(appState.selectedArticleId, appState.selectedCompanyId);
             }
           })
           .catch(function(error) {
@@ -1039,7 +1040,7 @@ function onNavigateBackFromNewArticle(newArticleData) {
       // If a new article was created, select it in the grid
       if (newArticleData && newArticleData.id && appState.articlesGrid) {
         appState.articlesGrid.selectRowById(newArticleData.id, false, true, true);
-        onArticleSelect(newArticleData.id);
+        onArticleSelect(newArticleData.id, appState.selectedCompanyId);
       }
     })
     .catch(function(error) {

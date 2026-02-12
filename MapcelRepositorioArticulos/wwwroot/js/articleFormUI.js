@@ -1210,7 +1210,7 @@ var ArticleFormUI = (function() {
         });
     } else if (formState.currentMode === 'edit') {
       // Update article with new data
-      ArticleService.getArticleById(formState.articleId)
+      ArticleService.getArticleById(formState.articleId, formState.companyId)
         .then(function(existingArticle) {
           formData.createdAt = existingArticle ? existingArticle.createdAt : null;
           

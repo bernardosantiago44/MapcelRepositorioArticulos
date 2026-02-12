@@ -2,6 +2,7 @@ using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using MapcelRepositorioArticulos.Repository;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;
@@ -36,16 +37,44 @@ public class ArticlesController(IArticleRepository repository, IArticlesService 
             Page = page,
             PageSize = pageSize
         };
-        var result = await _articleService.GetAllAsync(query, cancellationToken);
+        var result = await _articleService.GetAsync(query, cancellationToken);
         return Ok(result);
     }
 
     [HttpGet("{id}")]
-    public ActionResult<ArticleDetailsDto> GetById(string id)
+    public async Task<ActionResult<ArticleDetailsDto>> GetById(int id, [FromQuery] string companyId, CancellationToken cancellationToken = default)
     {
-        var article = _articleRepository.GetArticleById(id);
-        if (article is null) return NotFound();
-        return Ok(article);
+        if (companyId.IsNullOrEmpty()) return BadRequest("Company Id is required.");
+        var query = new ArticleQuery
+        {
+            CompanyId = companyId,
+            ArticleId = id,
+            Page = 1,
+            PageSize = 20
+        };
+        var result = await _articleService.GetAsync(query, cancellationToken);
+        if (result.Data.Count == 0) return NotFound();
+        try
+        {
+            var article = result.Data.First();
+            return Ok(article);
+        }
+        catch (ArgumentNullException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
+        }
+        catch (TaskCanceledException)
+        {
+            return NoContent();
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Error");
+            return StatusCode(500);
+        }
     }
-
 }

@@ -8,6 +8,7 @@ namespace MapcelRepositorioArticulos.DataService;
 public class ArticleQuery
 {
     public required string CompanyId { get; init; }
+    public int? ArticleId { get; init; }
     public string? Search { get; init; } //
     public string? Status { get; init; } //
     public DateOnly? DateFrom  { get; init; }

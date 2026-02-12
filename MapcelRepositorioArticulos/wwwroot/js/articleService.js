@@ -329,12 +329,14 @@ const ArticleService = (function() {
  * Get a single article from backend
  * Server already resolves tag names (no client mapping)
  * @param {string} articleId
+ * @param {string} companyId
  * @returns {Promise<Object|null>}
  */
-  async function getArticleById(articleId) {
+  async function getArticleById(articleId, companyId) {
     if (!articleId) return null;
 
-    const res = await fetch(`/api/articles/${encodeURIComponent(articleId)}`, {
+    const url = `/api/articles/${encodeURIComponent(articleId)}?companyId=${encodeURIComponent(companyId)}`;
+    const res = await fetch(url, {
       headers: { "Accept": "application/json" }
     });
 

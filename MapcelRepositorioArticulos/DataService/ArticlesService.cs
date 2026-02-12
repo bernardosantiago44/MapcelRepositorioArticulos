@@ -7,12 +7,12 @@ namespace MapcelRepositorioArticulos.DataService;
 
 public interface IArticlesService
 {
-    public Task<PagedResult<ArticleRowDto>> GetAllAsync(ArticleQuery query, CancellationToken cancellationToken);
+    public Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken);
 }
 
 public sealed class ArticlesService(IConfiguration configuration) : BaseService(configuration), IArticlesService
 {
-    public async Task<PagedResult<ArticleRowDto>> GetAllAsync(ArticleQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
     {
         var rows = new List<ArticleRowDto>();
 
@@ -44,6 +44,10 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                             AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
                         )
                       )
+                  AND (
+                    @articleId is NULL OR
+                    a.article_id = @articleId
+                  )
                 ORDER BY a.created_at DESC
                 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
             )
@@ -92,7 +96,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
             command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, 250) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
             command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
-            
+            command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
             
             int total = 0;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))

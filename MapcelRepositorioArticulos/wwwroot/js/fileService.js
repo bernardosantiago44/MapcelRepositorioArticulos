@@ -53,7 +53,7 @@ const FileService = (function() {
         if (!response.ok) throw new Error("API Error");
         return response.json();
       })
-      .then(pagedResult => pagedResult.items);
+      .then(pagedResult => pagedResult.data);
   }
   
   /**

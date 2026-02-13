@@ -61,13 +61,56 @@ public class TagsQuery
 /// <param name="DateTo">DateOnly></param>
 /// <param name="Page">int</param>
 /// <param name="PageSize">int</param>
-public record FileQuery(
-    string? CompanyId,
-    string? SearchTerm,
-    bool ImagesOnly,
-    string[]? IncludeFileExtensions,
-    DateOnly? DateFrom,
-    DateOnly? DateTo,
-    int Page,
-    int PageSize
-);
+public class FileQuery
+{
+    public string? CompanyId { get; init; }
+    public string? SearchTerm { get; set; } = null;
+    public bool ImagesOnly { get; set; } = false;
+    public int? Id { get; set; } = null;
+    public string[]? Extensions { get; set; } = null;
+    public DateOnly? DateFrom { get; init; } = null;
+    public DateOnly? DateTo { get; init; } = null;
+    public required int Page { get; init; } = 1;
+    public required int PageSize { get; init; } = 20;
+    
+    /// <summary>
+    /// Indicates whether the IncludedFileExtensions 
+    ///  is not null and contains at least one non-null
+    /// value.
+    /// </summary>
+    /// <returns></returns>
+    public bool IsFilteringExtensions()
+    {
+        return Extensions != null && Extensions.Length > 0;
+    }
+
+    public string GetFileExtensionsString()
+    {
+        if (!IsFilteringExtensions()) return "";
+        var clean = this.Extensions!
+            .Where(s => !string.IsNullOrWhiteSpace(s));
+        return string.Join(",", clean);
+    }
+
+    /// <summary>
+    /// Returns true if query contains a
+    /// CompanyId OR a particular Id, or both.
+    /// </summary>
+    /// <returns></returns>
+    public bool IsValidQuery()
+    {
+        return CompanyId != null || Id != null;
+    }
+
+    public FileQueryType GetFileQueryType()
+    {
+        if (Id != null) return FileQueryType.ById;
+        if (CompanyId != null) return FileQueryType.ByCompany;
+        return FileQueryType.Undefined;
+    }
+
+    public enum FileQueryType
+    {
+        ByCompany, ById, Undefined
+    }
+};

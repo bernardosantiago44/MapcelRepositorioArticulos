@@ -31,6 +31,7 @@ builder.Services.AddTransient<SqlConnection>(_ =>
 // Add all the needed services
 builder.Services.AddScoped<IArticlesService, ArticlesService>();
 builder.Services.AddScoped<ITagsService, TagsService>();
+builder.Services.AddScoped<IFilesService, FilesService>();
 
 // In-memory mock store (server-side)
 builder.Services.AddSingleton<RepositoryStore>(sp =>

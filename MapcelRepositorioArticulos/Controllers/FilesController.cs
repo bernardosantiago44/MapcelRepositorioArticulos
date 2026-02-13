@@ -1,25 +1,70 @@
 using MapcelRepositorioArticulos.DataService;
+using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Mvc;
-using MapcelRepositorioArticulos.Repository;
+using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/files")]
-public class FilesController(IArticleRepository repo) : ControllerBase
+public class FilesController(IFilesService service) : ControllerBase
 {
-    [HttpGet] 
-    public ActionResult GetFiles([FromQuery] FileQuery query) => 
-        Ok(repo.GetFiles(query));
+    private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAsync(FileQuery query, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await service.GetAsync(query, cancellationToken);
+            if (result.Data.IsNullOrEmpty()) return NotFound();
+            return Ok(result);
+        }
+        catch (ArgumentNullException)
+        {
+            return BadRequest("Please provide a companyId using `/api/files?companyId=co-01`");
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return BadRequest("Please make sure to provide a valid page number and a pageSize between 1 and 199");
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("The operation was canceled.");
+            return StatusCode(100);
+        }
+        catch (Exception exception)
+        {
+            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            return StatusCode(500, exception.Message);
+        }
+    }
+    
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    {
+        query.ImagesOnly = false;
+        return await ExecuteGetAsync(query, cancellationToken);
+    }
 
     [HttpGet("images")] // Specific filter for images
-    public ActionResult GetImages([FromQuery] FileQuery query) => 
-        Ok(repo.GetImages(query));
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    {
+        query.ImagesOnly = true;
+        return await ExecuteGetAsync(query, cancellationToken);
+    }
+
     [HttpGet("images/{id}")]
-    public ActionResult GetImageById(string id, [FromQuery] FileQuery query) =>
-        repo.GetImageById(id) is { } file ? Ok(file) : NotFound();
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    {
+        query.ImagesOnly = true;
+        query.Id = id;
+        return await ExecuteGetAsync(query, cancellationToken);
+    }
 
     [HttpGet("{id}")]
-    public ActionResult GetFileById(string id) => 
-        repo.GetFileById(id) is { } file ? Ok(file) : NotFound();
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    {
+        query.ImagesOnly = false;
+        query.Id = id;
+        return await ExecuteGetAsync(query, cancellationToken);
+    }
 }

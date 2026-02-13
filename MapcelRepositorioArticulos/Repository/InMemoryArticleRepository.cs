@@ -82,7 +82,6 @@ public class InMemoryArticleRepository: IArticleRepository
             {
                 Id = a.Id,
                 CompanyId = a.CompanyId,
-                CompanyName = companiesById.TryGetValue(a.CompanyId, out var cn) ? cn : a.CompanyId.ToString(),
                 Title = a.Title,
                 Description = a.Description,
                 Status = a.Status,
@@ -165,7 +164,8 @@ public class InMemoryArticleRepository: IArticleRepository
     public PagedResult<FileAsset> GetImages(FileQuery query)
     {
         // Force the ImagesOnly flag to true and reuse the main logic
-        return GetFiles(query with { ImagesOnly = true });
+        query.ImagesOnly = true;
+        return GetFiles(query);
     }
     
     public PagedResult<FileAsset> GetFiles(FileQuery query)
@@ -195,10 +195,10 @@ public class InMemoryArticleRepository: IArticleRepository
         }
 
         // 3. Filter by specific extensions (Safe lookup against the new property)
-        if (query.IncludeFileExtensions is { Length: > 0 })
+        if (query.Extensions is { Length: > 0 })
         {
             // Normalize query extensions to include the dot (e.g., "pdf" -> ".pdf")
-            var targetExtensions = query.IncludeFileExtensions
+            var targetExtensions = query.Extensions
                 .Select(e => e.StartsWith('.') ? e : $".{e}")
                 .ToList();
 

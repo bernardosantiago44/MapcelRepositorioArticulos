@@ -32,6 +32,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 FROM [dbo].[articles] a
                 WHERE a.company_code = @companyCode
                   AND (@status IS NULL OR a.status = @status)
+                  AND (@articleId IS NULL OR a.article_id = @articleId)
                   AND (
                         @search IS NULL
                         OR a.title LIKE '%' + @search + '%'
@@ -44,10 +45,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                             AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
                         )
                       )
-                  AND (
-                    @articleId is NULL OR
-                    a.article_id = @articleId
-                  )
                 ORDER BY a.created_at DESC
                 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
             )
@@ -69,14 +66,23 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             ) AS tag_data
             ORDER BY a.created_at DESC;
 
+            -- 2. Get the total count using the EXACT SAME filters
             SELECT COUNT(1)
             FROM [dbo].[articles] a
             WHERE a.company_code = @companyCode
               AND (@status IS NULL OR a.status = @status)
+              AND (@articleId IS NULL OR a.article_id = @articleId)
               AND (
                     @search IS NULL
                     OR a.title LIKE '%' + @search + '%'
                     OR a.description LIKE '%' + @search + '%'
+                  )
+              AND (
+                    @tagIds IS NULL OR EXISTS (
+                        SELECT 1 FROM article_tags filter_at
+                        WHERE filter_at.article_id = a.article_id
+                        AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
+                    )
                   );
         ";
 
@@ -94,7 +100,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             
             // Optional parameters
             command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
-            command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, 250) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
+            command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, int.MaxValue) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
             command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
             command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
             
@@ -112,25 +118,16 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     var updatedAtPos = reader.GetOrdinal("updated_at");
                     var tagsPos = reader.GetOrdinal("tags");
 
-                    var id = reader.GetInt32(idPos);
-                    var title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos);
-                    var description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos);
-                    var status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos);
-                    var createdAt = reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos);
-                    var updatedAt = reader.IsDBNull(updatedAtPos) ? new DateTime() : reader.GetDateTime(updatedAtPos);
-                    IReadOnlyList<string> tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(',');
-
                     rows.Add(new ArticleRowDto
                     {
-                        Id = id.ToString(),
-                        CompanyId =  companyCode,
-                        CompanyName = "",
-                        Title = title,
-                        Description = description,
-                        Status = status,
-                        CreatedAt = DateOnly.FromDateTime(createdAt),
-                        UpdatedAt = DateOnly.FromDateTime(updatedAt),
-                        Tags = tags
+                        Id = reader.GetInt32(idPos).ToString(),
+                        CompanyId = companyCode,
+                        Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
+                        Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
+                        Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
+                        CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
+                        UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
+                        Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(',')
                     });
                 }
 
@@ -139,10 +136,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 {
                     if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
                 }
-
             }
-            // Return: offset is fine to return (or use query.Page). Use total for real paging.
-            return new PagedResult<ArticleRowDto>(rows, offset, query.PageSize, total);
+            return new PagedResult<ArticleRowDto>(rows, total, query.Page, query.PageSize);
         }
     }
 }

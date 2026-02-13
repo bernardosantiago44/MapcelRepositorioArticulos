@@ -26,3 +26,12 @@ public class FileAsset(
     public long? Width { get; set; } = width;
     public long? Height { get; set; } = height;
 }
+
+public class FileDto
+{
+    public string Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Extension { get; set; }
+    public string? ThumbnailUrl { get; set; } = null;
+}

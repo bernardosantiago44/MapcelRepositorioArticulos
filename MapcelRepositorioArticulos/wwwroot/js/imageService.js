@@ -38,7 +38,7 @@ const ImageService = (function() {
       pageSize
     });
 
-    return fetch(`/api/files?${params}`)
+    return fetch(`/api/files/images?${params}`)
       .then(response => {
         if (!response.ok) throw new Error("API Error");
         return response.json();

@@ -34,4 +34,5 @@ public class FileDto
     public string Description { get; set; }
     public string Extension { get; set; }
     public string? ThumbnailUrl { get; set; } = null;
+    public bool IsImage { get; set; } = false;
 }

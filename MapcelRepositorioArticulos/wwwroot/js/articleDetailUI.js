@@ -401,10 +401,11 @@ const ArticleDetailUI = (function() {
     
     // Fetch images and files in parallel
     Promise.all([
-      ImageService.getImagesByArticle(articleId),
-      FileService.getFilesByArticle(articleId)
+      FileService.getFilesByArticle(articleId, true), // Fetch image files
+      FileService.getFilesByArticle(articleId, false) // Fetch non-image files
     ])
       .then(function(results) {
+        console.log('Attachments loaded:', results);
         const images = results[0];
         const files = results[1];
         

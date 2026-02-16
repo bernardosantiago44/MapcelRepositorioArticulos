@@ -107,16 +107,17 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             int total = 0;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
             {
+                var idPos = reader.GetOrdinal("article_id");
+                var titlePos = reader.GetOrdinal("title");
+                var descriptionPos = reader.GetOrdinal("description");
+                var statusPos = reader.GetOrdinal("status");
+                var createdAtPos = reader.GetOrdinal("created_at");
+                var updatedAtPos = reader.GetOrdinal("updated_at");
+                var tagsPos = reader.GetOrdinal("tags");
+                
                 // Result set 1: page rows
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    var idPos = reader.GetOrdinal("article_id");
-                    var titlePos = reader.GetOrdinal("title");
-                    var descriptionPos = reader.GetOrdinal("description");
-                    var statusPos = reader.GetOrdinal("status");
-                    var createdAtPos = reader.GetOrdinal("created_at");
-                    var updatedAtPos = reader.GetOrdinal("updated_at");
-                    var tagsPos = reader.GetOrdinal("tags");
 
                     rows.Add(new ArticleRowDto
                     {

@@ -10,7 +10,7 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("api/files")]
 public class FilesController(IFilesService service) : ControllerBase
 {
-    private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAsync(FileQuery query, CancellationToken cancellationToken = default)
+    private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAllAsync(FileQuery query, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -29,7 +29,7 @@ public class FilesController(IFilesService service) : ControllerBase
         catch (OperationCanceledException)
         {
             Log.Information("The operation was canceled.");
-            return StatusCode(100);
+            return StatusCode(499);
         }
         catch (Exception exception)
         {
@@ -42,14 +42,14 @@ public class FilesController(IFilesService service) : ControllerBase
     public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
-        return await ExecuteGetAsync(query, cancellationToken);
+        return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
     [HttpGet("images")] // Specific filter for images
     public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
-        return await ExecuteGetAsync(query, cancellationToken);
+        return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
     [HttpGet("images/{id}")]
@@ -57,7 +57,7 @@ public class FilesController(IFilesService service) : ControllerBase
     {
         query.ImagesOnly = true;
         query.Id = id;
-        return await ExecuteGetAsync(query, cancellationToken);
+        return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
     [HttpGet("{id}")]
@@ -65,6 +65,57 @@ public class FilesController(IFilesService service) : ControllerBase
     {
         query.ImagesOnly = false;
         query.Id = id;
-        return await ExecuteGetAsync(query, cancellationToken);
+        return await ExecuteGetAllAsync(query, cancellationToken);
+    }
+
+    [HttpGet("forArticleId={articleId}")]
+    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetForArticleId(int articleId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await service.GetByArticleIdAsync(articleId, cancellationToken);
+            if (result.IsNullOrEmpty()) return NotFound();
+            return Ok(result);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return BadRequest("Please provide a positive integer `articleId` using `/api/files/forArticleId={articleId}`");
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("The operation was canceled.");
+            return StatusCode(499);
+        }
+        catch (Exception exception)
+        {
+            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            return StatusCode(500, exception.Message);
+        }
+    }
+
+    [HttpGet("ids={filesIds}")]
+    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetFilesByIds(int[] filesIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await service.GetByIdsAsync(filesIds, cancellationToken);
+            if (result.IsNullOrEmpty()) return NotFound();
+            return Ok(result);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return BadRequest("Please provide a positive integer `articleId` using `/api/files/forArticleId={articleId}`");
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("The operation was canceled.");
+            return StatusCode(499);
+        }
+        catch (Exception exception)
+        {
+            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            return StatusCode(500, exception.Message);
+        }
     }
 }

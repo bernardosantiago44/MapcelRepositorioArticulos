@@ -3,8 +3,6 @@ namespace MapcelRepositorioArticulos.DataService;
 /// <summary>
 /// Query parameters of the articles to fetch.
 /// </summary>
-/// <param name="page">1</param>
-/// <param name="pageSize">20</param>
 public class ArticleQuery
 {
     public required string CompanyId { get; init; }

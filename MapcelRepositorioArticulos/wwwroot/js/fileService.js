@@ -9,6 +9,36 @@ const FileService = (function() {
   
   // Cache for file data to avoid multiple file loads
   let fileCache = null;
+  const filesByArticleCache = new Map();
+
+  function ensureCache() {
+    if (!fileCache) {
+      fileCache = {
+        byId: new Map()
+      };
+    }
+  }
+
+  function cacheFiles(files) {
+    if (!Array.isArray(files) || files.length === 0) {
+      return;
+    }
+
+    ensureCache();
+    files.forEach(file => {
+      if (file && file.id) {
+        fileCache.byId.set(file.id, file);
+      }
+    });
+  }
+
+  function getCachedFilesArray() {
+    if (!fileCache || !fileCache.byId) {
+      return [];
+    }
+
+    return Array.from(fileCache.byId.values());
+  }
   
   /**
    * Clear the file cache (useful for development/testing)
@@ -53,7 +83,11 @@ const FileService = (function() {
         if (!response.ok) throw new Error("API Error");
         return response.json();
       })
-      .then(pagedResult => pagedResult.data);
+      .then(pagedResult => {
+        const files = Array.isArray(pagedResult.data) ? pagedResult.data : [];
+        cacheFiles(files);
+        return files;
+      });
   }
   
   /**
@@ -238,26 +272,52 @@ const FileService = (function() {
   
   /**
    * Get files linked to a specific article
-   * @param {string} articleId - The article ID to filter files by
+   * @param {string|number} articleId - The article ID to filter files by
    * @returns {Promise<Array<Object>>} Promise resolving to array of file objects linked to the article
    */
-  function getFilesByArticle(articleId) {
-    // Validate articleId parameter
-    if (!articleId || typeof articleId !== 'string') {
-      return Promise.resolve([]);
+  function getFilesByArticle(articleId, imagesOnly = false) {
+    if (!articleId) {
+      return Promise.reject(new Error("articleId is required"));
     }
-    
-    return loadMockData().then(data => {
-      const files = data.files || [];
-      
-      // Filter files that have this article in their linked_articles array
-      const linkedFiles = files.filter(file => 
-        Array.isArray(file.linked_articles) && file.linked_articles.includes(articleId)
-      );
-      
-      return linkedFiles;
-    });
+
+    const key = String(articleId);
+
+    // Return cached value immediately
+    if (filesByArticleCache.has(key)) {
+      return Promise.resolve(filesByArticleCache.get(key).filter(file =>  file.isImage == imagesOnly));
+    }
+
+    return fetch(`/api/files/forArticleId=${encodeURIComponent(key)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    })
+      .then(function (response) {
+        if (response.status === 404) {
+        // Cache empty result
+        filesByArticleCache.set(key, []);
+        return [];
+      }
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch files for article " + key);
+      }
+
+      return response.json();
+      })
+      .then(function (data) {
+        // Store in cache
+        console.log(`Fetched files for article ${key}:`, data);
+        filesByArticleCache.set(key, data);
+        return data.filter(file =>  file.isImage == imagesOnly);
+      });
   }
+
+  // Optional cache invalidation
+  function invalidateFilesByArticleCache(articleId) {
+    filesByArticleCache.delete(String(articleId));
+}
   
   // Public API
   return {

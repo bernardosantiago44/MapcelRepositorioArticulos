@@ -48,18 +48,17 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
                 
                 await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    var idPos = reader.GetOrdinal("tag_id");
+                    var namePos = reader.GetOrdinal("name");
+                    var colorPos = reader.GetOrdinal("color");
+                    var descriptionPos = reader.GetOrdinal("description");
+                    
                     while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                     {
-                        var idPos = reader.GetOrdinal("tag_id");
-                        var namePos = reader.GetOrdinal("name");
-                        var colorPos = reader.GetOrdinal("color");
-                        var descriptionPos = reader.GetOrdinal("description");
-                        
                         var id = reader.GetInt32(idPos);
                         var name = reader.GetString(namePos);
                         var color = reader.GetString(colorPos);
                         var description = reader.GetString(descriptionPos);
-                        
                         tags.Add(new TagDto
                         {
                             Id = id.ToString(),

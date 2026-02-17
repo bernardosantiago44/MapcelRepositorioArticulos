@@ -11,7 +11,6 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("/api/articles")]
 public class ArticlesController(IArticleRepository repository, IArticlesService service) : ControllerBase
 {
-    private readonly IArticleRepository _articleRepository = repository;
     private readonly IArticlesService _articleService = service;
 
     [HttpGet]
@@ -74,6 +73,76 @@ public class ArticlesController(IArticleRepository repository, IArticlesService 
         catch (Exception e)
         {
             Log.Error(e, "Error");
+            return StatusCode(500);
+        }
+    }
+    
+    [HttpPost]
+    public async Task<ActionResult<ArticleDetailsDto>> Create(
+        [FromQuery] string companyId,
+        [FromBody] CreateArticleRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var createdArticle = await _articleService.CreateAsync(companyId, request, cancellationToken);
+            
+            return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyId }, createdArticle);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticlesController.Create failed for companyId={CompanyId}", companyId);
+            return StatusCode(500);
+        }
+    }
+    
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<ArticleDetailsDto>> Update(
+        [FromRoute] int id,
+        [FromQuery] string companyId,
+        [FromBody] UpdateArticleRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await _articleService.UpdateAsync(id, companyId, request, cancellationToken);
+            if (updated is null) return NotFound();
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticlesController.Update failed for id={Id}, companyId={CompanyId}", id, companyId);
+            return StatusCode(500);
+        }
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(
+        [FromRoute] int id,
+        [FromQuery] string companyId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await _articleService.DeleteAsync(id, companyId, cancellationToken);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticlesController.Delete failed for id={Id}, companyId={CompanyId}", id, companyId);
             return StatusCode(500);
         }
     }

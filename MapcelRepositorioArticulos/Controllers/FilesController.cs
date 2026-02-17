@@ -52,7 +52,7 @@ public class FilesController(IFilesService service) : ControllerBase
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("images/{id}")]
+    [HttpGet("images/{id:int}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
@@ -60,7 +60,7 @@ public class FilesController(IFilesService service) : ControllerBase
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
@@ -68,7 +68,7 @@ public class FilesController(IFilesService service) : ControllerBase
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("forArticleId={articleId}")]
+    [HttpGet("forArticleId={articleId:int}")]
     public async Task<ActionResult<IReadOnlyList<FileDto>>> GetForArticleId(int articleId, CancellationToken cancellationToken = default)
     {
         try

@@ -782,7 +782,7 @@ function onArticleSelect(articleId, companyId) {
           var editBtn = document.getElementById('edit-article-btn');
           if (editBtn) {
             editBtn.onclick = function() {
-              openEditArticleForm(articleId);
+              openEditArticleForm(articleId, appState.selectedCompanyId);
             };
           } else {
             console.warn('Edit button not found in DOM');
@@ -1129,9 +1129,10 @@ function rebuildArticlesTabLayout() {
 /**
  * Open the form for editing an existing article
  * @param {string} articleId - ID of the article to edit
+ * @param {string} companyId - ID of the company the article belongs to
  */
-function openEditArticleForm(articleId) {
-  ArticleService.getArticleById(articleId)
+function openEditArticleForm(articleId, companyId) {
+  ArticleService.getArticleById(articleId, companyId)
     .then(function(article) {
       if (!article) {
         dhtmlx.alert({

@@ -1,30 +1,57 @@
 namespace MapcelRepositorioArticulos.Models;
 
-public class FileAsset(
-    string id, 
-    string name, 
-    string description, 
-    string extension, 
-    long sizeBytes, 
-    DateOnly uploadDate, 
-    string companyId, 
-    IReadOnlyList<string> linkedArticles,
-    Uri? thumbnailUrl,
-    long? width,
-    long? height
-)
+public class FileAsset
 {
-    public string Id { get; set; } = id;
-    public string Name { get; set; } = name;
-    public string Description { get; set; } = description;
-    public string Extension { get; set; } = extension; // Store as ".jpg", ".pdf", etc.
-    public long SizeBytes { get; set; } = sizeBytes;
-    public DateOnly UploadDate { get; set; } = uploadDate;
-    public string CompanyId { get; set; }  = companyId;
-    public IReadOnlyList<string> LinkedArticles { get; set; } = linkedArticles;
-    public Uri? ThumbnailUrl { get; set; } = thumbnailUrl;
-    public long? Width { get; set; } = width;
-    public long? Height { get; set; } = height;
+    public string Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string Extension { get; set; }
+    public long SizeBytes { get; set; }
+    public DateOnly UploadDate { get; set; }
+    public string CompanyId { get; set; }
+    public IReadOnlyList<string> LinkedArticles { get; set; }
+    public Uri? ThumbnailUrl { get; set; }
+    public long? Width { get; set; }
+    public long? Height { get; set; }
+
+    // Empty Constructor (for serialization or EF Core)
+    public FileAsset()
+    {
+        // Initializing the list to prevent null reference issues
+        LinkedArticles = new List<string>();
+        Id = string.Empty;
+        Name = string.Empty;
+        Description = string.Empty;
+        Extension = string.Empty;
+        CompanyId = string.Empty;
+    }
+
+    // Regular Constructor
+    public FileAsset(
+        string id, 
+        string name, 
+        string description, 
+        string extension, 
+        long sizeBytes, 
+        DateOnly uploadDate, 
+        string companyId, 
+        IReadOnlyList<string> linkedArticles,
+        Uri? thumbnailUrl,
+        long? width,
+        long? height)
+    {
+        Id = id;
+        Name = name;
+        Description = description;
+        Extension = extension;
+        SizeBytes = sizeBytes;
+        UploadDate = uploadDate;
+        CompanyId = companyId;
+        LinkedArticles = linkedArticles;
+        ThumbnailUrl = thumbnailUrl;
+        Width = width;
+        Height = height;
+    }
 }
 
 public class FileDto
@@ -35,4 +62,25 @@ public class FileDto
     public string Extension { get; set; }
     public string? ThumbnailUrl { get; set; } = null;
     public bool IsImage { get; set; } = false;
+}
+
+public sealed class UpdateFileRequest
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+
+    public void Validate()
+    {
+        var nameEmpty = string.IsNullOrWhiteSpace(Name);
+        var descEmpty = string.IsNullOrWhiteSpace(Description);
+
+        if (nameEmpty && descEmpty)
+            throw new ArgumentException("UpdateFileRequest: at least one of Name or Description must be provided.");
+
+        if (!nameEmpty && Name!.Trim().Length > 255)
+            throw new ArgumentException("UpdateFileRequest: Name cannot exceed 255 characters.");
+
+        if (!descEmpty && Description!.Trim().Length > 500)
+            throw new ArgumentException("UpdateFileRequest: Description cannot exceed 500 characters.");
+    }
 }

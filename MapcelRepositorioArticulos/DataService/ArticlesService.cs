@@ -47,6 +47,7 @@ public interface IArticlesService
     /// <param name="cancellationToken"></param>
     /// <returns>True if the operation was successful, false otherwise.</returns>
     public Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken);
+
 }
 
 public sealed class ArticlesService(IConfiguration configuration) : BaseService(configuration), IArticlesService
@@ -175,6 +176,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         WHERE a.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
+
     private const string SqlSelectMultipleTags = @"
         SELECT
         t.tag_id,
@@ -187,6 +189,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     WHERE t.company_code = @CompanyCode
     ORDER BY t.tag_id;
     ";
+    
     
     public async Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
     {

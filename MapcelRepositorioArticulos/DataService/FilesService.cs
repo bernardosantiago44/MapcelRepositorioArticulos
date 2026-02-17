@@ -8,7 +8,7 @@ namespace MapcelRepositorioArticulos.DataService;
 public interface IFilesService
 {
     /// <summary>
-    /// 
+    /// Returns all the non-image files that match the given query. 
     /// </summary>
     /// <param name="query"></param>
     /// <param name="cancellationToken"></param>
@@ -162,7 +162,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
                   );
         ";
 
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         await using var command = new SqlCommand(sql, connection);
@@ -218,7 +218,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(articleId);
 
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         await using var command = new SqlCommand(SqlSelectFilesByArticleId, connection);
@@ -240,7 +240,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         // switch to TVP if size of ids increase.
         var idsCsv = string.Join(",", cleanIds);
 
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         await using var command = new SqlCommand(SqlSelectFilesByIdsCsv, connection);

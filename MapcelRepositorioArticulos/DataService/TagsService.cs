@@ -36,7 +36,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
             ORDER BY t.name DESC;
         ";
 
-        await using (var connection = new SqlConnection(_connectionString))
+        await using (var connection = new SqlConnection(ConnectionString))
         {
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
             await using (var command = new SqlCommand(sql, connection))

@@ -7,26 +7,54 @@ namespace MapcelRepositorioArticulos.DataService;
 
 public interface IArticlesService
 {
+    /// <summary>
+    /// Fetch all Articles from the SQL Database
+    /// matching the given query.
+    /// </summary>
+    /// <param name="query">ArticleQuery</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>PagedResult: ArticleRowDto</returns>
     public Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Creates a new Article record in the SQL Database
+    /// for the given company id with the given request.
+    /// </summary>
+    /// <param name="companyId">string</param>
+    /// <param name="request">CreateArticleRequest</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>ArticleRowDto</returns>
+    /// <exception cref="ArgumentException"></exception>
+    public Task<ArticleDetailsDto> CreateAsync(string companyId, CreateArticleRequest request, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Updates all fields of the given article id for
+    /// the given company in the SQL Database,
+    /// matching the given request.
+    /// </summary>
+    /// <param name="articleId">int</param>
+    /// <param name="companyId">string</param>
+    /// <param name="request">UpdateArticleRequest</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>ArticleDetailsDto?</returns>
+    public Task<ArticleDetailsDto?> UpdateAsync(int articleId, string companyId, UpdateArticleRequest request, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Deletes the specified article id within the given company id.
+    /// </summary>
+    /// <param name="articleId">int</param>
+    /// <param name="companyId">string</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>True if the operation was successful, false otherwise.</returns>
+    public Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken);
 }
 
 public sealed class ArticlesService(IConfiguration configuration) : BaseService(configuration), IArticlesService
 {
-    public async Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
-    {
-        var rows = new List<ArticleRowDto>();
-
-        if (query is null) throw new ArgumentNullException(nameof(query));
-        if (query.Page <= 0) throw new ArgumentOutOfRangeException(nameof(query.Page));
-        if (query.PageSize <= 0) throw new ArgumentOutOfRangeException(nameof(query.PageSize));
-
-        int offset = (query.Page - 1) * query.PageSize;
-
-        var companyCode = query.CompanyId;
-        if (string.IsNullOrWhiteSpace(companyCode))
-            throw new ArgumentNullException(nameof(query.CompanyId));
-
-        const string sql = @"
+    // -------------------
+    // --- SQL Queries ---
+    // -------------------
+    private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
                 FROM [dbo].[articles] a
@@ -85,60 +113,352 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     )
                   );
         ";
+    private const string SqlInsertArticle = @"
+        INSERT INTO dbo.articles
+        (
+            company_code,
+            title,
+            description,
+            external_link,
+            client_comments,
+            status
+        )
+        OUTPUT INSERTED.article_id
+        VALUES
+        (
+            @CompanyCode,
+            @Title,
+            @Description,
+            @ExternalLink,
+            @ClientComments,
+            @Status
+        );
+    ";
+    private const string SqlUpdateArticle = @"
+        UPDATE dbo.articles
+        SET
+            title = @Title,
+            description = @Description,
+            external_link = @ExternalLink,
+            client_comments = @ClientComments,
+            status = @Status,
+            updated_at = SYSDATETIME()
+        WHERE article_id = @ArticleId
+          AND company_code = @CompanyCode;
+    ";
+    private const string SqlDeleteArticleTags = @"
+        DELETE at
+        FROM dbo.article_tags at
+        INNER JOIN dbo.articles a ON a.article_id = at.article_id
+        WHERE at.article_id = @ArticleId
+          AND a.company_code = @CompanyCode;
+    ";
+    private const string SqlInsertArticleTagsFromCsv = @"
+        INSERT INTO dbo.article_tags (article_id, tag_id)
+        SELECT
+            @ArticleId,
+            t.tag_id
+        FROM string_split(@TagIdsCsv, ',') s
+        INNER JOIN dbo.tags t
+            ON t.tag_id = TRY_CAST(s.value AS int)
+           AND t.company_code = @CompanyCode;
+    ";
+    private const string SqlDeleteFileArticles = @"
+        DELETE fa
+        FROM dbo.file_articles fa
+        INNER JOIN dbo.articles a ON a.article_id = fa.article_id
+        WHERE fa.article_id = @ArticleId
+          AND a.company_code = @CompanyCode;";
+    private const string SqlDeleteArticle = @"
+        DELETE a
+        FROM dbo.articles a
+        WHERE a.article_id = @ArticleId
+          AND a.company_code = @CompanyCode;
+    ";
+    private const string SqlSelectMultipleTags = @"
+        SELECT
+        t.tag_id,
+        t.company_code,
+        t.name,
+        t.color,
+        t.description
+    FROM dbo.tags AS t
+        INNER JOIN @TagIds AS ids ON t.tag_id = ids.Id
+    WHERE t.company_code = @CompanyCode
+    ORDER BY t.tag_id;
+    ";
+    
+    public async Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
+    {
+        var rows = new List<ArticleRowDto>();
 
-        await using var connection = new SqlConnection(_connectionString);
+        if (query is null) throw new ArgumentNullException(nameof(query));
+        if (query.Page <= 0) throw new ArgumentOutOfRangeException(nameof(query.Page));
+        if (query.PageSize <= 0) throw new ArgumentOutOfRangeException(nameof(query.PageSize));
+
+        int offset = (query.Page - 1) * query.PageSize;
+
+        var companyCode = query.CompanyId;
+        if (string.IsNullOrWhiteSpace(companyCode))
+            throw new ArgumentNullException(nameof(query.CompanyId));
+
+        await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        await using (var command = new SqlCommand(sql, connection))
+        await using var command = new SqlCommand(SqlSelectArticlesWithQuery, connection);
+        command.CommandType = CommandType.Text;
+
+        // Mandatory parameters
+        command.Parameters.Add(new SqlParameter("@offset", SqlDbType.Int) { Value = offset });
+        command.Parameters.Add(new SqlParameter("@pageSize", SqlDbType.Int) { Value = query.PageSize });
+        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.NVarChar, 20) { Value = companyCode });
+        
+        // Optional parameters
+        command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
+        command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, int.MaxValue) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
+        command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
+        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
+        
+        int total = 0;
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
-            command.CommandType = CommandType.Text;
-
-            // Mandatory parameters
-            command.Parameters.Add(new SqlParameter("@offset", SqlDbType.Int) { Value = offset });
-            command.Parameters.Add(new SqlParameter("@pageSize", SqlDbType.Int) { Value = query.PageSize });
-            command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.NVarChar, 20) { Value = companyCode });
+            var idPos = reader.GetOrdinal("article_id");
+            var titlePos = reader.GetOrdinal("title");
+            var descriptionPos = reader.GetOrdinal("description");
+            var statusPos = reader.GetOrdinal("status");
+            var createdAtPos = reader.GetOrdinal("created_at");
+            var updatedAtPos = reader.GetOrdinal("updated_at");
+            var tagsPos = reader.GetOrdinal("tags");
             
-            // Optional parameters
-            command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
-            command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, int.MaxValue) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
-            command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
-            command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
-            
-            int total = 0;
-            await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+            // Result set 1: page rows
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var idPos = reader.GetOrdinal("article_id");
-                var titlePos = reader.GetOrdinal("title");
-                var descriptionPos = reader.GetOrdinal("description");
-                var statusPos = reader.GetOrdinal("status");
-                var createdAtPos = reader.GetOrdinal("created_at");
-                var updatedAtPos = reader.GetOrdinal("updated_at");
-                var tagsPos = reader.GetOrdinal("tags");
+
+                rows.Add(new ArticleRowDto
+                {
+                    Id = reader.GetInt32(idPos).ToString(),
+                    CompanyId = companyCode,
+                    Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
+                    Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
+                    Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
+                    CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
+                    UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
+                    Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(',')
+                });
+            }
+
+            // Result set 2: total
+            if (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            {
+                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
+            }
+        }
+        return new PagedResult<ArticleRowDto>(rows, total, query.Page, query.PageSize);
+        
+    }
+    
+    public async Task<ArticleDetailsDto> CreateAsync(string companyId, CreateArticleRequest request, CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyId); // CompanyId should be a non-null string.
+        request.Validate(); // The request must contain a Title and a Status, at least.
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            // 1. Build the 'create new article' command  
+            await using var createArticleCommand = new SqlCommand(SqlInsertArticle, connection);
+            createArticleCommand.CommandType = CommandType.Text;
+
+            createArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            createArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
+            createArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
+            createArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
+            createArticleCommand.Parameters.Add(new SqlParameter("@ClientComments", SqlDbType.NVarChar) { Value = (object?)request.ClientComments ?? DBNull.Value });
+            createArticleCommand.Parameters.Add(new SqlParameter("@Status", SqlDbType.VarChar, 50) { Value = request.Status.Trim() });
+            
+            // Execute the creation
+            var articleResult = await createArticleCommand.ExecuteScalarAsync(cancellationToken);
+            if (articleResult is null) throw new InvalidOperationException("ArticleService.CreateAsync(string:request:token): Failed to create article.");
+            var newArticleId = Convert.ToInt32(articleResult);
+            
+            // If the request carries tags, insert each tag into the article_tags table
+            if (request.TagIds is { Length: > 0 }) // TagIds may be null
+            {
+                // 1.1 Build the 'insert article tags' command
+                var csv = string.Join(",", request.TagIds);
+                await using var insertArticleTagsCommand = new SqlCommand(SqlInsertArticleTagsFromCsv, connection);
+                insertArticleTagsCommand.CommandType = CommandType.Text;
                 
-                // Result set 1: page rows
-                while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
-                {
+                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
+                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
-                    rows.Add(new ArticleRowDto
-                    {
-                        Id = reader.GetInt32(idPos).ToString(),
-                        CompanyId = companyCode,
-                        Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
-                        Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
-                        Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
-                        CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
-                        UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
-                        Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(',')
-                    });
-                }
+                await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
 
-                // Result set 2: total
-                if (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+            var created = new ArticleDetailsDto
+            {
+                Id = newArticleId.ToString(),
+                CompanyId = companyId,
+                Title = request.Title,
+                Description = request.Description,
+                ClientComments = request.ClientComments,
+                Status = request.Status,
+                CompanyName = "",
+                CreatedAt = new DateOnly(),
+                UpdatedAt = new DateOnly(),
+                ExternalLink = request.ExternalLink,
+                Tags = request.TagIds ?? [],
+                TagNames = []
+            };
+            return created;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.CreateAsync(string:request:token) failed for companyCode={CompanyCode}", companyId);
+            throw;
+        }
+    }
+    
+    public async Task<ArticleDetailsDto?> UpdateAsync(int articleId, string companyId, UpdateArticleRequest request, CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyId);
+        ValidateId(articleId);
+        request.Validate(); // Must contain Title and Status at least.
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            // 1. Build the 'update article' command
+            await using var updateArticleCommand = new SqlCommand(SqlUpdateArticle, connection);
+            updateArticleCommand.CommandType = CommandType.Text;
+
+            updateArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@ClientComments", SqlDbType.NVarChar) { Value = (object?)request.ClientComments ?? DBNull.Value });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@Status", SqlDbType.VarChar, 50) { Value = request.Status.Trim() });
+
+            var affected = await updateArticleCommand.ExecuteNonQueryAsync(cancellationToken);
+            if (affected == 0) return null; // Not found OR not in tenant.
+
+            // 2. If TagIds is provided:
+            //    - null => keep existing tags
+            //    - []   => clear all tags
+            //    - [..] => replace tags
+            if (request.TagIds is not null)
+            {
+                // 2.1 Delete existing article tags (tenant-safe via join to articles)
+                await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
+                deleteArticleTagsCommand.CommandType = CommandType.Text;
+
+                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+
+                await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
+
+                // 2.2 Insert new article tags (if any)
+                if (request.TagIds.Length > 0)
                 {
-                    if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
+                    var csv = string.Join(",", request.TagIds);
+
+                    await using var insertArticleTagsCommand = new SqlCommand(SqlInsertArticleTagsFromCsv, connection);
+                    insertArticleTagsCommand.CommandType = CommandType.Text;
+
+                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+                    await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
             }
-            return new PagedResult<ArticleRowDto>(rows, total, query.Page, query.PageSize);
+
+            var updated = new ArticleDetailsDto
+            {
+                Id = articleId.ToString(),
+                CompanyId = companyId,
+                Title = request.Title,
+                Description = request.Description,
+                ClientComments = request.ClientComments,
+                Status = request.Status,
+                CompanyName = "",
+                CreatedAt = new DateOnly(),
+                UpdatedAt = new DateOnly(),
+                ExternalLink = request.ExternalLink,
+                Tags = request.TagIds ?? [],      // if null => unknown/unchanged, but kept as [] for DTO consistency
+                TagNames = []
+            };
+
+            return updated;
         }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.UpdateAsync(int:string:request:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+            throw;
+        }
+    }
+    
+    public async Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyId);
+        ValidateId(articleId);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            // 1. Delete file_articles rows for this article (tenant-safe via join to articles)
+            await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
+            deleteFileArticlesCommand.CommandType = CommandType.Text;
+
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+
+            await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            // 2. Delete article_tags rows for this article (tenant-safe via join to articles)
+            await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
+            deleteArticleTagsCommand.CommandType = CommandType.Text;
+
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+
+            await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            // 3. Delete the article row (tenant-safe)
+            await using var deleteArticleCommand = new SqlCommand(SqlDeleteArticle, connection);
+            deleteArticleCommand.CommandType = CommandType.Text;
+
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+
+            var deleted = await deleteArticleCommand.ExecuteNonQueryAsync(cancellationToken);
+            return deleted != 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.DeleteAsync(int:string:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+            throw;
+        }
+    }
+    
+    // ----------- Helper Validation Functions -----------
+    private static void ValidateCompany(string companyId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(companyId, nameof(companyId));
+        ArgumentException.ThrowIfNullOrEmpty(companyId, nameof(companyId));
+        ArgumentNullException.ThrowIfNull(companyId, nameof(companyId));
+    }
+
+    private static void ValidateId(int articleId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(articleId, nameof(articleId));
     }
 }

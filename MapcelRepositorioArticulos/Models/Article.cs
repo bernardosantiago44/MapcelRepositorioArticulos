@@ -62,12 +62,28 @@ public class ArticleRowDto
 /// <summary>
 /// Object used for creating a new article in the database.
 /// </summary>
-public class CreateArticleDto
+public class CreateArticleRequest
 {
-    public required string CompanyId { get; init; }
     public required string Title { get; init; }
+    public required string? Description { get; init; }
+    public required string? ExternalLink { get; init; }
+    public required string? ClientComments { get; init; }
     public required string Status { get; init; }
-    public IReadOnlyList<string> Tags { get; init; } = [];
+    public required string[]? TagIds  { get; init; }
+
+    /// <summary>
+    /// Throws if Title or Status are (any) null or empty.
+    /// </summary>
+    /// <exception cref="ArgumentException"></exception>
+    public void Validate()
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(Title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(Status);
+    }
+}
+
+public class UpdateArticleRequest : CreateArticleRequest
+{
 }
 
 public sealed class ArticleDetailsDto
@@ -86,6 +102,10 @@ public sealed class ArticleDetailsDto
 
     public required DateOnly CreatedAt { get; init; }
     public required DateOnly UpdatedAt { get; init; }
+
+    public ArticleDetailsDto()
+    {
+    }
 
     [SetsRequiredMembers]
     public ArticleDetailsDto(Article article, string companyName, List<string> tagNames)

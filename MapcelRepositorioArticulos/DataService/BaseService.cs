@@ -9,13 +9,13 @@ namespace MapcelRepositorioArticulos.DataService;
 /// </summary>
 public abstract class BaseService
 {
-    protected readonly IConfiguration _configuration;
-    protected string _connectionString;
+    private readonly IConfiguration _configuration;
+    protected string ConnectionString;
 
     protected BaseService(IConfiguration configuration)
     {
         _configuration = configuration;
-        _connectionString = string.Empty;
+        ConnectionString = string.Empty;
         try
         {
             SetupConnectionString("DefaultConnection");
@@ -33,6 +33,6 @@ public abstract class BaseService
         {
             throw new Exception($"Connection {connectionName} could not be found in appsettings.json.");
         }
-        _connectionString = connection!;
+        ConnectionString = connection!;
     }
 }

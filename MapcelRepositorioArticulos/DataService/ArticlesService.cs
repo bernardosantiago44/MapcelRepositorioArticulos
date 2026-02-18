@@ -47,6 +47,14 @@ public interface IArticlesService
     /// <param name="cancellationToken"></param>
     /// <returns>True if the operation was successful, false otherwise.</returns>
     public Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken);
+    
+    Task<int> BulkUpdateSingleTagAsync(
+        string companyId,
+        int[] articleIds,
+        int tagId,
+        string action,
+        CancellationToken cancellationToken);
+
 
 }
 
@@ -188,6 +196,56 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         INNER JOIN @TagIds AS ids ON t.tag_id = ids.Id
     WHERE t.company_code = @CompanyCode
     ORDER BY t.tag_id;
+    ";
+    private const string SqlBulkAddTagToArticles = @"
+        IF NOT EXISTS (SELECT 1 FROM dbo.tags WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        BEGIN
+            SELECT CAST(-1 AS int);
+            RETURN;
+        END;
+
+        ;WITH ids AS
+        (
+            SELECT DISTINCT TRY_CAST(value AS int) AS article_id
+            FROM string_split(@ArticleIdsCsv, ',')
+            WHERE TRY_CAST(value AS int) IS NOT NULL
+        )
+        INSERT INTO dbo.article_tags (article_id, tag_id)
+        SELECT a.article_id, @TagId
+        FROM dbo.articles a
+        INNER JOIN ids i ON i.article_id = a.article_id
+        WHERE a.company_code = @CompanyCode
+          AND NOT EXISTS
+          (
+              SELECT 1
+              FROM dbo.article_tags at
+              WHERE at.article_id = a.article_id
+                AND at.tag_id = @TagId
+          );
+
+        SELECT @@ROWCOUNT;
+    ";
+    private const string SqlBulkRemoveTagFromArticles = @"
+        IF NOT EXISTS (SELECT 1 FROM dbo.tags WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        BEGIN
+            SELECT CAST(-1 AS int);
+            RETURN;
+        END;
+
+        ;WITH ids AS
+        (
+            SELECT DISTINCT TRY_CAST(value AS int) AS article_id
+            FROM string_split(@ArticleIdsCsv, ',')
+            WHERE TRY_CAST(value AS int) IS NOT NULL
+        )
+        DELETE at
+        FROM dbo.article_tags at
+        INNER JOIN dbo.articles a ON a.article_id = at.article_id
+        INNER JOIN ids i ON i.article_id = a.article_id
+        WHERE a.company_code = @CompanyCode
+          AND at.tag_id = @TagId;
+
+        SELECT @@ROWCOUNT;
     ";
     
     
@@ -448,6 +506,55 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         catch (Exception ex)
         {
             Log.Error(ex, "ArticleService.DeleteAsync(int:string:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+            throw;
+        }
+    }
+    
+    public async Task<int> BulkUpdateSingleTagAsync(
+        string companyId,
+        int[] articleIds,
+        int tagId,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyId);
+        if (articleIds is null || articleIds.Length == 0) throw new ArgumentException("ArticleIds is required.", nameof(articleIds));
+        if (tagId <= 0) throw new ArgumentOutOfRangeException(nameof(tagId), "TagId must be > 0.");
+        if (string.IsNullOrWhiteSpace(action)) throw new ArgumentException("Action is required.", nameof(action));
+
+        var normalized = action.Trim().ToLowerInvariant();
+        if (normalized is not ("add" or "remove")) throw new ArgumentException("Action must be 'add' or 'remove'.", nameof(action));
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            var csv = string.Join(",", articleIds);
+
+            var sql = normalized == "add" ? SqlBulkAddTagToArticles : SqlBulkRemoveTagFromArticles;
+
+            await using var command = new SqlCommand(sql, connection);
+            command.CommandType = CommandType.Text;
+
+            command.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            command.Parameters.Add(new SqlParameter("@TagId", SqlDbType.Int) { Value = tagId });
+            command.Parameters.Add(new SqlParameter("@ArticleIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            if (result is null) throw new InvalidOperationException("ArticleService.BulkUpdateSingleTagAsync: Failed to execute bulk update.");
+
+            var updatedCount = Convert.ToInt32(result);
+
+            // -1 indicates the tag does not exist for this tenant
+            if (updatedCount == -1)
+                throw new KeyNotFoundException("Tag was not found for the provided companyId.");
+
+            return updatedCount;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.BulkUpdateSingleTagAsync failed for companyCode={CompanyCode}, tagId={TagId}, action={Action}", companyId, tagId, action);
             throw;
         }
     }

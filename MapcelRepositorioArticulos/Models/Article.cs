@@ -124,3 +124,15 @@ public sealed class ArticleDetailsDto
         UpdatedAt = article.UpdatedAt;
     }
 }
+
+public record BulkUpdateTagsRequest(
+    int[] ArticleIds,
+    int TagId,
+    string Action // "add" | "remove"
+);
+
+public sealed record BulkUpdateTagsResponse(
+    string Status,
+    int UpdatedCount
+);
+

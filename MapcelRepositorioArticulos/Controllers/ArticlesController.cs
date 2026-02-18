@@ -114,6 +114,48 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
     }
     
+    [HttpPost("bulk-tags")]
+    public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
+        [FromQuery] string companyId,
+        [FromBody] BulkUpdateTagsRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (request is null) return BadRequest("Request body is required.");
+            if (request.ArticleIds is null || request.ArticleIds.Length == 0) return BadRequest("ArticleIds is required.");
+            if (request.TagId <= 0) return BadRequest("TagId must be > 0.");
+            if (string.IsNullOrWhiteSpace(request.Action)) return BadRequest("Action is required.");
+
+            var action = request.Action.Trim().ToLowerInvariant();
+            if (action is not ("add" or "remove")) return BadRequest("Action must be 'add' or 'remove'.");
+
+            var updatedCount = await service.BulkUpdateSingleTagAsync(
+                companyId,
+                request.ArticleIds,
+                request.TagId,
+                action,
+                cancellationToken);
+
+            return Ok(new BulkUpdateTagsResponse("ok", updatedCount));
+        }
+        catch (KeyNotFoundException ex)
+        {
+            // Tag not found for this company (tenant-safe)
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticlesController.BulkUpdateTags failed for companyId={CompanyId}", companyId);
+            return StatusCode(500);
+        }
+    }
+
+    
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ArticleDetailsDto>> Update(
         [FromRoute] int id,

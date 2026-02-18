@@ -366,6 +366,8 @@ var BulkTagEditorUI = (function() {
     var articleIds = bulkTagEditorState.selectedArticles.map(function(article) {
       return article.id;
     });
+
+    ArticleService.clearCache()
     
     // Fetch updated articles using bulk method
     return ArticleService.getArticlesByIds(articleIds)

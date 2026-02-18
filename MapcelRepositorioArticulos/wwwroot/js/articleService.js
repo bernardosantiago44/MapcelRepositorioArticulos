@@ -8,29 +8,39 @@ const ArticleService = (function() {
   
   // Cache for mock data to avoid multiple file loads
   let mockDataCache = null;
-  let tagCache = null;  // Separate cache for tags by company
+  let tagCache = new Map();  // Separate cache for tags by company
   let companiesCache = new Map(); // Company map cache
+  let articlesCache = new Map(); // Article map cache (keyed by article ID)
   
   /**
    * Clear the data cache (useful for development/testing)
    */
   function clearCache() {
     mockDataCache = null;
-    tagCache = null;
+    tagCache.clear();
     companiesCache.clear();
+    articlesCache.clear();
   }
   
   /**
    * Clear only the tag cache (useful when tags are modified)
    */
   function clearTagCache() {
-    tagCache = null;
+    tagCache.clear();
+  }
+
+  function getTagCache() {
+    return tagCache;
   }
 
   function clearCompaniesCache() {
     companiesCache.clear();
   }
   
+  function getArticlesCache() {
+    return articlesCache;
+  }
+
   /**
    * Load mock data from JSON file
    * @param {boolean} forceRefresh - Force reload even if cached
@@ -65,11 +75,11 @@ const ArticleService = (function() {
    */
   function getTags(companyId) {
     // Check cache first
-    if (tagCache && tagCache[companyId]) {
-      return Promise.resolve(tagCache[companyId]);
+    if (tagCache && tagCache.has(companyId)) {
+      return Promise.resolve(tagCache.get(companyId));
     }
 
-    return fetch(`/api/tags?companyId=${encodeURIComponent(companyId)}`, {
+    return fetch(`/api/tags?companyCode=${encodeURIComponent(companyId)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -78,15 +88,11 @@ const ArticleService = (function() {
       }
 
       const companyTags = res.json();
-
-      // Initialize cache if needed
-      if (!tagCache) {
-        tagCache = {};
-      }
-
+      return companyTags;
+    })
+    .then(function (companyTags) {
       // Cache the tags for this company
-      tagCache[companyId] = companyTags;
-
+      tagCache.set(companyId, companyTags);
       return companyTags;
     });
   }
@@ -99,8 +105,8 @@ const ArticleService = (function() {
   function getTagById(tagId) {
     // Check if tag is in cache
     if (tagCache) {
-      for (const companyId in tagCache) {
-        const tags = tagCache[companyId];
+      for (const companyId of tagCache.keys()) {
+        const tags = tagCache.get(companyId);
         const tag = tags.find(t => t.id === tagId);
         if (tag) {
           return Promise.resolve(tag);
@@ -129,34 +135,34 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string, data: Object}>} Promise resolving to the created tag
    */
   function createTag(tagData) {
-    return new Promise(function(resolve, reject) {
-      if (!tagData.name || !tagData.color || !tagData.companyId) {
-        reject(new Error('Tag name, color, and companyId are required'));
-        return;
+    const headers = new Headers();
+    headers.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify(tagData);
+
+    const requestOptions = {
+      method: "POST",
+      headers: headers,
+      body: raw,
+      redirect: "follow"
+    };
+
+    return fetch(`/api/tags?companyCode=${encodeURIComponent(tagData.companyId)}`, requestOptions)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Failed to create tag: " + response.status);
       }
-      
-      // NOTE: Using Date.now() + random for mock data only.
-      // In production, the backend should generate proper UUIDs or auto-increment IDs
-      var newId = 'tag-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-      var newTag = {
-        id: newId,
-        name: tagData.name,
-        color: tagData.color,
-        description: tagData.description || '',
-        companyId: tagData.companyId
-      };
-      
-      console.log('Creating new tag:', newTag);
-      
-      // Add to mock data cache if available
-      if (mockDataCache && mockDataCache.tags) {
-        mockDataCache.tags.push(newTag);
-      }
-      
-      // Clear tag cache to force refresh
+      return response.json();
+    })
+    .then(function (result) {
+      console.log("Tag created successfully:", result);
+      // Clear tag cache to force refresh on next getTags call
       clearTagCache();
-      
-      resolve({ status: 'success', data: newTag });
+      return { status: "success", data: result };
+    })
+    .catch(function (error) {
+      console.error("Error creating tag:", error);
+      throw error;
     });
   }
   
@@ -167,38 +173,34 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string, data: Object}>} Promise resolving to the updated tag
    */
   function updateTag(tagId, tagData) {
-    return new Promise(function(resolve, reject) {
-      if (!tagData.name || !tagData.color) {
-        reject(new Error('Tag name and color are required'));
-        return;
+    const headers = new Headers();
+    headers.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify(tagData);
+
+    const requestOptions = {
+      method: "PUT",
+      headers: headers,
+      body: raw,
+      redirect: "follow"
+    };
+
+    return fetch(`/api/tags/${tagId}`, requestOptions)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Failed to update tag: " + response.status);
       }
-      
-      console.log('Updating tag ' + tagId, tagData);
-      
-      // Update in mock data cache if available
-      if (mockDataCache && mockDataCache.tags) {
-        var index = mockDataCache.tags.findIndex(function(tag) {
-          return tag.id === tagId;
-        });
-        if (index !== -1) {
-          var updatedTag = {
-            id: tagId,
-            name: tagData.name,
-            color: tagData.color,
-            description: tagData.description || '',
-            companyId: mockDataCache.tags[index].companyId  // Preserve companyId
-          };
-          mockDataCache.tags[index] = updatedTag;
-          
-          // Clear tag cache to force refresh
-          clearTagCache();
-          
-          resolve({ status: 'success', data: updatedTag });
-          return;
-        }
-      }
-      
-      reject(new Error('Tag not found'));
+      return response.json();
+    })
+    .then(function (result) {
+      console.log("Tag updated successfully:", result);
+      // Clear tag cache to force refresh on next getTags call
+      clearTagCache();
+      return { status: "success", data: result };
+    })
+    .catch(function (error) {
+      console.error("Error updating tag:", error);
+      throw error;
     });
   }
   
@@ -208,26 +210,24 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string}>} Promise resolving to status
    */
   function deleteTag(tagId) {
-    return new Promise(function(resolve, reject) {
-      console.log('Deleting tag ' + tagId);
-      
-      // Delete from mock data cache if available
-      if (mockDataCache && mockDataCache.tags) {
-        var index = mockDataCache.tags.findIndex(function(tag) {
-          return tag.id === tagId;
-        });
-        if (index !== -1) {
-          mockDataCache.tags.splice(index, 1);
-          
-          // Clear tag cache to force refresh
-          clearTagCache();
-          
-          resolve({ status: 'success' });
-          return;
-        }
+    const requestOptions = {
+      method: "DELETE",
+      redirect: "follow"
+    };
+
+    return fetch(`/api/tags/${tagId}`, requestOptions)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Failed to delete tag: " + response.status);
       }
-      
-      reject(new Error('Tag not found'));
+      console.log("Tag deleted successfully:", tagId);
+      // Clear tag cache to force refresh on next getTags call
+      clearTagCache();
+      return { status: "success" };
+    })
+    .catch(function (error) {
+      console.error("Error deleting tag:", error);
+      throw error;
     });
   }
   
@@ -291,6 +291,13 @@ const ArticleService = (function() {
       return article;
     });
 
+    for (const article of articlesWithResolvedTags) {
+      // Cache each article by its ID for quick lookup later
+      if (article.id) {
+        articlesCache.set(article.id, article);
+      }
+    }
+
     return articlesWithResolvedTags;
   }
 
@@ -302,7 +309,7 @@ const ArticleService = (function() {
  * @param {string} companyId
  * @returns {Promise<Object|null>}
  */
-  async function getArticleById(articleId, companyId) {
+  async function getArticleById(articleId, companyId = appState.selectedCompanyId) {
     if (!articleId) return null;
 
     const url = `/api/articles/${encodeURIComponent(articleId)}?companyId=${encodeURIComponent(companyId)}`;
@@ -338,32 +345,50 @@ const ArticleService = (function() {
    * @param {Array<string>} articleIds - Array of article IDs
    * @returns {Promise<Array<Article>>} Promise resolving to array of articles (with resolved tags)
    */
-  function getArticlesByIds(articleIds) {
-    if (!articleIds || articleIds.length === 0) {
-      return Promise.resolve([]);
-    }
-    
-    return loadMockData().then(data => {
-      const articles = data.articles || [];
-      const tags = data.tags || [];
-      
-      // Find all articles that match the requested IDs
-      const matchedArticles = articles.filter(article => articleIds.indexOf(article.id) !== -1);
-      
-      // Resolve tags for each article
-      return matchedArticles.map(article => {
-        if (article.tags && Array.isArray(article.tags)) {
-          const resolvedTags = article.tags.map(tagId => {
-            const tag = tags.find(t => t.id === tagId);
-            return tag || null;
-          }).filter(tag => tag !== null);
-          
-          return Object.assign({}, article, { tags: resolvedTags });
+    function getArticlesByIds(articleIds) {
+      const resultsMap = new Map();
+      const idsToFetch = [];
+
+      // 1. Check cache and categorize IDs
+      articleIds.forEach(id => {
+        const cached = articlesCache.get(id);
+        if (cached) {
+          resultsMap.set(id, cached);
+        } else {
+          idsToFetch.push(id);
         }
-        return article;
       });
-    });
-  }
+
+      // 2. Short-circuit if all items were in cache
+      if (idsToFetch.length === 0) {
+        const orderedResults = articleIds.map(id => resultsMap.get(id));
+        return Promise.resolve(orderedResults);
+      }
+
+      // 3. Create an array of Promises for the missing articles
+      const fetchPromises = idsToFetch.map(id => {
+        return getArticleById(id)
+          .then(article => {
+            if (article) {
+              articlesCache.set(id, article); // Hydrate cache for future use
+              resultsMap.set(id, article);
+            }
+            return article;
+          })
+          .catch(err => {
+            console.error(`Failed to fetch article ${id}:`, err);
+            return null; // Resolve with null so Promise.all doesn't reject early
+          });
+      });
+
+      // 4. Execute all fetches simultaneously
+      return Promise.all(fetchPromises).then(() => {
+        // 5. Reconstruct the list in the original order, filtering out missing/failed items
+        return articleIds
+          .map(id => resultsMap.get(id))
+          .filter(article => article != null);
+      });
+    }
   
   
   /**
@@ -372,23 +397,40 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the created article
    */
   function createArticle(data) {
-    return new Promise(function(resolve) {
-      var newId = 'issue-' + Math.floor(Math.random() * 10000);
-      var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      var newRecord = Object.assign({}, data, {
-        id: newId,
-        createdAt: today,
-        updatedAt: today
-      });
-      
-      console.log('Creating new article:', newRecord);
-      
-      // Add to mock data cache if available
-      if (mockDataCache && mockDataCache.articles) {
-        mockDataCache.articles.push(newRecord);
+    const headers = new Headers();
+    headers.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+      title: data.title,
+      description: data.description,
+      externalLink: data.externalLink,
+      status: data.status,
+      clientComments: data.clientComments,
+      tagIds: data.tags
+    });
+
+    const requestOptions = {
+      method: "POST",
+      headers: headers,
+      body: raw,
+      redirect: "follow"
+    };
+
+    return fetch(`/api/articles?companyId=${appState.selectedCompanyId}`, requestOptions)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Failed to create article: " + response.status);
       }
-      
-      resolve({ status: 'success', data: newRecord });
+      return response.json();
+    })
+    .then(function (result) {
+      articlesCache.set(result.id, result);
+      console.log("Article created successfully:", result);
+      return { status: "success", data: result };
+    })
+    .catch(function (error) {
+      console.error("Error creating article:", error);
+      throw error;
     });
   }
   
@@ -434,67 +476,25 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string, updatedCount: number}>} Promise resolving to the result
    */
   function bulkUpdateTags(articleIds, tagId, action) {
-    return new Promise(function(resolve, reject) {
-      if (!articleIds || articleIds.length === 0) {
-        reject(new Error('No articles specified for bulk update'));
-        return;
-      }
-      
-      if (!tagId) {
-        reject(new Error('No tag specified for bulk update'));
-        return;
-      }
-      
-      if (action !== 'add' && action !== 'remove') {
-        reject(new Error('Invalid action: must be "add" or "remove"'));
-        return;
-      }
-      
-      console.log('Bulk updating tags: ' + action + ' tag ' + tagId + ' for articles:', articleIds);
-      
-      // Update in mock data cache
-      if (mockDataCache && mockDataCache.articles) {
-        var updatedCount = 0;
-        
-        articleIds.forEach(function(articleId) {
-          var articleIndex = mockDataCache.articles.findIndex(function(article) {
-            return article.id === articleId;
-          });
-          
-          if (articleIndex !== -1) {
-            var article = mockDataCache.articles[articleIndex];
-            
-            // Ensure tags is an array
-            if (!article.tags) {
-              article.tags = [];
-            }
-            
-            var tagIndex = article.tags.indexOf(tagId);
-            
-            if (action === 'add') {
-              // Add tag if not already present
-              if (tagIndex === -1) {
-                article.tags.push(tagId);
-                updatedCount++;
-              }
-            } else if (action === 'remove') {
-              // Remove tag if present
-              if (tagIndex !== -1) {
-                article.tags.splice(tagIndex, 1);
-                updatedCount++;
-              }
-            }
-            
-            // Update the updatedAt timestamp
-            article.updatedAt = new Date().toISOString().split('T')[0];
-          }
-        });
-        
-        resolve({ status: 'success', updatedCount: updatedCount });
-      } else {
-        reject(new Error('Mock data not loaded'));
-      }
+    const headers = new Headers();
+    headers.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+      "articleIds": articleIds,
+      "tagId": tagId,
+      "action": action
     });
+
+    const requestOptions = {
+      method: "POST",
+      headers: headers,
+      body: raw,
+      redirect: "follow"
+    };
+
+    const companyId = appState.selectedCompanyId;
+
+    return fetch(`/api/articles/bulk-tags?companyId=${companyId}`, requestOptions);
   }
   
   // Public API
@@ -511,6 +511,7 @@ const ArticleService = (function() {
     updateArticle: updateArticle,
     bulkUpdateTags: bulkUpdateTags,  // Bulk update tags for multiple articles
     clearCache: clearCache,  // Expose cache clearing for development/testing
-    clearTagCache: clearTagCache  // Expose tag cache clearing
+    clearTagCache: clearTagCache,  // Expose tag cache clearing
+    getTagCache: getTagCache  // Expose tag cache for debugging/testing
   };
 })();

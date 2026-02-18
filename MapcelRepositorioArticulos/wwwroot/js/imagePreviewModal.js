@@ -15,14 +15,14 @@ const ImagePreviewModal = (function() {
   function openPreview(imageId) {
     ImageService.getImageById(imageId)
       .then(response => {
-        if (!response.data) {
+        if (!response) {
           dhtmlx.message({
             type: 'error',
             text: 'Imagen no encontrada'
           });
           return;
         }
-        showPreviewModal(response.data[0]);
+        showPreviewModal(response);
       })
       .catch(error => {
         console.error('Error loading image:', error);

@@ -562,6 +562,7 @@ const ImagesTabManager = (function() {
           () => {
             ImageService.deleteImage(imageId)
               .then(() => {
+                
                 dhtmlx.message({
                   type: 'success',
                   text: 'Imagen eliminada correctamente'
@@ -576,11 +577,12 @@ const ImagesTabManager = (function() {
                 refreshImagesList();
               })
               .catch(error => {
+                refreshImagesList();
                 console.error('Error deleting image:', error);
-                dhtmlx.message({
-                  type: 'error',
-                  text: 'Error al eliminar imagen'
-                });
+                // dhtmlx.message({
+                //   type: 'error',
+                //   text: 'Error al eliminar imagen'
+                // });
               });
           }
         );
@@ -761,7 +763,11 @@ const ImagesTabManager = (function() {
    * Refresh images list
    */
   function refreshImagesList() {
-    loadImages();
+    try {
+      loadImages();
+    } catch (error) {
+      console.error('Error refreshing images list:', error);
+    }
   }
   
   /**

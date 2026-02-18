@@ -6,6 +6,7 @@
 
 const ImageService = (function() {
   'use strict';
+  let imagesCache = new Map(); // Cache images by ID to avoid multiple loads
   
   /**
    * Load mock data from JSON file
@@ -41,13 +42,21 @@ const ImageService = (function() {
     return fetch(`/api/files/images?${params}`)
       .then(response => {
         if (response.status === 404) {
-          // Cache empty result to prevent future calls
+          // remove that id from cache if not found
+          imagesCache.delete(companyId);
           return {data:[]};
         }
         if (!response.ok) throw new Error("API Error");
         return response.json();
       })
-      .then(pagedResult => pagedResult.data);
+      .then((pagedResult) => {
+        const images = Array.isArray(pagedResult.data) ? pagedResult.data : [];
+        // Cache images by ID
+        images.forEach(image => {
+          imagesCache.set(image.id, image);
+        });
+        return pagedResult.data;
+      });
   }
   
   /**
@@ -56,6 +65,11 @@ const ImageService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to image object or null
    */
   function getImageById(imageId) {
+    // Check cache first
+    if (imagesCache.has(imageId)) {
+      return Promise.resolve(imagesCache.get(imageId));
+    }
+
     // We call the specific endpoint for an image by ID
     return fetch(`/api/files/images/${imageId}`)
       .then(response => {
@@ -68,7 +82,7 @@ const ImageService = (function() {
           throw new Error(`Server error: ${response.statusText}`);
         }
 
-        return response.json();
+        return response.json().data[0];
       })
       .catch(error => {
         console.error("Error fetching image:", error);
@@ -80,33 +94,38 @@ const ImageService = (function() {
    * Update image metadata (description)
    * @param {string} imageId - The image ID
    * @param {string} newDescription - New description text
-   * @returns {Promise<Object>} Promise resolving to updated image object
+   * @param {string} companyCode - The company code
+   * @return {Promise<Object>} Promise resolving to the updated image object
    */
-  function updateImageMetadata(imageId, newDescription) {
-    // Simulate network delay
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        getImageById(imageId).then(image => {
-          if (!image) {
-            reject(new Error('Image not found: ' + imageId));
-            return;
-          }
-          
-          // Create updated image object
-          const updatedImage = {
-            ...image,
-            description: newDescription
-          };
-          
-          // In a real implementation, this would update the backend
-          // For now, we just return the updated object
-          resolve(updatedImage);
-          
-        }).catch(error => {
-          reject(error);
-        });
-      }, 500); // Simulate 0.5 second update time
+  function updateImageMetadata(imageId, newDescription, companyCode) {
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+
+    const raw = JSON.stringify({
+      "description": newDescription
     });
+
+    const requestOptions = {
+      method: "PUT",
+      headers: myHeaders,
+      body: raw,
+      redirect: "follow"
+    };
+
+    return fetch(`/api/files/${imageId}?companyId=${companyCode}`, requestOptions)
+      .then(response => {
+        if (response.status === 404) {
+          console.warn(`Image with ID ${imageId} not found for update.`);
+        }
+        if (!response.ok) {
+          throw new Error(`Failed to update image metadata: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .catch(error => {
+        console.error('Error updating image metadata:', error);
+        throw error;
+      });
   }
   
   /**
@@ -115,24 +134,19 @@ const ImageService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function deleteImage(imageId) {
-    // Simulate network delay
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        getImageById(imageId).then(image => {
-          if (!image) {
-            reject(new Error('Image not found: ' + imageId));
-            return;
-          }
-          
-          // In a real implementation, this would delete from backend
-          // For now, we just return success
-          resolve(true);
-          
-        }).catch(error => {
-          reject(error);
-        });
-      }, 500); // Simulate 0.5 second delete time
-    });
+    const requestOptions = {
+      method: "DELETE",
+      redirect: "follow"
+    };
+
+    return fetch(`/api/files/${imageId}?companyId=${appState.selectedCompanyId}`, requestOptions)
+      .then(response => {
+        console.log(response);
+        if (!response.ok) {
+          throw new Error(`Failed to delete image: ${response.statusText}`);
+        }
+        return response.json();
+      });
   }
 
   /**

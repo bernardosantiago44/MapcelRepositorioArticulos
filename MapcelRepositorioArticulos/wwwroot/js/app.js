@@ -213,7 +213,7 @@ function initializeApplication() {
  */
 function initializeAdminView() {
   // Load companies and populate company picker
-  ArticleService.getCompanies()
+  CompanyService.getAllCompanies()
     .then(function(companies) {
       if (companies.length === 0) {
         throw new Error('No companies found');
@@ -272,7 +272,7 @@ function initializeRegularUserView() {
   createFilterFormForRegularUser();
 
   // Add the company title to the header bar
-  ArticleService.getCompanyById(companyId)
+  CompanyService.getCompanyById(companyId)
     .then(function(company) {
       if (company) {
         var companyTitleHtml = createCompanyTitleHtml(company.name);
@@ -750,7 +750,7 @@ function onArticleSelect(articleId, companyId) {
   // Fetch article details and company info
   Promise.all([
     ArticleService.getArticleById(articleId, companyId),
-    ArticleService.getCompanyById(appState.selectedCompanyId)
+    CompanyService.getCompanyById(companyId)
   ])
     .then(function(results) {
       var article = results[0];
@@ -982,7 +982,7 @@ function openNewArticleForm() {
   }
   
   // Get company name for display
-  ArticleService.getCompanyById(appState.selectedCompanyId)
+  CompanyService.getCompanyById(appState.selectedCompanyId)
     .then(function(company) {
       var companyName = company ? company.name : '';
       
@@ -1118,7 +1118,7 @@ function rebuildArticlesTabLayout() {
   
   // Recreate filters
   if (UserService.isAdministrator()) {
-    ArticleService.getCompanies().then(function(companies) {
+    CompanyService.getAllCompanies().then(function(companies) {
       createGridFilters(companies);
     });
   } else {

@@ -362,7 +362,7 @@ const CompanyFormUI = (function() {
         
         // Load company data and settings
         Promise.all([
-            ArticleService.getCompanyById(companyId),
+            CompanyService.getCompanyById(companyId),
             CompanyService.getCompanySettings(companyId)
         ])
         .then(function(results) {

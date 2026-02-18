@@ -465,11 +465,16 @@ const ImagesTabManager = (function() {
       
       updateSelectionUI();
     }).catch(error => {
-      console.error('Error loading images:', error);
-      dhtmlx.message({
-        type: 'error',
-        text: 'Error al cargar imágenes'
-      });
+      if (error.status === 404) {
+        // No images found, render empty state
+        currentImages = [];
+      } else {
+        console.error('Error loading images:', error);
+        dhtmlx.message({
+          type: 'error',
+          text: 'Error al cargar imágenes'
+        });
+      }
     });
   }
   

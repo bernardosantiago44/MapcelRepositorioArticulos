@@ -9,12 +9,64 @@ const CompanyService = (function() {
 
   // Cache for company settings to avoid multiple lookups
   let companySettingsCache = {};
+  let companiesCache = new Map();
 
   /**
    * Clear the settings cache (useful for development/testing)
    */
   function clearCache() {
     companySettingsCache = {};
+    companiesCache.clear();
+  }
+  function getAllCompanies() {
+    return fetch(`/api/companies`)
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Failed to fetch companies');
+        }
+        return response.json();
+      })
+      .then(function(companies) {
+        if (Array.isArray(companies)) {
+          companies.forEach(function(company) {
+            if (company && company.id) {
+              companiesCache.set(company.id, company);
+            }
+          });
+        }
+        return companies || [];
+      })
+      .catch(function(error) {
+        console.error('Error fetching companies:', error);
+        return [];
+      });
+  }
+
+  function getCompanyById(companyId) {
+    if (companiesCache.has(companyId)) {
+      return Promise.resolve(companiesCache.get(companyId));
+    }
+
+    return fetch(`/api/companies/${companyId}`)
+      .then(function(response) {
+        if (response.status === 404) {
+          return null; // Company not found
+        }
+        if (!response.ok) {
+          throw new Error('Failed to fetch company: ' + response.statusText);
+        }
+        return response.json();
+      })
+      .then(function(company) {
+        if (company && company.id) {
+          companiesCache.set(company.id, company);
+        }
+        return company;
+      })
+      .catch(function(error) {
+        console.error('Error fetching company by ID:', error);
+        return null;
+      });
   }
 
   /**
@@ -28,8 +80,8 @@ const CompanyService = (function() {
       return Promise.resolve(companySettingsCache[companyId]);
     }
 
-    // Load from ArticleService (which manages mock data)
-    return ArticleService.getCompanyById(companyId)
+    // Load from CompanyService and cache the result
+    return getCompanyById(companyId)
       .then(function(company) {
         if (!company) {
           throw new Error('Company not found: ' + companyId);
@@ -69,44 +121,32 @@ const CompanyService = (function() {
         return;
       }
 
-      console.log('Updating company settings for ' + companyId, newSettings);
+      const headers = new Headers();
+      headers.append("Content-Type", "application/json");
 
-      // In mock mode, update the data via fetch and modify in memory
-      // This simulates what would be a PUT request to the backend
-      fetch('./data/articles-mock-data.json')
+      const rawSettings = JSON.stringify(newSettings);
+      const requestOptions = {
+        method: "PUT",
+        headers: headers,
+        body: rawSettings,
+        redirect: "follow"
+      };
+
+      fetch(`/api/companies/${companyId}`, requestOptions)
         .then(function(response) {
           return response.json();
         })
         .then(function(data) {
-          // Find the company and update settings
-          const companies = data.companies || [];
-          const companyIndex = companies.findIndex(function(c) {
-            return c.id === companyId;
-          });
-
-          if (companyIndex === -1) {
-            throw new Error('Company not found: ' + companyId);
-          }
-
-          // Update settings in the company object
-          // Note: In production, this would be a backend call
-          // For mock data, we update the in-memory ArticleService cache
-          ArticleService.getCompanyById(companyId)
-            .then(function(company) {
-              if (company) {
-                company.settings = newSettings;
-              }
-            });
 
           // Clear the settings cache to force refresh
           delete companySettingsCache[companyId];
 
           // Update cache with new settings
-          companySettingsCache[companyId] = newSettings;
+          companySettingsCache[companyId] = data.settings || newSettings;
 
           resolve({ 
             status: 'success', 
-            data: newSettings 
+            data: data.settings || newSettings
           });
         })
         .catch(function(error) {
@@ -163,6 +203,8 @@ const CompanyService = (function() {
 
   // Public API
   return {
+    getAllCompanies: getAllCompanies,
+    getCompanyById: getCompanyById,
     getCompanySettings: getCompanySettings,
     updateCompanySettings: updateCompanySettings,
     isSettingEnabled: isSettingEnabled,

@@ -85,11 +85,16 @@ const ImagesGridHelper = (function() {
         });
       })
       .catch(error => {
-        console.error('Error loading images:', error);
-        dhtmlx.message({
-          type: 'error',
-          text: 'Error al cargar imágenes: ' + error.message
-        });
+        if (error.status === 404) {
+          // No images found, render empty state
+          grid.clearAll();
+        } else {
+          console.error('Error loading images:', error);
+          dhtmlx.message({
+            type: 'error',
+            text: 'Error al cargar imágenes: ' + error.message
+          });
+        }
       });
   }
   

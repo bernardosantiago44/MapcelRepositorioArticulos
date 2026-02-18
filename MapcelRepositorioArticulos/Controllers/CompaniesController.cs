@@ -1,27 +1,72 @@
+using MapcelRepositorioArticulos.DataService;
 using Microsoft.AspNetCore.Mvc;
 using MapcelRepositorioArticulos.Models;
-using MapcelRepositorioArticulos.Repository;
+using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/companies")]
-public class CompaniesController(IArticleRepository repo) : ControllerBase
+public class CompanyController(ICompaniesService companiesService) : ControllerBase
 {
-    private readonly IArticleRepository _repo = repo;
-
     [HttpGet]
-    public ActionResult<IEnumerable<Company>> GetAllCompanies()
+    public async Task<ActionResult<IReadOnlyList<Company>>> GetAll(CancellationToken cancellationToken)
     {
-        var result = _repo.GetCompanies();
-        return Ok(result);
+        try
+        {
+            var companies = await companiesService.GetAllAsync(cancellationToken);
+            return Ok(companies);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CompanyController.GetAll failed");
+            return StatusCode(500);
+        }
     }
     
     [HttpGet("{id}")]
-    public ActionResult<Company> GetById(string id)
+    public async Task<ActionResult<Company>> GetById(
+        [FromRoute] string id,
+        CancellationToken cancellationToken)
     {
-        var result = _repo.GetCompanyById(id);
-        if  (result is null) return NotFound();
-        return Ok(result);
+        try
+        {
+            var company = await companiesService.GetByIdAsync(id, cancellationToken);
+            if (company is null) return NotFound();
+            return Ok(company);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CompanyController.GetById failed for id={Id}", id);
+            return StatusCode(500);
+        }
+    }
+
+    
+    [HttpPut("{id}")]
+    public async Task<ActionResult<Company>> Update(
+        [FromRoute] string id,
+        [FromBody] UpdateCompanyRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await companiesService.UpdateAsync(id, request, cancellationToken);
+            if (updated is null) return NotFound();
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "CompanyController.Update failed for id={Id}", id);
+            return StatusCode(500);
+        }
     }
 }

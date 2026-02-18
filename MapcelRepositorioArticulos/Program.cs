@@ -1,6 +1,5 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
-using MapcelRepositorioArticulos.Repository;
 using Microsoft.Data.SqlClient;
 using Serilog;
 
@@ -32,24 +31,7 @@ builder.Services.AddTransient<SqlConnection>(_ =>
 builder.Services.AddScoped<IArticlesService, ArticlesService>();
 builder.Services.AddScoped<ITagsService, TagsService>();
 builder.Services.AddScoped<IFilesService, FilesService>();
-
-// In-memory mock store (server-side)
-builder.Services.AddSingleton<RepositoryStore>(sp =>
-{
-    var env = sp.GetRequiredService<IWebHostEnvironment>();
-
-    var path = Path.Combine(
-        env.ContentRootPath,
-        "wwwroot",
-        "data",
-        "articles-mock-data.json"
-    );
-
-    return ArticlesRepositoryParser.FromFile(path);
-});
-
-// In-memory repositories (swap to SQL later)
-builder.Services.AddSingleton<IArticleRepository, InMemoryArticleRepository>();
+builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 
 var app = builder.Build();
 

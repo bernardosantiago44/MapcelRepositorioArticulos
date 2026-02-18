@@ -1,6 +1,5 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
-using MapcelRepositorioArticulos.Repository;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -9,7 +8,7 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("/api/articles")]
-public class ArticlesController(IArticleRepository repository, IArticlesService service) : ControllerBase
+public class ArticlesController(IArticlesService service) : ControllerBase
 {
     private readonly IArticlesService _articleService = service;
 

@@ -40,6 +40,10 @@ const ImageService = (function() {
 
     return fetch(`/api/files/images?${params}`)
       .then(response => {
+        if (response.status === 404) {
+          // Cache empty result to prevent future calls
+          return {data:[]};
+        }
         if (!response.ok) throw new Error("API Error");
         return response.json();
       })

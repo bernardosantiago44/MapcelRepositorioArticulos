@@ -59,36 +59,6 @@ const ArticleService = (function() {
   }
   
   /**
-   * Get all companies
-   * @returns {Promise<Array<Company>>} Promise resolving to array of company objects
-   */
-  function getCompanies() {
-    if (companiesCache.size > 0) {
-      return Promise.resolve(Array.from(companiesCache.values()));
-    }
-
-    const companies =  fetch(`/api/companies`, {
-      headers: { "Accept": "application/json" }
-    })
-    .then(function (res) {
-      if (!res.ok) {
-        throw new Error("Failed to load companies: " + res.status);
-      }
-
-      return res.json();
-    })
-    .then(function(data) {
-      // Cache companies in map for quick access
-      data.forEach(company => {
-        companiesCache.set(company.id, company);
-      });
-      return data;
-    });
-
-    return companies;
-  }
-  
-  /**
    * Get tags specific to a company from the new centralized tags array
    * @param {string} companyId - The company ID to filter tags by
    * @returns {Promise<Array<{id: string, name: string, color: string, description: string, companyId: string}>>} Promise resolving to array of tags
@@ -395,18 +365,6 @@ const ArticleService = (function() {
     });
   }
   
-  /**
-   * Get company by ID
-   * @param {string} companyId - The company ID
-   * @returns {Promise<Company|null>} Promise resolving to company object or null
-   */
-  function getCompanyById(companyId) {
-    return loadMockData().then(data => {
-      const companies = data.companies || [];
-      const company = companies.find(company => company.id === companyId);
-      return company || null;
-    });
-  }
   
   /**
    * Create a new article (POST equivalent)
@@ -541,7 +499,6 @@ const ArticleService = (function() {
   
   // Public API
   return {
-    getCompanies: getCompanies,
     getTags: getTags,
     getTagById: getTagById,
     createTag: createTag,
@@ -550,7 +507,6 @@ const ArticleService = (function() {
     getArticles: getArticles,
     getArticleById: getArticleById,
     getArticlesByIds: getArticlesByIds,  // Bulk fetch for multiple articles
-    getCompanyById: getCompanyById,
     createArticle: createArticle,
     updateArticle: updateArticle,
     bulkUpdateTags: bulkUpdateTags,  // Bulk update tags for multiple articles

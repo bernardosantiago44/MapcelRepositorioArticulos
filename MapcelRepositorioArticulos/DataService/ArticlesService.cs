@@ -55,6 +55,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     // -------------------
     // --- SQL Queries ---
     // -------------------
+    // TODO: Add date range filters
     private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
@@ -115,7 +116,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                   );
         ";
     private const string SqlInsertArticle = @"
-        INSERT INTO dbo.articles
+        INSERT INTO [dbo].[articles]
         (
             company_code,
             title,
@@ -176,7 +177,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         WHERE a.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
-
     private const string SqlSelectMultipleTags = @"
         SELECT
         t.tag_id,

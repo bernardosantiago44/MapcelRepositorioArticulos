@@ -3,6 +3,7 @@ using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using System.Text;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
@@ -116,6 +117,112 @@ public class FilesController(IFilesService service) : ControllerBase
         {
             Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
             return StatusCode(500, exception.Message);
+        }
+    }
+    
+    [HttpPost]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<FileAsset>> Create(
+        [FromQuery] string companyId,
+        [FromForm] IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var createdFile = await service.CreateAsync(companyId, file, cancellationToken);
+
+            // TODO: Add binary storage URL
+            var downloadUrl = $"/api/files/{createdFile.Id}/download?companyId={companyId}";
+
+            return Ok(new
+            {
+                file = createdFile,
+                downloadUrl
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FilesController.Create failed for companyId={CompanyId}", companyId);
+            return StatusCode(500);
+        }
+    }
+    
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<FileDto>> Update(
+        [FromRoute] int id,
+        [FromQuery] string companyId,
+        [FromBody] UpdateFileRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var updated = await service.UpdateAsync(id, companyId, request, cancellationToken);
+            if (updated is null) return NotFound();
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FilesController.Update failed for id={Id}, companyId={CompanyId}", id, companyId);
+            return StatusCode(500);
+        }
+    }
+    
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(
+        [FromRoute] int id,
+        [FromQuery] string companyId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await service.DeleteAsync(id, companyId, cancellationToken);
+            if (!deleted) return NotFound();
+            return NoContent(); // 204
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FilesController.Delete failed for id={Id}, companyId={CompanyId}", id, companyId);
+            return StatusCode(500);
+        }
+    }
+    
+    [HttpGet("{id:int}/download")]
+    public async Task<IActionResult> Download(
+        [FromRoute] int id,
+        [FromQuery] string companyId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var info = await service.GetDownloadInfoAsync(id, companyId, cancellationToken);
+            if (info is null) return NotFound();
+
+            // Mock file bytes for now
+            var filename = $"{info.Value.Name}{info.Value.Extension}";
+            var bytes = Encoding.UTF8.GetBytes($"Mock download payload for fileId={id}.");
+
+            return File(bytes, "application/octet-stream", filename);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "FilesController.Download failed for id={Id}, companyId={CompanyId}", id, companyId);
+            return StatusCode(500);
         }
     }
 }

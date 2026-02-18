@@ -69,6 +69,11 @@ public sealed class UpdateFileRequest
     public string? Name { get; set; }
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Validates the current FileRequest.
+    /// </summary>
+    /// <exception cref="ArgumentException">If name or description are empty (any),
+    /// or if the length exceeds 500 characters.</exception>
     public void Validate()
     {
         var nameEmpty = string.IsNullOrWhiteSpace(Name);

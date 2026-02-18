@@ -39,13 +39,49 @@ public interface IFilesService
     /// <returns></returns>
     public Task<IReadOnlyList<FileDto>> GetByIdsAsync(int[] ids, CancellationToken cancellationToken);
     
+    /// <summary>
+    /// Creates a new File record in the database, asynchronously.
+    /// </summary>
+    /// <param name="companyId">string</param>
+    /// <param name="file">IFormFile</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>FileAsset</returns>
+    /// <exception cref="ArgumentException">If companyId is empty.</exception>
+    /// <exception cref="ArgumentNullException">If provided file is null, empty or invalid.</exception>
     Task<FileAsset> CreateAsync(string companyId, IFormFile file, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Updates all the fields of the provided fileId with the given request.
+    /// </summary>
+    /// <param name="fileId"></param>
+    /// <param name="companyId"></param>
+    /// <param name="request"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     Task<FileDto?> UpdateAsync(int fileId, string companyId, UpdateFileRequest request, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Deletes the file associated with the given fileId from the database.
+    /// </summary>
+    /// <param name="fileId">The file to be deleted.</param>
+    /// <param name="companyId">The company this file belongs to.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>Bool: True if the file existed, false otherwise.</returns>
+    /// <exception cref="ArgumentException"></exception>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     Task<bool> DeleteAsync(int fileId, string companyId, CancellationToken cancellationToken);
     
+    /// <summary>
+    /// Returns the name and file extension
+    /// for the given fileId within the given companyId.
+    /// </summary>
+    /// <param name="fileId"></param>
+    /// <param name="companyId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>(Name, Extension)</returns>
     Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, string companyId, CancellationToken cancellationToken);
-
-
 }
 
 public class FilesService(IConfiguration configuration) : BaseService(configuration), IFilesService

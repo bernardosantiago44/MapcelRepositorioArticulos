@@ -744,13 +744,13 @@ function loadArticlesForCompany(companyId) {
  * @param {string} articleId - Selected article ID
  * @param {string} companyId
  */
-function onArticleSelect(articleId, companyId) {
+function onArticleSelect(articleId) {
   appState.selectedArticleId = articleId;
   
   // Fetch article details and company info
   Promise.all([
-    ArticleService.getArticleById(articleId, companyId),
-    CompanyService.getCompanyById(companyId)
+    ArticleService.getArticleById(articleId, appState.selectedCompanyId),
+    CompanyService.getCompanyById(appState.selectedCompanyId)
   ])
     .then(function(results) {
       var article = results[0];

@@ -70,6 +70,8 @@ public class CreateArticleRequest
     public required string? ClientComments { get; init; }
     public required string Status { get; init; }
     public required string[]? TagIds  { get; init; }
+    public required int[]? FileIds { get; init; }
+
 
     /// <summary>
     /// Throws if Title or Status are (any) null or empty.

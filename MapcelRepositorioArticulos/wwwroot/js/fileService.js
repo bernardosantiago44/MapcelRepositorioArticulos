@@ -1,7 +1,6 @@
 /**
  * File Service Module
  * Provides Promise-based data fetching methods for file management
- * Simulates async HTTP calls with mock data
  */
 
 const FileService = (function() {
@@ -47,23 +46,6 @@ const FileService = (function() {
     fileCache = null;
   }
   
-  /**
-   * Load mock data from JSON file
-   * @returns {Promise<Object>} Promise resolving to the mock data
-   */
-  function loadMockData() {
-    return fetch('./data/articles-mock-data.json')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to load mock data: ' + response.statusText);
-        }
-        return response.json();
-      })
-      .catch(error => {
-        console.error('Error loading mock data:', error);
-        throw error;
-      });
-  }
   
   /**
    * Get files for a specific company
@@ -121,52 +103,34 @@ const FileService = (function() {
   
   /**
    * Upload one or more files with optional description
-   * Simulates async file upload operation
    * @param {FileList|Array<File>} files - Files to upload
    * @param {string} description - Optional description for the files
    * @param {string} companyId - Company ID to associate files with
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded file objects
    */
   function uploadFiles(files, description, companyId) {
-    // Simulate network delay
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const uploadedFiles = [];
-          const currentDate = new Date().toISOString().split('T')[0];
-          
-          // Convert FileList to Array if needed
-          const filesArray = Array.from(files);
-          
-          filesArray.forEach((file, index) => {
-            const fileId = 'file-' + Date.now() + '-' + index;
-            const fileSizeInKB = (file.size / 1024).toFixed(1);
-            const fileSizeDisplay = fileSizeInKB > 1024 
-              ? (fileSizeInKB / 1024).toFixed(1) + ' MB'
-              : fileSizeInKB + ' KB';
-            
-            const uploadedFile = {
-              id: fileId,
-              name: file.name,
-              size: fileSizeDisplay,
-              description: description || file.name + ' para la empresa',
-              upload_date: currentDate,
-              companyId: companyId,
-              linked_articles: []
-            };
-            
-            uploadedFiles.push(uploadedFile);
-          });
-          
-          // In a real implementation, this would save to backend
-          // For now, we just return the file objects
-          resolve(uploadedFiles);
-          
-        } catch (error) {
-          reject(new Error('Error uploading files: ' + error.message));
-        }
-      }, 1500); // Simulate 1.5 second upload time
+    // Convert FileList to Array if needed
+    const filesArray = Array.from(files);
+    
+    // Upload all files in parallel
+    const uploadPromises = filesArray.map(file => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      return fetch(`/api/files?companyId=${encodeURIComponent(companyId)}`, {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to upload file: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(result => result.file);
     });
+    
+    return Promise.all(uploadPromises);
   }
   
   /**
@@ -176,30 +140,23 @@ const FileService = (function() {
    * @returns {Promise<Object>} Promise resolving to updated file object
    */
   function updateFileMetadata(fileId, newDescription) {
-    // Simulate network delay
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        getFileById(fileId).then(file => {
-          if (!file) {
-            reject(new Error('File not found: ' + fileId));
-            return;
-          }
-          
-          // Create updated file object
-          const updatedFile = {
-            ...file,
-            description: newDescription
-          };
-          
-          // In a real implementation, this would update the backend
-          // For now, we just return the updated object
-          resolve(updatedFile);
-          
-        }).catch(error => {
-          reject(error);
-        });
-      }, 500); // Simulate 0.5 second update time
-    });
+    const companyId = appState.selectedCompanyId;
+    
+    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        description: newDescription
+      })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to update file: ${response.statusText}`);
+        }
+        return response.json();
+      });
   }
   
   /**
@@ -208,50 +165,47 @@ const FileService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function deleteFile(fileId) {
-    // Simulate network delay
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        getFileById(fileId).then(file => {
-          if (!file) {
-            reject(new Error('File not found: ' + fileId));
-            return;
-          }
-          
-          // In a real implementation, this would delete from backend
-          // For now, we just return success
-          resolve(true);
-          
-        }).catch(error => {
-          reject(error);
-        });
-      }, 500); // Simulate 0.5 second delete time
-    });
+    const companyId = appState.selectedCompanyId;
+    
+    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+      method: 'DELETE'
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to delete file: ${response.statusText}`);
+        }
+        return true;
+      });
   }
   
   /**
    * Download a file
-   * In a real implementation, this would trigger a file download
-   * For now, it just simulates the action
    * @param {string} fileId - The file ID to download
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function downloadFile(fileId) {
-    return new Promise((resolve, reject) => {
-      getFileById(fileId).then(file => {
-        if (!file) {
-          reject(new Error('File not found: ' + fileId));
-          return;
+    const companyId = appState.selectedCompanyId;
+    
+    return fetch(`/api/files/${fileId}/download?companyId=${encodeURIComponent(companyId)}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.statusText}`);
         }
-        
-        // In a real implementation, this would download the file
-        // For now, we just show a message
-        console.log('Downloading file:', file.name);
-        resolve(true);
-        
-      }).catch(error => {
-        reject(error);
+        return response.blob();
+      })
+      .then(blob => {
+        // Get filename from Content-Disposition header or use default
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = ''; // Browser will use filename from Content-Disposition
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        return true;
       });
-    });
   }
   
   /**

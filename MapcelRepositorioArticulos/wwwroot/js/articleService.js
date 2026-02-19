@@ -1,13 +1,11 @@
 /**
  * Article Service Module
- * Provides Promise-based data fetching methods for companies, tags, and articles
+ * Provides Promise-based data fetching methods for companies, tags, and articles with API integration
  */
 
 const ArticleService = (function() {
   'use strict';
   
-  // Cache for mock data to avoid multiple file loads
-  let mockDataCache = null;
   let tagCache = new Map();  // Separate cache for tags by company
   let companiesCache = new Map(); // Company map cache
   let articlesCache = new Map(); // Article map cache (keyed by article ID)
@@ -16,7 +14,6 @@ const ArticleService = (function() {
    * Clear the data cache (useful for development/testing)
    */
   function clearCache() {
-    mockDataCache = null;
     tagCache.clear();
     companiesCache.clear();
     articlesCache.clear();
@@ -41,32 +38,6 @@ const ArticleService = (function() {
     return articlesCache;
   }
 
-  /**
-   * Load mock data from JSON file
-   * @param {boolean} forceRefresh - Force reload even if cached
-   * @returns {Promise<Object>} Promise resolving to the mock data
-   */
-  function loadMockData(forceRefresh) {
-    if (mockDataCache && !forceRefresh) {
-      return Promise.resolve(mockDataCache);
-    }
-    
-    return fetch('./data/articles-mock-data.json')
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to load mock data: ' + response.statusText);
-        }
-        return response.json();
-      })
-      .then(data => {
-        mockDataCache = data;
-        return data;
-      })
-      .catch(error => {
-        console.error('Error loading mock data:', error);
-        throw error;
-      });
-  }
   
   /**
    * Get tags specific to a company from the new centralized tags array
@@ -441,28 +412,44 @@ const ArticleService = (function() {
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the updated article
    */
   function updateArticle(id, data) {
-    return new Promise(function(resolve) {
-      var today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
-      var updatedRecord = Object.assign({}, data, {
-        id: id,
-        updatedAt: today
-      });
-      
-      console.log('Updating article ' + id, updatedRecord);
-      
-      // Update in mock data cache if available
-      if (mockDataCache && mockDataCache.articles) {
-        var index = mockDataCache.articles.findIndex(function(article) {
-          return article.id === id;
-        });
-        if (index !== -1) {
-          // Preserve original createdAt
-          updatedRecord.createdAt = mockDataCache.articles[index].createdAt;
-          mockDataCache.articles[index] = updatedRecord;
-        }
+    const headers = new Headers();
+    headers.append("Content-Type", "application/json");
+
+    console.log(data);
+    const raw = JSON.stringify({
+      title: data.title || null,
+      description: data.description || null,
+      externalLink: data.externalLink || null,
+      clientComments: data.clientComments || null,
+      status: data.status || null,
+      tagIds: data.tags || null,
+      fileIds: data.fileIds || null
+    });
+    console.log(raw);
+
+    const requestOptions = {
+      method: "PUT",
+      headers: headers,
+      body: raw,
+      redirect: "follow"
+    };
+
+    return fetch(`/api/articles/${id}?companyId=${appState.selectedCompanyId}`, requestOptions)
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("Failed to update article: " + response.status);
       }
-      
-      resolve({ status: 'success', data: updatedRecord });
+      return response.json();
+    })
+    .then(function (result) {
+      articlesCache.set(id, result);
+      console.log("Article updated successfully:", result);
+      return { status: "success", data: result };
+    })
+    .then(FileService.getFilesByArticle())
+    .catch(function (error) {
+      console.error("Error updating article:", error);
+      throw error;
     });
   }
   

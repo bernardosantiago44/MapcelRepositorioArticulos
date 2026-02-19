@@ -122,7 +122,11 @@ const CompanyService = (function() {
       const headers = new Headers();
       headers.append("Content-Type", "application/json");
 
-      const rawSettings = JSON.stringify(newSettings);
+      const rawSettings = JSON.stringify({
+        allowUserUploads: newSettings.allow_user_uploads,
+        allowUserTagCreation: newSettings.allow_user_tag_creation,
+        requireClientComments: newSettings.require_client_comments
+      });
       const requestOptions = {
         method: "PUT",
         headers: headers,

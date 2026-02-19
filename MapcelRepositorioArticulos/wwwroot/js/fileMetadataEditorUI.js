@@ -37,11 +37,11 @@ const FileMetadataEditorUI = (function() {
         editWindow.button('minmax').hide();
         
         // Attach HTML content
-        editWindow.attachHTMLString(renderEditForm(file));
+        editWindow.attachHTMLString(renderEditForm(file.data[0]));
         
         // Setup event handlers after content is attached
         setTimeout(() => {
-          setupEventHandlers(file, editWindow, onSaveComplete);
+          setupEventHandlers(file.data[0], editWindow, onSaveComplete);
         }, 100);
       })
       .catch(error => {

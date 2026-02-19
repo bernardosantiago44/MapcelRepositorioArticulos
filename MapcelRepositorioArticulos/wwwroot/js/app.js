@@ -1171,6 +1171,7 @@ function openEditArticleForm(articleId, companyId) {
  */
 function onArticleFormSaved(articleData, mode) {
   // Reload articles for the current company to refresh the grid
+  ArticleService.clearCache(); // Clear cache to ensure fresh data is loaded
   loadArticlesForCompany(appState.selectedCompanyId)
     .then(function() {
       if (mode === 'create') {

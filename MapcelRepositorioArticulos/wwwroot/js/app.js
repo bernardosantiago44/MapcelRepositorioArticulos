@@ -787,6 +787,17 @@ function onArticleSelect(articleId) {
           } else {
             console.warn('Edit button not found in DOM');
           }
+          
+          var deleteBtn = document.getElementById('delete-article-btn');
+          if (deleteBtn) {
+            deleteBtn.onclick = function() {
+              ArticleDetailUI.handleDeleteArticle(articleId, appState.selectedCompanyId, function() {
+                // After deletion, clear sidebar and refresh articles list
+                appState.sidebarCell.attachHTMLString(ArticleDetailUI.renderEmptyState());
+                loadArticlesForCompany(appState.selectedCompanyId);
+              });
+            };
+          }
         }
       });
     })

@@ -230,6 +230,7 @@ var TagManagerUI = (function() {
    * @param {string|null} tagId - Tag ID to edit, or null to create new
    */
   function openTagForm(tagId) {
+    closeTagForm();
     tagManagerState.editingTagId = tagId;
     
     var tag = null;

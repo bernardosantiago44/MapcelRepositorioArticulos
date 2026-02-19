@@ -35,7 +35,8 @@ var ArticleFormUI = (function() {
     imageSearchQuery: '',       // Current image search query
     fileSearchQuery: '',        // Current file search query
     activeMediaTab: 'images',   // Active tab in media section: 'images' or 'files'
-    descriptionTab: 'write'     // Active tab in description editor: 'write' or 'preview'
+    descriptionTab: 'write',    // Active tab in description editor: 'write' or 'preview'
+    originalArticleData: null   // Original article data for edit mode
   };
   
   /**
@@ -590,6 +591,30 @@ var ArticleFormUI = (function() {
   }
   
   /**
+   * Resolve fileIds from original article data into attachedImages and attachedFiles
+   * Called after media data (images/files) is loaded from the server
+   */
+  function resolveFileIdsFromArticleData() {
+    if (!formState.originalArticleData || !formState.originalArticleData.fileIds) return;
+    var fileIds = formState.originalArticleData.fileIds;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) return;
+    
+    // Use Sets for O(1) lookup performance
+    var imageIdSet = new Set(formState.allImages.map(function(img) { return img.id; }));
+    var fileIdSet = new Set(formState.allFiles.map(function(f) { return f.id; }));
+    var attachedImageSet = new Set(formState.attachedImages);
+    var attachedFileSet = new Set(formState.attachedFiles);
+    
+    fileIds.forEach(function(id) {
+      if (imageIdSet.has(id) && !attachedImageSet.has(id)) {
+        formState.attachedImages.push(id);
+      } else if (fileIdSet.has(id) && !attachedFileSet.has(id)) {
+        formState.attachedFiles.push(id);
+      }
+    });
+  }
+  
+  /**
    * Load media data (images and files) for the company
    */
   function loadMediaData() {
@@ -599,8 +624,8 @@ var ArticleFormUI = (function() {
     ImageService.getImages(formState.companyId)
       .then(function(images) {
         formState.allImages = images;
+        resolveFileIdsFromArticleData();
         updateAvailableImagesDisplay();
-        // Update attached images display in case data loaded after populating form
         updateAttachedImagesDisplay();
         updateMediaCounts();
       })
@@ -616,8 +641,8 @@ var ArticleFormUI = (function() {
     FileService.getFiles(formState.companyId)
       .then(function(files) {
         formState.allFiles = files;
+        resolveFileIdsFromArticleData();
         updateAvailableFilesDisplay();
-        // Update attached files display in case data loaded after populating form
         updateAttachedFilesDisplay();
         updateMediaCounts();
       })
@@ -1266,6 +1291,7 @@ var ArticleFormUI = (function() {
     formState.selectedTags = [];
     formState.attachedImages = [];
     formState.attachedFiles = [];
+    formState.originalArticleData = null;
     formState.allImages = [];
     formState.allFiles = [];
     formState.imageSearchQuery = '';
@@ -1349,6 +1375,7 @@ var ArticleFormUI = (function() {
     formState.articleId = articleData.id;
     formState.companyId = articleData.companyId;
     formState.onSaveCallback = onSaveCallback;
+    formState.originalArticleData = articleData;
     formState.attachedImages = [];
     formState.attachedFiles = [];
     formState.allImages = [];

@@ -64,7 +64,21 @@ const ImageService = (function() {
           throw new Error(`Server error: ${response.statusText}`);
         }
 
-        return response.json().data[0];
+        return response.json();
+      })
+      .then(data => {
+        if (!data) return null;
+        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+          const image = data.data[0];
+          imagesCache.set(image.id, image);
+          return image;
+        }
+        // If the response is the image object directly
+        if (data.id) {
+          imagesCache.set(data.id, data);
+          return data;
+        }
+        return null;
       })
       .catch(error => {
         console.error("Error fetching image:", error);

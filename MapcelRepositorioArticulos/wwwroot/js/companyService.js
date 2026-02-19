@@ -132,7 +132,14 @@ const CompanyService = (function() {
 
       fetch(`/api/companies/${companyId}`, requestOptions)
         .then(function(response) {
-          return response.json();
+          if (!response.ok) {
+            throw new Error('Failed to update company settings: ' + response.status);
+          }
+          var contentType = response.headers.get('content-type');
+          if (contentType && contentType.indexOf('application/json') !== -1) {
+            return response.json();
+          }
+          return { settings: newSettings };
         })
         .then(function(data) {
 

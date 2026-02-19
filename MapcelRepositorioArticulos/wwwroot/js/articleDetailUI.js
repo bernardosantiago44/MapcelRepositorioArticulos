@@ -461,6 +461,12 @@ const ArticleDetailUI = (function() {
       >
         Editar Artículo
       </button>
+      <button
+        id="delete-article-btn"
+        class="w-full p-3 mt-2 bg-red-500 hover:bg-red-600 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200"
+      >
+        Eliminar Artículo
+      </button>
     ` : '';
     
     return `
@@ -595,11 +601,51 @@ const ArticleDetailUI = (function() {
     `;
   }
   
+  /**
+   * Handle article deletion with confirmation
+   * @param {string} articleId - Article ID to delete
+   * @param {string} companyId - Company ID
+   * @param {Function} onDeleteComplete - Callback after successful deletion
+   */
+  function handleDeleteArticle(articleId, companyId, onDeleteComplete) {
+    dhtmlx.confirm({
+      title: 'Confirmar eliminación',
+      text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+      callback: function(result) {
+        if (result) {
+          fetch('/api/articles/' + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
+            method: 'DELETE'
+          })
+            .then(function(response) {
+              if (!response.ok) {
+                throw new Error('Failed to delete article: ' + response.status);
+              }
+              dhtmlx.message({
+                type: 'success',
+                text: 'Artículo eliminado exitosamente'
+              });
+              if (onDeleteComplete) {
+                onDeleteComplete(articleId);
+              }
+            })
+            .catch(function(error) {
+              console.error('Error deleting article:', error);
+              dhtmlx.alert({
+                title: 'Error',
+                text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+              });
+            });
+        }
+      }
+    });
+  }
+  
   // Public API
   return {
     renderArticleDetailSidebar: renderArticleDetailSidebar,
     renderEmptyState: renderEmptyState,
     loadAttachments: loadAttachments,
-    formatDate: formatDate
+    formatDate: formatDate,
+    handleDeleteArticle: handleDeleteArticle
   };
 })();

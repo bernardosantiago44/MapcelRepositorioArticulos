@@ -1154,7 +1154,8 @@ var ArticleFormUI = (function() {
       companyId: formState.companyId,
       tags: tagIds,
       attachedImages: formState.attachedImages.slice(),
-      attachedFiles: formState.attachedFiles.slice()
+      attachedFiles: formState.attachedFiles.slice(),
+      fileIds: formState.attachedFiles.slice().concat(formState.attachedImages.slice()) 
     };
   }
   

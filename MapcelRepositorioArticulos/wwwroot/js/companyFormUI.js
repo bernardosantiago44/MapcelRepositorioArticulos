@@ -357,13 +357,13 @@ const CompanyFormUI = (function() {
     function openSettingsForm(companyId, onSaveCallback) {
         resetFormState();
         
-        formState.companyId = companyId;
+        formState.companyId = appState.selectedCompanyId || companyId;
         formState.onSaveCallback = onSaveCallback;
         
         // Load company data and settings
         Promise.all([
-            CompanyService.getCompanyById(companyId),
-            CompanyService.getCompanySettings(companyId)
+            CompanyService.getCompanyById(formState.companyId),
+            CompanyService.getCompanySettings(formState.companyId)
         ])
         .then(function(results) {
             const company = results[0];

@@ -90,13 +90,19 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         WHERE t.tag_id = @TagId;
     ";
     private const string SqlInsertTagReturn = @"
-        INSERT INTO [dbo].[tags]
+        INSERT INTO dbo.tags
         (
             company_code,
             name,
             color,
             description
         )
+        OUTPUT
+            INSERTED.tag_id,
+            INSERTED.name,
+            INSERTED.color,
+            INSERTED.description,
+            INSERTED.company_code
         VALUES
         (
             @CompanyCode,
@@ -106,11 +112,17 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         );
     ";
     private const string SqlUpdateTagReturn = @"
-        UPDATE [dbo].[tags]
+        UPDATE dbo.tags
         SET
             name = COALESCE(NULLIF(@Name, ''), name),
             color = COALESCE(NULLIF(@Color, ''), color),
             description = COALESCE(NULLIF(@Description, ''), description)
+        OUTPUT
+            INSERTED.tag_id,
+            INSERTED.name,
+            INSERTED.color,
+            INSERTED.description,
+            INSERTED.company_code
         WHERE tag_id = @TagId;
     ";
     private const string SqlDeleteTagBatchReturn = @"

@@ -10,10 +10,9 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("/api/articles")]
 public class ArticlesController(IArticlesService service) : ControllerBase
 {
-    private readonly IArticlesService _articleService = service;
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<ArticleRowDto>>> GetAll(
+    public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
         [FromQuery] string companyId,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
@@ -35,7 +34,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
             Page = page,
             PageSize = pageSize
         };
-        var result = await _articleService.GetAsync(query, cancellationToken);
+        var result = await service.GetAsync(query, cancellationToken);
         return Ok(result);
     }
 
@@ -65,7 +64,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
             Page = page,
             PageSize = pageSize
         };
-        var result = await _articleService.GetAsync(query, cancellationToken);
+        var result = await service.GetAsync(query, cancellationToken);
         if (result.Data.Count == 0) return NotFound();
         try
         {
@@ -99,7 +98,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
-            var createdArticle = await _articleService.CreateAsync(companyId, request, cancellationToken);
+            var createdArticle = await service.CreateAsync(companyId, request, cancellationToken);
             
             return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyId }, createdArticle);
         }
@@ -165,7 +164,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
-            var updated = await _articleService.UpdateAsync(id, companyId, request, cancellationToken);
+            var updated = await service.UpdateAsync(id, companyId, request, cancellationToken);
             if (updated is null) return NotFound();
             return Ok(updated);
         }
@@ -188,7 +187,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
-            var deleted = await _articleService.DeleteAsync(id, companyId, cancellationToken);
+            var deleted = await service.DeleteAsync(id, companyId, cancellationToken);
             if (!deleted) return NotFound();
             return NoContent();
         }

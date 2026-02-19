@@ -415,14 +415,17 @@ const ArticleService = (function() {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
+    console.log(data);
     const raw = JSON.stringify({
       title: data.title || null,
       description: data.description || null,
       externalLink: data.externalLink || null,
       clientComments: data.clientComments || null,
       status: data.status || null,
-      tagIds: data.tags || null
+      tagIds: data.tags || null,
+      fileIds: data.fileIds || null
     });
+    console.log(raw);
 
     const requestOptions = {
       method: "PUT",
@@ -443,6 +446,7 @@ const ArticleService = (function() {
       console.log("Article updated successfully:", result);
       return { status: "success", data: result };
     })
+    .then(FileService.getFilesByArticle())
     .catch(function (error) {
       console.error("Error updating article:", error);
       throw error;

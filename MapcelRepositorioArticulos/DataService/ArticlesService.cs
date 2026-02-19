@@ -14,7 +14,7 @@ public interface IArticlesService
     /// <param name="query">ArticleQuery</param>
     /// <param name="cancellationToken"></param>
     /// <returns>PagedResult: ArticleRowDto</returns>
-    public Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken);
+    public Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken);
     
     /// <summary>
     /// Creates a new Article record in the SQL Database
@@ -93,7 +93,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 a.status,
                 a.created_at,
                 a.updated_at,
-                tag_data.tags
+                tag_data.tags,
+                external_link
             FROM ArticleBase b
             JOIN [dbo].[articles] a ON b.article_id = a.article_id
             OUTER APPLY (
@@ -145,7 +146,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         );
     ";
     private const string SqlUpdateArticle = @"
-        UPDATE dbo.articles
+        UPDATE [dbo].[articles]
         SET
             title = @Title,
             description = @Description,
@@ -158,7 +159,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     ";
     private const string SqlDeleteArticleTags = @"
         DELETE at
-        FROM dbo.article_tags at
+        FROM [dbo].[article_tags] at
         INNER JOIN dbo.articles a ON a.article_id = at.article_id
         WHERE at.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
@@ -247,11 +248,22 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
 
         SELECT @@ROWCOUNT;
     ";
+    private const string SqlInsertFileArticlesFromCsv = @"
+        INSERT INTO [dbo].[file_articles] (file_id, article_id)
+        SELECT
+            f.file_id,
+            @ArticleId
+        FROM string_split(@FileIdsCsv, ',') s
+        INNER JOIN dbo.files f
+            ON f.file_id = TRY_CAST(s.value AS int)
+           AND f.company_code = @CompanyCode;
+    ";
+
     
     
-    public async Task<PagedResult<ArticleRowDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
     {
-        var rows = new List<ArticleRowDto>();
+        var rows = new List<ArticleDetailsDto>();
 
         if (query is null) throw new ArgumentNullException(nameof(query));
         if (query.Page <= 0) throw new ArgumentOutOfRangeException(nameof(query.Page));
@@ -290,12 +302,13 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             var createdAtPos = reader.GetOrdinal("created_at");
             var updatedAtPos = reader.GetOrdinal("updated_at");
             var tagsPos = reader.GetOrdinal("tags");
+            var externalLinkPos = reader.GetOrdinal("external_link");
             
             // Result set 1: page rows
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
 
-                rows.Add(new ArticleRowDto
+                rows.Add(new ArticleDetailsDto
                 {
                     Id = reader.GetInt32(idPos).ToString(),
                     CompanyId = companyCode,
@@ -304,7 +317,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
                     CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
                     UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
-                    Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(',')
+                    Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(','),
+                    ExternalLink = reader.IsDBNull(externalLinkPos) ? "" : reader.GetString(externalLinkPos),
+                    CompanyName = ""
                 });
             }
 
@@ -314,7 +329,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
             }
         }
-        return new PagedResult<ArticleRowDto>(rows, total, query.Page, query.PageSize);
+        return new PagedResult<ArticleDetailsDto>(rows, total, query.Page, query.PageSize);
         
     }
     
@@ -357,6 +372,21 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
                 await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+            
+            // If the request carries files, insert each file link into the file_articles table
+            if (request.FileIds is { Length: > 0 }) // FileIds may be null
+            {
+                var csv = string.Join(",", request.FileIds);
+
+                await using var insertFileArticlesCommand = new SqlCommand(SqlInsertFileArticlesFromCsv, connection);
+                insertFileArticlesCommand.CommandType = CommandType.Text;
+
+                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
+                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+                await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
             }
 
             var created = new ArticleDetailsDto
@@ -439,7 +469,38 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
             }
+            
+            // 3. If FileIds is provided:
+            //    - null => keep existing file links
+            //    - []   => clear all file links
+            //    - [..] => replace file links
+            if (request.FileIds is not null)
+            {
+                // 3.1 Delete existing file links (tenant-safe via join to articles)
+                await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
+                deleteFileArticlesCommand.CommandType = CommandType.Text;
 
+                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+
+                await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+
+                // 3.2 Insert new file links (if any)
+                if (request.FileIds.Length > 0)
+                {
+                    var csv = string.Join(",", request.FileIds);
+
+                    await using var insertFileArticlesCommand = new SqlCommand(SqlInsertFileArticlesFromCsv, connection);
+                    insertFileArticlesCommand.CommandType = CommandType.Text;
+
+                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+                    await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+                }
+            }
+            
             var updated = new ArticleDetailsDto
             {
                 Id = articleId.ToString(),

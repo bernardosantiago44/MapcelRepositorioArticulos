@@ -88,7 +88,14 @@ const CompanyService = (function() {
         }
 
         // Get settings or use defaults
-        const settings = company.settings || getDefaultCompanySettings();
+        var raw = company.settings || getDefaultCompanySettings();
+        
+        // Normalize camelCase API keys to snake_case used by the frontend
+        var settings = {
+          allow_user_uploads: raw.allow_user_uploads !== undefined ? raw.allow_user_uploads : raw.allowUserUploads,
+          allow_user_tag_creation: raw.allow_user_tag_creation !== undefined ? raw.allow_user_tag_creation : raw.allowUserTagCreation,
+          require_client_comments: raw.require_client_comments !== undefined ? raw.require_client_comments : raw.requireClientComments
+        };
         
         // Cache the settings
         companySettingsCache[companyId] = settings;
@@ -147,8 +154,9 @@ const CompanyService = (function() {
         })
         .then(function(data) {
 
-          // Clear the settings cache to force refresh
+          // Clear caches to force refresh
           delete companySettingsCache[companyId];
+          companiesCache.delete(companyId);
 
           // Update cache with new settings
           companySettingsCache[companyId] = data.settings || newSettings;

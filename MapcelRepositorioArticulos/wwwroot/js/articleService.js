@@ -371,13 +371,15 @@ const ArticleService = (function() {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
+    console.log(data);
     const raw = JSON.stringify({
       title: data.title,
       description: data.description,
       externalLink: data.externalLink,
       status: data.status,
       clientComments: data.clientComments,
-      tagIds: data.tags
+      tagIds: data.tags,
+      fileIds: data.fileIds
     });
 
     const requestOptions = {

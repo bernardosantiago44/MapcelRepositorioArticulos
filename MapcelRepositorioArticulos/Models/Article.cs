@@ -101,6 +101,7 @@ public sealed class ArticleDetailsDto
 
     public IReadOnlyList<string> Tags { get; init; }
     public IReadOnlyList<string> TagNames { get; init; }
+    public IReadOnlyList<string> FileIds { get; init; }
 
     public required DateOnly CreatedAt { get; init; }
     public required DateOnly UpdatedAt { get; init; }

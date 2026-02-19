@@ -1,6 +1,7 @@
 using System.Data;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.DataService;
@@ -94,6 +95,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 a.created_at,
                 a.updated_at,
                 tag_data.tags,
+                file_data.files,
+                client_comments,
                 external_link
             FROM ArticleBase b
             JOIN [dbo].[articles] a ON b.article_id = a.article_id
@@ -103,6 +106,11 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 JOIN tags t ON at.tag_id = t.tag_id
                 WHERE at.article_id = a.article_id
             ) AS tag_data
+            OUTER APPLY (
+                SELECT STRING_AGG(fa.file_id, ',') AS files
+                FROM file_articles fa
+                WHERE fa.article_id = a.article_id
+            ) as file_data
             ORDER BY a.created_at DESC;
 
             -- 2. Get the total count using the EXACT SAME filters
@@ -302,7 +310,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             var createdAtPos = reader.GetOrdinal("created_at");
             var updatedAtPos = reader.GetOrdinal("updated_at");
             var tagsPos = reader.GetOrdinal("tags");
+            var filesPos = reader.GetOrdinal("files");
             var externalLinkPos = reader.GetOrdinal("external_link");
+            var clientCommentsPos = reader.GetOrdinal("client_comments");
             
             // Result set 1: page rows
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -318,7 +328,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
                     UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
                     Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(','),
+                    FileIds = reader.IsDBNull(filesPos) ? [] : reader.GetString(filesPos).Split(','),
                     ExternalLink = reader.IsDBNull(externalLinkPos) ? "" : reader.GetString(externalLinkPos),
+                    ClientComments =  reader.IsDBNull(clientCommentsPos) ? "" : reader.GetString(clientCommentsPos),
                     CompanyName = ""
                 });
             }
@@ -402,7 +414,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 UpdatedAt = new DateOnly(),
                 ExternalLink = request.ExternalLink,
                 Tags = request.TagIds ?? [],
-                TagNames = []
+                TagNames = [],
+                FileIds = request.FileIds?.Select(x => x.ToString()).ToArray() ?? Array.Empty<string>()
             };
             return created;
         }

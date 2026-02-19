@@ -930,8 +930,9 @@ var NewArticlePageUI = (function() {
       clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
       companyId: pageState.companyId,
       tags: tagIds,
-      attachedImages: [],
-      attachedFiles: []
+      attachedImages: pageState.stagedImages.map(img => img.id),
+      attachedFiles: pageState.stagedFiles.map(file => file.id),
+      fileIds: [...pageState.stagedImages.map(img => img.id), ...pageState.stagedFiles.map(file => file.id)] // For backward compatibility if needed by API
     };
   }
 

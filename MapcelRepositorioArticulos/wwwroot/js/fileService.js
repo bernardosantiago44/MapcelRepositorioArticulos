@@ -18,6 +18,11 @@ const FileService = (function() {
     }
   }
 
+  function getCache() {
+    ensureCache();
+    return fileCache;
+  }
+
   function cacheFiles(files) {
     if (!Array.isArray(files) || files.length === 0) {
       return;
@@ -288,6 +293,7 @@ const FileService = (function() {
     deleteFile,
     downloadFile,
     searchFiles,
-    clearCache
+    clearCache,
+    getCache
   };
 })();

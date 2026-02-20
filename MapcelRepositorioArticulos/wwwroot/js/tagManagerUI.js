@@ -477,7 +477,7 @@ var TagManagerUI = (function() {
     var colorInput = document.getElementById('tag-form-color-custom');
     var descInput = document.getElementById('tag-form-description');
     
-    if (!nameInput || !colorInput) {
+    if (!nameInput || !colorInput || !descInput) {
       return;
     }
     

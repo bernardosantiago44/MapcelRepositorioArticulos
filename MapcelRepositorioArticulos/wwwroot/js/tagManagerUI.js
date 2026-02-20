@@ -122,8 +122,9 @@ var TagManagerUI = (function() {
     document.body.appendChild(overlay);
     tagManagerState.modalOverlay = overlay;
     
-    // Attach event listeners
-    attachTagManagerEventListeners();
+    // Attach event listeners - persistent listeners only once, dynamic listeners for initial list
+    attachPersistentTagManagerListeners();
+    attachDynamicTagManagerListeners();
     
     // Prevent clicks on modal from closing it
     modalContainer.addEventListener('click', function(e) {
@@ -187,9 +188,10 @@ var TagManagerUI = (function() {
   }
   
   /**
-   * Attach event listeners to tag manager elements
+   * Attach event listeners to persistent (non-recreated) tag manager elements.
+   * Must be called only ONCE during initial modal render to avoid duplicate listeners.
    */
-  function attachTagManagerEventListeners() {
+  function attachPersistentTagManagerListeners() {
     // Close button
     var closeBtn = document.getElementById('tag-manager-close-btn');
     if (closeBtn) {
@@ -197,7 +199,7 @@ var TagManagerUI = (function() {
         closeTagManager();
       });
     }
-    
+
     // New tag button
     var newTagBtn = document.getElementById('tag-manager-new-tag-btn');
     if (newTagBtn) {
@@ -205,7 +207,13 @@ var TagManagerUI = (function() {
         openTagForm(null);
       });
     }
-    
+  }
+
+  /**
+   * Attach event listeners to dynamic (recreated on refresh) tag list elements.
+   * Safe to call each time the tag list is re-rendered.
+   */
+  function attachDynamicTagManagerListeners() {
     // Edit buttons
     var editButtons = document.querySelectorAll('.tag-edit-btn');
     editButtons.forEach(function(btn) {
@@ -214,7 +222,7 @@ var TagManagerUI = (function() {
         openTagForm(tagId);
       });
     });
-    
+
     // Delete buttons
     var deleteButtons = document.querySelectorAll('.tag-delete-btn');
     deleteButtons.forEach(function(btn) {
@@ -292,10 +300,10 @@ var TagManagerUI = (function() {
     // Description textarea
     var descGroup = document.createElement('div');
     descGroup.innerHTML = `
-      <label class="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Descripción *</label>
       <textarea id="tag-form-description" rows="3"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Descripción opcional de la etiqueta">${escapeHtml(formData.description || '')}</textarea>
+                placeholder="Descripción de la etiqueta">${escapeHtml(formData.description || '')}</textarea>
     `;
     formBody.appendChild(descGroup);
     
@@ -477,13 +485,29 @@ var TagManagerUI = (function() {
     var color = colorInput.value;
     var description = descInput ? descInput.value.trim() : '';
     
-    // Validate
+    // Validate name
     if (!name) {
       dhtmlx.alert({
         title: 'Error de validación',
         text: 'El nombre de la etiqueta es obligatorio.'
       });
       return;
+    }
+    
+    // Validate description (required)
+    if (!description) {
+      dhtmlx.alert({
+        title: 'Error de validación',
+        text: 'La descripción de la etiqueta es obligatoria.'
+      });
+      return;
+    }
+    
+    // Disable save button to prevent duplicate submissions
+    var saveBtn = document.getElementById('tag-form-save-btn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Guardando...';
     }
     
     var tagData = {
@@ -528,6 +552,12 @@ var TagManagerUI = (function() {
       })
       .catch(function(error) {
         console.error('Error saving tag:', error);
+        // Re-enable save button so user can retry
+        var saveBtn = document.getElementById('tag-form-save-btn');
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Crear etiqueta';
+        }
         dhtmlx.alert({
           title: 'Error',
           text: 'No se pudo guardar la etiqueta. Por favor, inténtelo de nuevo.'
@@ -595,7 +625,8 @@ var TagManagerUI = (function() {
   }
   
   /**
-   * Refresh the tag list in the modal
+   * Refresh the tag list in the modal.
+   * Only re-attaches listeners for dynamically recreated edit/delete buttons.
    */
   function refreshTagList() {
     var modalBody = tagManagerState.modalOverlay ? 
@@ -603,7 +634,11 @@ var TagManagerUI = (function() {
     
     if (modalBody) {
       modalBody.innerHTML = renderTagList();
-      attachTagManagerEventListeners();
+      // BUG FIX: Only re-attach listeners for dynamically created elements.
+      // Persistent buttons (close, new-tag) must NOT get additional listeners here
+      // because they are not re-created; calling attachTagManagerEventListeners() here
+      // would duplicate their listeners on every refresh (causing exponential save calls).
+      attachDynamicTagManagerListeners();
     }
     
     // Update tag count in footer

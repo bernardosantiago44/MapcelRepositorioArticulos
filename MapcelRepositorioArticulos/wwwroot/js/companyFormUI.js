@@ -366,6 +366,7 @@ const CompanyFormUI = (function() {
             CompanyService.getCompanySettings(formState.companyId)
         ])
         .then(function(results) {
+            console.log(results);
             const company = results[0];
             const settings = results[1];
             

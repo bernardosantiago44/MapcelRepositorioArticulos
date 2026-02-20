@@ -1160,6 +1160,7 @@ function openEditArticleForm(articleId, companyId) {
  */
 function onArticleFormSaved(articleData, mode) {
   // Reload articles for the current company to refresh the grid
+  ArticleService.clearCache(); // Clear cache to ensure fresh data is loaded
   loadArticlesForCompany(appState.selectedCompanyId)
     .then(function() {
       if (mode === 'create') {
@@ -1173,6 +1174,10 @@ function onArticleFormSaved(articleData, mode) {
         if (appState.selectedArticleId === articleData.id) {
           onArticleSelect(articleData.id);
         }
+      } else if (mode === 'delete') {
+        // Clear sidebar after article deletion
+        appState.sidebarCell.attachHTMLString(ArticleDetailUI.renderEmptyState());
+        appState.selectedArticleId = null;
       }
     })
     .catch(function(error) {

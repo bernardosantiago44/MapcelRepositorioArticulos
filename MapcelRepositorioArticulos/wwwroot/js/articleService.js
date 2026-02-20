@@ -448,7 +448,6 @@ const ArticleService = (function() {
       console.log("Article updated successfully:", result);
       return { status: "success", data: result };
     })
-    .then(FileService.getFilesByArticle())
     .catch(function (error) {
       console.error("Error updating article:", error);
       throw error;
@@ -483,7 +482,18 @@ const ArticleService = (function() {
 
     const companyId = appState.selectedCompanyId;
 
-    return fetch(`/api/articles/bulk-tags?companyId=${companyId}`, requestOptions);
+    return fetch(`/api/articles/bulk-tags?companyId=${companyId}`, requestOptions)
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Failed to bulk update tags: " + response.status);
+        }
+        return response.json();
+      })
+      .then(function (result) {
+        // Clear article cache to force refresh
+        articlesCache.clear();
+        return { status: "success", updatedCount: result.updatedCount !== undefined ? result.updatedCount : articleIds.length };
+      });
   }
   
   // Public API

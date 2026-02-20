@@ -35,7 +35,8 @@ var ArticleFormUI = (function() {
     imageSearchQuery: '',       // Current image search query
     fileSearchQuery: '',        // Current file search query
     activeMediaTab: 'images',   // Active tab in media section: 'images' or 'files'
-    descriptionTab: 'write'     // Active tab in description editor: 'write' or 'preview'
+    descriptionTab: 'write',    // Active tab in description editor: 'write' or 'preview'
+    originalArticleData: null   // Original article data for edit mode
   };
   
   /**
@@ -375,21 +376,32 @@ var ArticleFormUI = (function() {
         </div>
         
         <!-- Fixed Footer with Buttons -->
-        <div class="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+        <div class="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between">
+          ${mode === 'edit' ? `
           <button 
-            id="article-form-cancel-btn"
+            id="article-form-delete-btn"
             type="button"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
           >
-            Cancelar
+            Eliminar Artículo
           </button>
-          <button 
-            id="article-form-submit-btn"
-            type="button"
-            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            ${buttonLabel}
-          </button>
+          ` : '<div></div>'}
+          <div class="flex gap-3">
+            <button 
+              id="article-form-cancel-btn"
+              type="button"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Cancelar
+            </button>
+            <button 
+              id="article-form-submit-btn"
+              type="button"
+              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              ${buttonLabel}
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -478,6 +490,12 @@ var ArticleFormUI = (function() {
     var submitBtn = document.getElementById('article-form-submit-btn');
     if (submitBtn) {
       submitBtn.addEventListener('click', handleFormSubmit);
+    }
+    
+    // Delete button (edit mode only)
+    var deleteBtn = document.getElementById('article-form-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', handleDeleteArticle);
     }
 
     // Description markdown editor tabs
@@ -590,6 +608,30 @@ var ArticleFormUI = (function() {
   }
   
   /**
+   * Resolve fileIds from original article data into attachedImages and attachedFiles
+   * Called after media data (images/files) is loaded from the server
+   */
+  function resolveFileIdsFromArticleData() {
+    if (!formState.originalArticleData || !formState.originalArticleData.fileIds) return;
+    var fileIds = formState.originalArticleData.fileIds;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) return;
+    
+    // Use Sets for O(1) lookup performance
+    var imageIdSet = new Set(formState.allImages.map(function(img) { return img.id; }));
+    var fileIdSet = new Set(formState.allFiles.map(function(f) { return f.id; }));
+    var attachedImageSet = new Set(formState.attachedImages);
+    var attachedFileSet = new Set(formState.attachedFiles);
+    
+    fileIds.forEach(function(id) {
+      if (imageIdSet.has(id) && !attachedImageSet.has(id)) {
+        formState.attachedImages.push(id);
+      } else if (fileIdSet.has(id) && !attachedFileSet.has(id)) {
+        formState.attachedFiles.push(id);
+      }
+    });
+  }
+  
+  /**
    * Load media data (images and files) for the company
    */
   function loadMediaData() {
@@ -599,8 +641,8 @@ var ArticleFormUI = (function() {
     ImageService.getImages(formState.companyId)
       .then(function(images) {
         formState.allImages = images;
+        resolveFileIdsFromArticleData();
         updateAvailableImagesDisplay();
-        // Update attached images display in case data loaded after populating form
         updateAttachedImagesDisplay();
         updateMediaCounts();
       })
@@ -616,8 +658,8 @@ var ArticleFormUI = (function() {
     FileService.getFiles(formState.companyId)
       .then(function(files) {
         formState.allFiles = files;
+        resolveFileIdsFromArticleData();
         updateAvailableFilesDisplay();
-        // Update attached files display in case data loaded after populating form
         updateAttachedFilesDisplay();
         updateMediaCounts();
       })
@@ -1250,6 +1292,51 @@ var ArticleFormUI = (function() {
   }
   
   /**
+   * Handle delete article action with confirmation
+   */
+  function handleDeleteArticle() {
+    if (!formState.articleId || !formState.companyId) return;
+    
+    var articleId = formState.articleId;
+    var companyId = formState.companyId;
+    
+    dhtmlx.confirm({
+      title: 'Confirmar eliminación',
+      text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+      callback: function(result) {
+        if (result) {
+          fetch('/api/articles/' + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
+            method: 'DELETE'
+          })
+            .then(function(response) {
+              if (!response.ok) {
+                throw new Error('Failed to delete article: ' + response.status);
+              }
+              dhtmlx.message({
+                type: 'success',
+                text: 'Artículo eliminado exitosamente'
+              });
+              
+              // Notify caller via callback so the grid/sidebar can refresh
+              if (formState.onSaveCallback) {
+                formState.onSaveCallback({ id: articleId }, 'delete');
+              }
+              
+              closeForm();
+            })
+            .catch(function(error) {
+              console.error('Error deleting article:', error);
+              dhtmlx.alert({
+                title: 'Error',
+                text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+              });
+            });
+        }
+      }
+    });
+  }
+  
+  /**
    * Close the form window and clean up
    */
   function closeForm() {
@@ -1266,6 +1353,7 @@ var ArticleFormUI = (function() {
     formState.selectedTags = [];
     formState.attachedImages = [];
     formState.attachedFiles = [];
+    formState.originalArticleData = null;
     formState.allImages = [];
     formState.allFiles = [];
     formState.imageSearchQuery = '';
@@ -1349,6 +1437,7 @@ var ArticleFormUI = (function() {
     formState.articleId = articleData.id;
     formState.companyId = articleData.companyId;
     formState.onSaveCallback = onSaveCallback;
+    formState.originalArticleData = articleData;
     formState.attachedImages = [];
     formState.attachedFiles = [];
     formState.allImages = [];

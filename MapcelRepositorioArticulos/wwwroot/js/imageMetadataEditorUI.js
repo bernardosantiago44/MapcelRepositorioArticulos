@@ -62,10 +62,10 @@ const ImageMetadataEditorUI = (function() {
    */
   function renderEditForm(image) {
     // Escape user-controlled data to prevent XSS
-    const escapedName = Utils.escapeHtml(image.name);
-    const escapedDescription = Utils.escapeHtml(image.description);
-    const escapedDimensions = Utils.escapeHtml(image.dimensions);
-    const escapedSize = Utils.escapeHtml(image.size);
+    const escapedName = Utils.escapeHtml(image.name || '');
+    const escapedDescription = Utils.escapeHtml(image.description || '');
+    const escapedDimensions = Utils.escapeHtml(image.dimensions || '');
+    const escapedSize = Utils.escapeHtml(image.size || '');
     const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     
     return `

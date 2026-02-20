@@ -371,7 +371,7 @@ const ImageUploadUI = (function() {
    * Update the selected images gallery UI with thumbnails
    */
   function updateSelectedImagesGallery() {
-    const galleryContainer = document.getElementById('images-gallery-container');
+    const galleryContainer = document.getElementById('selected-images-gallery');
     const imagesContainer = document.getElementById('selected-images-container');
     
     

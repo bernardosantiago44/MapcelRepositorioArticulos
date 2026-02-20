@@ -88,7 +88,14 @@ const CompanyService = (function() {
         }
 
         // Get settings or use defaults
-        const settings = company.settings || getDefaultCompanySettings();
+        var raw = company.settings || getDefaultCompanySettings();
+        
+        // Normalize camelCase API keys to snake_case used by the frontend
+        var settings = {
+          allow_user_uploads: raw.allow_user_uploads !== undefined ? raw.allow_user_uploads : raw.allowUserUploads,
+          allow_user_tag_creation: raw.allow_user_tag_creation !== undefined ? raw.allow_user_tag_creation : raw.allowUserTagCreation,
+          require_client_comments: raw.require_client_comments !== undefined ? raw.require_client_comments : raw.requireClientComments
+        };
         
         // Cache the settings
         companySettingsCache[companyId] = settings;
@@ -122,7 +129,11 @@ const CompanyService = (function() {
       const headers = new Headers();
       headers.append("Content-Type", "application/json");
 
-      const rawSettings = JSON.stringify(newSettings);
+      const rawSettings = JSON.stringify({
+        allowUserUploads: newSettings.allow_user_uploads,
+        allowUserTagCreation: newSettings.allow_user_tag_creation,
+        requireClientComments: newSettings.require_client_comments
+      });
       const requestOptions = {
         method: "PUT",
         headers: headers,
@@ -132,12 +143,20 @@ const CompanyService = (function() {
 
       fetch(`/api/companies/${companyId}`, requestOptions)
         .then(function(response) {
-          return response.json();
+          if (!response.ok) {
+            throw new Error('Failed to update company settings: ' + response.status);
+          }
+          var contentType = response.headers.get('content-type');
+          if (contentType && contentType.indexOf('application/json') !== -1) {
+            return response.json();
+          }
+          return { settings: newSettings };
         })
         .then(function(data) {
 
-          // Clear the settings cache to force refresh
+          // Clear caches to force refresh
           delete companySettingsCache[companyId];
+          companiesCache.delete(companyId);
 
           // Update cache with new settings
           companySettingsCache[companyId] = data.settings || newSettings;

@@ -27,8 +27,9 @@ var TagPickerUI = (function() {
     tagsPerPage: 10,
     pickerOverlay: null,
     onSelectionCallback: null,
-    searchListenerAttached: false,  // Listener guard to prevent duplication
-    searchDebounceTimer: null       // Debounce timer for search input
+    searchListenerAttached: false,   // Listener guard to prevent duplication
+    actionListenersAttached: false,  // Guard for cancel/apply button listeners
+    searchDebounceTimer: null        // Debounce timer for search input
   };
   
   // Constants
@@ -238,21 +239,24 @@ var TagPickerUI = (function() {
       });
     }
     
-    // Cancel button
+    // Cancel button - guard prevents duplicate listeners when tag list is refreshed
     var cancelBtn = document.getElementById('tag-picker-cancel-btn');
-    if (cancelBtn) {
+    if (cancelBtn && !tagPickerState.actionListenersAttached) {
       cancelBtn.addEventListener('click', function() {
         closeTagPicker(false);
       });
     }
     
-    // Apply button
+    // Apply button - guard prevents duplicate listeners when tag list is refreshed
     var applyBtn = document.getElementById('tag-picker-apply-btn');
-    if (applyBtn) {
+    if (applyBtn && !tagPickerState.actionListenersAttached) {
       applyBtn.addEventListener('click', function() {
         closeTagPicker(true);
       });
     }
+    
+    // Mark action listeners as attached so they are not duplicated on refresh
+    tagPickerState.actionListenersAttached = true;
     
     // Checkbox change events
     var checkboxes = document.querySelectorAll('.tag-picker-checkbox');
@@ -401,6 +405,7 @@ var TagPickerUI = (function() {
     tagPickerState.currentPage = 1;
     tagPickerState.onSelectionCallback = null;
     tagPickerState.searchListenerAttached = false; // Reset listener guard
+    tagPickerState.actionListenersAttached = false; // Reset action listener guard
     
     // Clear any pending debounce timer
     if (tagPickerState.searchDebounceTimer) {

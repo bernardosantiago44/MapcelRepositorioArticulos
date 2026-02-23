@@ -48,14 +48,23 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         ORDER BY c.name;
     ";
     private const string SqlSelectCompanyByCode = @"
+        WITH CompanyCTE AS (
+            SELECT
+                company_code,
+                name,
+                allow_user_uploads,
+                allow_user_tag_creation,
+                require_client_comments
+            FROM dbo.companies
+            WHERE (@CompanyCode IS NULL OR company_code = @CompanyCode)
+        )
         SELECT
-            c.company_code,
-            c.name,
-            c.allow_user_uploads,
-            c.allow_user_tag_creation,
-            c.require_client_comments
-        FROM [dbo].[companies] c
-        WHERE c.company_code = @CompanyCode;
+            company_code,
+            name,
+            allow_user_uploads,
+            allow_user_tag_creation,
+            require_client_comments
+        FROM CompanyCTE;
     ";
     private const string SqlUpdateCompanyReturn = @"
         UPDATE [dbo].[companies]

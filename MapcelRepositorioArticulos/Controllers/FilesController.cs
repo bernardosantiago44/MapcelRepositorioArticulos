@@ -11,6 +11,9 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("api/files")]
 public class FilesController(IFilesService service) : ControllerBase
 {
+    private CompanyContext GetCompanyContext()
+        => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
+
     private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAllAsync(FileQuery query, CancellationToken cancellationToken = default)
     {
         try
@@ -21,7 +24,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (ArgumentNullException)
         {
-            return BadRequest("Please provide a companyId using `/api/files?companyId=co-01`");
+            return BadRequest("Company context is required.");
         }
         catch (ArgumentOutOfRangeException)
         {
@@ -42,13 +45,17 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
+        var ctx = GetCompanyContext();
+        query.CompanyId = ctx.CompanyCode;
         query.ImagesOnly = false;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("images")] // Specific filter for images
+    [HttpGet("images")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
+        var ctx = GetCompanyContext();
+        query.CompanyId = ctx.CompanyCode;
         query.ImagesOnly = true;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
@@ -56,6 +63,8 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpGet("images/{id:int}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
+        var ctx = GetCompanyContext();
+        query.CompanyId = ctx.CompanyCode;
         query.ImagesOnly = true;
         query.Id = id;
         return await ExecuteGetAllAsync(query, cancellationToken);
@@ -64,6 +73,8 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
+        var ctx = GetCompanyContext();
+        query.CompanyId = ctx.CompanyCode;
         query.ImagesOnly = false;
         query.Id = id;
         return await ExecuteGetAllAsync(query, cancellationToken);
@@ -123,16 +134,15 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<FileAsset>> Create(
-        [FromQuery] string companyId,
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
         try
         {
-            var createdFile = await service.CreateAsync(companyId, file, cancellationToken);
+            var ctx = GetCompanyContext();
+            var createdFile = await service.CreateAsync(ctx.CompanyCode, file, cancellationToken);
 
-            // TODO: Add binary storage URL
-            var downloadUrl = $"/api/files/{createdFile.Id}/download?companyId={companyId}";
+            var downloadUrl = $"/api/files/{createdFile.Id}/download";
 
             return Ok(new
             {
@@ -146,7 +156,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Create failed for companyId={CompanyId}", companyId);
+            Log.Error(ex, "FilesController.Create failed");
             return StatusCode(500);
         }
     }
@@ -154,13 +164,13 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<FileDto>> Update(
         [FromRoute] int id,
-        [FromQuery] string companyId,
         [FromBody] UpdateFileRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await service.UpdateAsync(id, companyId, request, cancellationToken);
+            var ctx = GetCompanyContext();
+            var updated = await service.UpdateAsync(id, ctx.CompanyCode, request, cancellationToken);
             if (updated is null) return NotFound();
             return Ok(updated);
         }
@@ -170,7 +180,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Update failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Update failed for id={Id}", id);
             return StatusCode(500);
         }
     }
@@ -178,14 +188,14 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,
-        [FromQuery] string companyId,
         CancellationToken cancellationToken)
     {
         try
         {
-            var deleted = await service.DeleteAsync(id, companyId, cancellationToken);
+            var ctx = GetCompanyContext();
+            var deleted = await service.DeleteAsync(id, ctx.CompanyCode, cancellationToken);
             if (!deleted) return NotFound();
-            return NoContent(); // 204
+            return NoContent();
         }
         catch (ArgumentException ex)
         {
@@ -193,7 +203,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Delete failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Delete failed for id={Id}", id);
             return StatusCode(500);
         }
     }
@@ -201,15 +211,14 @@ public class FilesController(IFilesService service) : ControllerBase
     [HttpGet("{id:int}/download")]
     public async Task<IActionResult> Download(
         [FromRoute] int id,
-        [FromQuery] string companyId,
         CancellationToken cancellationToken)
     {
         try
         {
-            var info = await service.GetDownloadInfoAsync(id, companyId, cancellationToken);
+            var ctx = GetCompanyContext();
+            var info = await service.GetDownloadInfoAsync(id, ctx.CompanyCode, cancellationToken);
             if (info is null) return NotFound();
 
-            // Mock file bytes for now
             var filename = $"{info.Value.Name}{info.Value.Extension}";
             var bytes = Encoding.UTF8.GetBytes($"Mock download payload for fileId={id}.");
 
@@ -221,7 +230,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Download failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Download failed for id={Id}", id);
             return StatusCode(500);
         }
     }

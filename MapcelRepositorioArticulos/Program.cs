@@ -1,4 +1,5 @@
 using MapcelRepositorioArticulos.DataService;
+using MapcelRepositorioArticulos.Middleware;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.Data.SqlClient;
 using Serilog;
@@ -45,6 +46,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+// Decrypt and validate X-Company-Context header for all API requests.
+app.UseMiddleware<CompanyContextMiddleware>();
 
 app.UseAuthorization();
 

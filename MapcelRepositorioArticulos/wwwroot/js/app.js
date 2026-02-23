@@ -191,20 +191,61 @@ appState.imagesTabInitialized = false;
 // ============================================================================
 
 /**
- * Initialize the application on load
+ * Initialize the application on load.
+ *
+ * Boot flow (FR-2 / FR-3):
+ *  1. Check URL for an encrypted auth-context parameter.
+ *  2. If present  → persist it, strip it from URL, boot in company-scoped mode.
+ *  3. If absent   → check if admin is already logged in; if not, show login.
  */
 function initializeApplication() {
+  // --- Step 1: try to capture auth context from the URL ---
+  var ctx = AuthContext.getAuthContextFromUrl();
+
+  if (ctx) {
+    // Company-scoped mode (FR-2)
+    AuthContext.persistAuthContext(ctx);
+    AuthContext.stripAuthContextFromUrl();
+    bootApp();
+    return;
+  }
+
+  // --- Step 2: check for a previously persisted context ---
+  if (AuthContext.isCompanyScoped()) {
+    bootApp();
+    return;
+  }
+
+  // --- Step 3: admin path ---
+  if (AdminAuth.isAdminLoggedIn()) {
+    bootApp();
+    return;
+  }
+
+  // No auth at all → show admin login (FR-3)
+  AdminLoginUI.show(function () {
+    bootApp();
+  });
+}
+
+/**
+ * Continue the normal application boot once auth is resolved.
+ */
+function bootApp() {
   // Show loading indicator on main content cell
   main_content.progressOn();
-  
+
   // Get current user
   appState.currentUser = UserService.getCurrentUser();
-  
+
   // Initialize based on user role
-  if (UserService.isAdministrator()) {
-    initializeAdminView();
-  } else {
+  if (AuthContext.isCompanyScoped()) {
+    // Company-scoped: treat as regular (non-admin) user
+    UserService.setCurrentUser('regular');
+    appState.currentUser = UserService.getCurrentUser();
     initializeRegularUserView();
+  } else {
+    initializeAdminView();
   }
 }
 

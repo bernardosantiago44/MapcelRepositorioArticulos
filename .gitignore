@@ -53,3 +53,6 @@ Thumbs.db
 desktop.ini
 *.swp
 *.log
+
+## --- Application Logs ---
+[Ll]ogs/

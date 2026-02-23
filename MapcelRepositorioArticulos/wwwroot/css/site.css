@@ -20,3 +20,83 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+/* ==========================================================================
+   Admin Login Overlay
+   ========================================================================== */
+
+.admin-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.admin-login-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+  padding: 2rem 2.5rem;
+  width: 100%;
+  max-width: 380px;
+}
+
+.admin-login-title {
+  margin: 0 0 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+  color: #333;
+}
+
+.admin-login-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.admin-login-input {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.admin-login-input:focus {
+  outline: none;
+  border-color: #258cfb;
+  box-shadow: 0 0 0 2px rgba(37, 140, 251, 0.25);
+}
+
+.admin-login-error {
+  color: #d32f2f;
+  font-size: 0.82rem;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.admin-login-btn {
+  display: block;
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  background: #258cfb;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.admin-login-btn:hover {
+  background: #1a6fd4;
+}

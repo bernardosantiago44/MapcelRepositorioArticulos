@@ -721,7 +721,7 @@ function initializeImagesTab(companyId) {
  * @returns {Promise} Promise that resolves when articles are loaded
  */
 function loadArticlesForCompany(companyId) {
-  return ArticleService.getArticles({companyId: companyId})
+  return ArticleService.getArticles({})
     .then(function(articles) {
       // Precompute search index for O(n) filtering performance
       GridFilterService.precomputeSearchIndex(articles);

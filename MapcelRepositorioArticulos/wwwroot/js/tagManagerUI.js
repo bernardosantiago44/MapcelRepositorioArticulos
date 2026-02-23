@@ -57,7 +57,7 @@ var TagManagerUI = (function() {
     tagManagerState.onTagsChangedCallback = onTagsChanged || null;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags()
       .then(function(tags) {
         tagManagerState.tags = tags;
         renderTagManagerModal();
@@ -536,7 +536,7 @@ var TagManagerUI = (function() {
           closeTagForm();
           
           // Reload tags and refresh the list
-          return ArticleService.getTags(tagManagerState.currentCompanyId);
+          return ArticleService.getTags();
         }
       })
       .then(function(tags) {
@@ -601,7 +601,7 @@ var TagManagerUI = (function() {
           });
           
           // Reload tags and refresh the list
-          return ArticleService.getTags(tagManagerState.currentCompanyId);
+          return ArticleService.getTags();
         }
       })
       .then(function(tags) {

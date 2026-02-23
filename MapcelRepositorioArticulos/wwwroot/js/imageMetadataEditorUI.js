@@ -182,7 +182,7 @@ const ImageMetadataEditorUI = (function() {
       
       console.log('image:', image.id, 'newDescription:', newDescription);
       // Call image service to update metadata
-      ImageService.updateImageMetadata(image.id, newDescription, appState.selectedCompanyId)
+      ImageService.updateImageMetadata(image.id, newDescription)
         .then(updatedImage => {
           // Show success message
           dhtmlx.message({

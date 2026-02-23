@@ -54,18 +54,16 @@ const FileService = (function() {
   
   /**
    * Get files for a specific company
-   * @param {string} companyId - The company ID to filter files by
    * @returns {Promise<Array<Object>>} Promise resolving to array of file objects
    */
-  function getFiles(companyId, page = 1, pageSize = 10) {
+  function getFiles(page = 1, pageSize = 10) {
     const params = new URLSearchParams({
-      companyId,
       imagesOnly: false,
       page,
       pageSize
     });
 
-    return fetch(`/api/files?${params}`)
+    return ApiClient.request(`/api/files?${params}`)
       .then(response => {
         if (response.status === 404) {
           // Cache empty result to prevent future calls
@@ -88,7 +86,7 @@ const FileService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to file object or null
    */
   function getFileById(fileId) {
-    return fetch(`/api/files/${fileId}`)
+    return ApiClient.request(`/api/files/${fileId}`)
       .then(response => {
         if (response.status === 404) {
           return null;
@@ -110,10 +108,9 @@ const FileService = (function() {
    * Upload one or more files with optional description
    * @param {FileList|Array<File>} files - Files to upload
    * @param {string} description - Optional description for the files
-   * @param {string} companyId - Company ID to associate files with
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded file objects
    */
-  function uploadFiles(files, description, companyId) {
+  function uploadFiles(files, description) {
     // Convert FileList to Array if needed
     const filesArray = Array.from(files);
     
@@ -122,7 +119,7 @@ const FileService = (function() {
       const formData = new FormData();
       formData.append('file', file);
       
-      return fetch(`/api/files?companyId=${encodeURIComponent(companyId)}`, {
+      return ApiClient.request(`/api/files`, {
         method: 'POST',
         body: formData
       })
@@ -145,9 +142,7 @@ const FileService = (function() {
    * @returns {Promise<Object>} Promise resolving to updated file object
    */
   function updateFileMetadata(fileId, newDescription) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+    return ApiClient.request(`/api/files/${fileId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -170,9 +165,7 @@ const FileService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function deleteFile(fileId) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+    return ApiClient.request(`/api/files/${fileId}`, {
       method: 'DELETE'
     })
       .then(response => {
@@ -189,9 +182,7 @@ const FileService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function downloadFile(fileId) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}/download?companyId=${encodeURIComponent(companyId)}`)
+    return ApiClient.request(`/api/files/${fileId}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download file: ${response.statusText}`);
@@ -215,12 +206,11 @@ const FileService = (function() {
   
   /**
    * Search files by name or description
-   * @param {string} companyId - Company ID to filter files by
    * @param {string} searchTerm - Search term to filter by
    * @returns {Promise<Array<Object>>} Promise resolving to array of filtered file objects
    */
-  function searchFiles(companyId, searchTerm) {
-    return getFiles(companyId).then(files => {
+  function searchFiles(searchTerm) {
+    return getFiles().then(files => {
       if (!searchTerm || searchTerm.trim() === '') {
         return files;
       }
@@ -251,7 +241,7 @@ const FileService = (function() {
       return Promise.resolve(filesByArticleCache.get(key).filter(file =>  file.isImage == imagesOnly));
     }
 
-    return fetch(`/api/files/forArticleId=${encodeURIComponent(key)}`, {
+    return ApiClient.request(`/api/files/forArticleId=${encodeURIComponent(key)}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json"

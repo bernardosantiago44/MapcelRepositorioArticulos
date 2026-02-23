@@ -58,8 +58,8 @@ const FilesGridHelper = (function() {
     grid.clearAll();
     
     const dataPromise = searchTerm 
-      ? FileService.searchFiles(companyId, searchTerm)
-      : FileService.getFiles(companyId);
+      ? FileService.searchFiles(searchTerm)
+      : FileService.getFiles();
     
     dataPromise
       .then(files => {

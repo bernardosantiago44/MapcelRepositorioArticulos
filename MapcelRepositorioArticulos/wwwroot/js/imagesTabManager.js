@@ -439,8 +439,8 @@ const ImagesTabManager = (function() {
    */
   function loadImages() {
     const dataPromise = currentSearchTerm 
-      ? ImageService.searchImages(currentCompanyId, currentSearchTerm)
-      : ImageService.getImages(currentCompanyId);
+      ? ImageService.searchImages(currentSearchTerm)
+      : ImageService.getImages();
     
     dataPromise.then(images => {
       currentImages = images;

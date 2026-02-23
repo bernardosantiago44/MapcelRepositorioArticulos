@@ -41,29 +41,18 @@ const ArticleService = (function() {
   
   /**
    * Get tags specific to a company from the new centralized tags array
-   * @param {string} companyId - The company ID to filter tags by
    * @returns {Promise<Array<{id: string, name: string, color: string, description: string, companyId: string}>>} Promise resolving to array of tags
    */
-  function getTags(companyId) {
+  function getTags() {
     // Check cache first
-    if (tagCache && tagCache.has(companyId)) {
-      return Promise.resolve(tagCache.get(companyId));
+    if (tagCache && tagCache.has('_all_')) {
+      return Promise.resolve(tagCache.get('_all_'));
     }
 
-    return fetch(`/api/tags?companyCode=${encodeURIComponent(companyId)}`, {
-      headers: { "Accept": "application/json" }
-    })
-    .then(function (res) {
-      if (!res.ok) {
-        throw new Error("Failed to load tags: " + res.status);
-      }
-
-      const companyTags = res.json();
-      return companyTags;
-    })
+    return ApiClient.getJSON('/api/tags')
     .then(function (companyTags) {
-      // Cache the tags for this company
-      tagCache.set(companyId, companyTags);
+      // Cache the tags
+      tagCache.set('_all_', companyTags);
       return companyTags;
     });
   }
@@ -86,7 +75,7 @@ const ArticleService = (function() {
     }
 
     // Otherwise, fetch specific one from server
-    return fetch(`/api/tags/${encodeURIComponent(tagId)}`, {
+    return ApiClient.request(`/api/tags/${encodeURIComponent(tagId)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -118,7 +107,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags?companyCode=${encodeURIComponent(tagData.companyId)}`, requestOptions)
+    return ApiClient.request('/api/tags', requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create tag: " + response.status);
@@ -156,7 +145,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags/${tagId}`, requestOptions)
+    return ApiClient.request(`/api/tags/${tagId}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update tag: " + response.status);
@@ -186,7 +175,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags/${tagId}`, requestOptions)
+    return ApiClient.request(`/api/tags/${tagId}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to delete tag: " + response.status);
@@ -211,8 +200,6 @@ const ArticleService = (function() {
   async function getArticles(params = {}) {
     const qs = new URLSearchParams();
 
-    if (params.companyId) qs.set("companyId", params.companyId);
-
     // FIX: ensure search is string, not function
     const searchValue =
       typeof params.search === "function"
@@ -236,7 +223,7 @@ const ArticleService = (function() {
 
     const url = `/api/articles?${qs.toString()}`;
 
-    const res = await fetch(url, {
+    const res = await ApiClient.request(url, {
       headers: { "Accept": "application/json" }
     });
 
@@ -245,7 +232,7 @@ const ArticleService = (function() {
     const response = await res.json();
     const allArticles = response.data || [];
 
-    const tags = await getTags(params.companyId);
+    const tags = await getTags();
 
     // Resolve tag IDs to full tag objects
     const articlesWithResolvedTags = allArticles.map(article => {
@@ -277,14 +264,13 @@ const ArticleService = (function() {
  * Get a single article from backend
  * Server already resolves tag names (no client mapping)
  * @param {string} articleId
- * @param {string} companyId
  * @returns {Promise<Object|null>}
  */
-  async function getArticleById(articleId, companyId = appState.selectedCompanyId) {
+  async function getArticleById(articleId) {
     if (!articleId) return null;
 
-    const url = `/api/articles/${encodeURIComponent(articleId)}?companyId=${encodeURIComponent(companyId)}`;
-    const res = await fetch(url, {
+    const url = `/api/articles/${encodeURIComponent(articleId)}`;
+    const res = await ApiClient.request(url, {
       headers: { "Accept": "application/json" }
     });
 
@@ -292,7 +278,7 @@ const ArticleService = (function() {
     if (!res.ok) throw new Error(`getArticleById failed: ${res.status}`);
 
     const article = await res.json();
-    const tags = await getTags(article.companyId);  // Get tags for the company to resolve tag IDs
+    const tags = await getTags();  // Get tags for the company to resolve tag IDs
 
     if (article.tags && Array.isArray(article.tags)) {
       const resolvedTags = article.tags.map(tagId => {
@@ -389,7 +375,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles?companyId=${appState.selectedCompanyId}`, requestOptions)
+    return ApiClient.request('/api/articles', requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create article: " + response.status);
@@ -436,7 +422,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${id}?companyId=${appState.selectedCompanyId}`, requestOptions)
+    return ApiClient.request(`/api/articles/${id}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update article: " + response.status);
@@ -480,9 +466,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    const companyId = appState.selectedCompanyId;
-
-    return fetch(`/api/articles/bulk-tags?companyId=${companyId}`, requestOptions)
+    return ApiClient.request('/api/articles/bulk-tags', requestOptions)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("Failed to bulk update tags: " + response.status);

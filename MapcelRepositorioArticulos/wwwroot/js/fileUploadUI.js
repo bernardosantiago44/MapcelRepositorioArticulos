@@ -191,7 +191,7 @@ const FileUploadUI = (function() {
       submitBtn.textContent = 'Subiendo...';
       
       // Call file service to upload
-      FileService.uploadFiles(selectedFiles, description, companyId)
+      FileService.uploadFiles(selectedFiles, description)
         .then(uploadedFiles => {
           // Show success message
           dhtmlx.message({

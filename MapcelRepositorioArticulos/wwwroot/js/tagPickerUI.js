@@ -49,7 +49,7 @@ var TagPickerUI = (function() {
     tagPickerState.currentPage = 1;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags()
       .then(function(tags) {
         tagPickerState.allTags = tags;
         tagPickerState.filteredTags = tags;

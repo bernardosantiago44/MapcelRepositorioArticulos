@@ -225,8 +225,8 @@ const FilesTabManager = (function() {
       
       // Load files and render card view
       const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyId, currentSearchTerm)
-        : FileService.getFiles(currentCompanyId);
+        ? FileService.searchFiles(currentSearchTerm)
+        : FileService.getFiles();
       
       dataPromise.then(files => {
         contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));
@@ -273,8 +273,8 @@ const FilesTabManager = (function() {
       FilesGridHelper.loadFilesData(filesGrid, currentCompanyId, currentSearchTerm);
     } else if (currentView === 'card' && contentSection) {
       const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyId, currentSearchTerm)
-        : FileService.getFiles(currentCompanyId);
+        ? FileService.searchFiles(currentSearchTerm)
+        : FileService.getFiles();
       
       dataPromise.then(files => {
         contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));

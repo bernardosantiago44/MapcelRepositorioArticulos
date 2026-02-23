@@ -13,9 +13,9 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
 
     /// <summary>
-    /// Returns 401 if the caller is not an admin per the decrypted context.
+    /// Returns <c>true</c> if the caller is an admin per the decrypted context.
     /// </summary>
-    private bool RequireAdmin(out CompanyContext ctx)
+    private bool IsAdmin(out CompanyContext ctx)
     {
         ctx = GetCompanyContext();
         return ctx.IsAdmin;
@@ -24,7 +24,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Company>>> GetAll(CancellationToken cancellationToken)
     {
-        if (!RequireAdmin(out _))
+        if (!IsAdmin(out _))
             return Unauthorized("Admin access required.");
 
         try
@@ -44,7 +44,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
-        if (!RequireAdmin(out _))
+        if (!IsAdmin(out _))
             return Unauthorized("Admin access required.");
 
         try
@@ -71,7 +71,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
-        if (!RequireAdmin(out _))
+        if (!IsAdmin(out _))
             return Unauthorized("Admin access required.");
 
         try

@@ -37,7 +37,7 @@ public sealed class AdminController(ICompaniesService companiesService, IConfigu
             if (company is null)
                 return NotFound("Company not found.");
 
-            var issuedAt = DateTime.UtcNow.ToString("o");
+            var issuedAt = DateTimeOffset.UtcNow.ToString("o");
             var checksum = CompanyContextPayload.ComputeChecksum(
                 request.CompanyCode, isAdmin: true, issuedAt, key);
 

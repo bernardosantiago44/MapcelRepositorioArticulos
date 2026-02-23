@@ -56,7 +56,7 @@ var BulkTagEditorUI = (function() {
     bulkTagEditorState.onUpdateCallback = onUpdate || null;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags()
       .then(function(tags) {
         bulkTagEditorState.allTags = tags;
         calculateTagPresence();

@@ -638,7 +638,7 @@ var ArticleFormUI = (function() {
     if (!formState.companyId) return;
     
     // Load images
-    ImageService.getImages(formState.companyId)
+    ImageService.getImages()
       .then(function(images) {
         formState.allImages = images;
         resolveFileIdsFromArticleData();
@@ -655,7 +655,7 @@ var ArticleFormUI = (function() {
       });
     
     // Load files
-    FileService.getFiles(formState.companyId)
+    FileService.getFiles()
       .then(function(files) {
         formState.allFiles = files;
         resolveFileIdsFromArticleData();
@@ -1295,17 +1295,16 @@ var ArticleFormUI = (function() {
    * Handle delete article action with confirmation
    */
   function handleDeleteArticle() {
-    if (!formState.articleId || !formState.companyId) return;
+    if (!formState.articleId) return;
     
     var articleId = formState.articleId;
-    var companyId = formState.companyId;
     
     dhtmlx.confirm({
       title: 'Confirmar eliminación',
       text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
       callback: function(result) {
         if (result) {
-          fetch('/api/articles/' + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
+          ApiClient.request('/api/articles/' + encodeURIComponent(articleId), {
             method: 'DELETE'
           })
             .then(function(response) {
@@ -1448,7 +1447,7 @@ var ArticleFormUI = (function() {
     formState.descriptionTab = 'write';
     
     // Load tags for the company and convert article tags to tag objects
-    ArticleService.getTags(articleData.companyId)
+    ArticleService.getTags()
       .then(function(companyTags) {
         // Convert article's tag IDs (if they exist) to full tag objects
         formState.selectedTags = [];

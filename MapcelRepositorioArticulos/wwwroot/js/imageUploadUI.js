@@ -207,7 +207,7 @@ const ImageUploadUI = (function() {
       const imageDimensions = selectedImages.map(img => img.dimensions);
       
       // Call image service to upload
-      ImageService.uploadImages(imageFiles, imageDimensions, description, companyId)
+      ImageService.uploadImages(imageFiles, imageDimensions, description)
         .then(uploadedImages => {
           // Show success message
           dhtmlx.message({

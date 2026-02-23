@@ -59,8 +59,8 @@ const ImagesGridHelper = (function() {
     grid.clearAll();
     
     const dataPromise = searchTerm 
-      ? ImageService.searchImages(companyId, searchTerm)
-      : ImageService.getImages(companyId);
+      ? ImageService.searchImages(searchTerm)
+      : ImageService.getImages();
     
     dataPromise
       .then(images => {

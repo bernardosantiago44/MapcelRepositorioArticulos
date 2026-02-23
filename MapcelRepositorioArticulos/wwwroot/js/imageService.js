@@ -10,22 +10,18 @@ const ImageService = (function() {
   
   /**
    * Get images for a specific company
-   * @param {string} companyId - The company ID to filter images by
    * @returns {Promise<Array<Object>>} Promise resolving to array of image objects
    */
-  function getImages(companyId, page = 1, pageSize = 10) {
+  function getImages(page = 1, pageSize = 10) {
     const params = new URLSearchParams({
-      companyId,
       imagesOnly: true,
       page,
       pageSize
     });
 
-    return fetch(`/api/files/images?${params}`)
+    return ApiClient.request(`/api/files/images?${params}`)
       .then(response => {
         if (response.status === 404) {
-          // remove that id from cache if not found
-          imagesCache.delete(companyId);
           return {data:[]};
         }
         if (!response.ok) throw new Error("API Error");
@@ -53,7 +49,7 @@ const ImageService = (function() {
     }
 
     // We call the specific endpoint for an image by ID
-    return fetch(`/api/files/images/${imageId}`)
+    return ApiClient.request(`/api/files/images/${imageId}`)
       .then(response => {
         // If the server returns 404, we return null to match your original logic
         if (response.status === 404) {
@@ -90,10 +86,9 @@ const ImageService = (function() {
    * Update image metadata (description)
    * @param {string} imageId - The image ID
    * @param {string} newDescription - New description text
-   * @param {string} companyCode - The company code
    * @return {Promise<Object>} Promise resolving to the updated image object
    */
-  function updateImageMetadata(imageId, newDescription, companyCode) {
+  function updateImageMetadata(imageId, newDescription) {
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
 
@@ -108,7 +103,7 @@ const ImageService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/files/${imageId}?companyId=${companyCode}`, requestOptions)
+    return ApiClient.request(`/api/files/${imageId}`, requestOptions)
       .then(response => {
         if (response.status === 404) {
           console.warn(`Image with ID ${imageId} not found for update.`);
@@ -135,7 +130,7 @@ const ImageService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/files/${imageId}?companyId=${appState.selectedCompanyId}`, requestOptions)
+    return ApiClient.request(`/api/files/${imageId}`, requestOptions)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to delete image: ${response.statusText}`);
@@ -155,7 +150,7 @@ const ImageService = (function() {
     }
     
     const idsParam = imageIds.join(',');
-    return fetch(`/api/files/ids=${idsParam}`)
+    return ApiClient.request(`/api/files/ids=${idsParam}`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to fetch images: ${response.statusText}`);
@@ -181,13 +176,12 @@ const ImageService = (function() {
       return Promise.reject(new Error('No images specified for deletion'));
     }
     
-    const companyId = appState.selectedCompanyId;
     const deletePromises = imageIds.map(imageId => {
       const requestOptions = {
         method: "DELETE",
         redirect: "follow"
       };
-      return fetch(`/api/files/${imageId}?companyId=${companyId}`, requestOptions)
+      return ApiClient.request(`/api/files/${imageId}`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to delete image ${imageId}: ${response.statusText}`);
@@ -216,9 +210,7 @@ const ImageService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function downloadImage(imageId) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${imageId}/download?companyId=${companyId}`)
+    return ApiClient.request(`/api/files/${imageId}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download image: ${response.statusText}`);
@@ -253,12 +245,11 @@ const ImageService = (function() {
   
   /**
    * Search images by name, description, or dimensions
-   * @param {string} companyId - Company ID to filter images by
    * @param {string} searchTerm - Search term to filter by
    * @returns {Promise<Array<Object>>} Promise resolving to array of filtered image objects
    */
-  function searchImages(companyId, searchTerm) {
-    return getImages(companyId).then(images => {
+  function searchImages(searchTerm) {
+    return getImages().then(images => {
       if (!searchTerm || searchTerm.trim() === '') {
         return images;
       }
@@ -278,10 +269,9 @@ const ImageService = (function() {
    * @param {FileList|Array<File>} imageFiles - Image files to upload
    * @param {Array<Object>} imageDimensions - Array of {width, height} objects for each file (kept for backwards compatibility)
    * @param {string} description - Optional description for the images (batch) (kept for backwards compatibility)
-   * @param {string} companyId - Company ID to associate images with
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded image objects
    */
-  function uploadImages(imageFiles, imageDimensions, description, companyId) {
+  function uploadImages(imageFiles, imageDimensions, description) {
     // Convert FileList to Array if needed
     const filesArray = Array.from(imageFiles);
     
@@ -295,7 +285,7 @@ const ImageService = (function() {
         redirect: "follow"
       };
       
-      return fetch(`/api/files?companyId=${companyId}`, requestOptions)
+      return ApiClient.request(`/api/files`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to upload ${file.name}: ${response.statusText}`);
@@ -326,7 +316,7 @@ const ImageService = (function() {
       return Promise.resolve([]);
     }
     
-    return fetch(`/api/files/forArticleId=${encodeURIComponent(articleId)}`)
+    return ApiClient.request(`/api/files/forArticleId=${encodeURIComponent(articleId)}`)
       .then(response => {
         if (response.status === 404) {
           return [];

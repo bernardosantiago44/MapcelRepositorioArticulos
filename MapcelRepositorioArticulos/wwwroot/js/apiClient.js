@@ -17,14 +17,14 @@ var ApiClient = (function () {
   function _getAuthHeaders() {
     var ctx = AuthContext.getPersistedAuthContext();
     if (ctx) {
-      var h = {};
-      h[AuthConfig.AUTH_CONTEXT_HEADER_NAME] = ctx;
-      return h;
+      var headers = {};
+      headers[AuthConfig.AUTH_CONTEXT_HEADER_NAME] = ctx;
+      return headers;
     }
     if (AdminAuth.isAdminLoggedIn()) {
-      var h = {};
-      h[AuthConfig.ADMIN_HEADER_NAME] = '1';
-      return h;
+      var headers = {};
+      headers[AuthConfig.ADMIN_HEADER_NAME] = '1';
+      return headers;
     }
     throw new Error('No active auth session');
   }

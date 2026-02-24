@@ -28,7 +28,7 @@ public sealed class AdminController(ICompaniesService companiesService, IConfigu
             var key = configuration["Crypto:MetadataKey"];
             if (string.IsNullOrWhiteSpace(key))
             {
-                Log.Error("AdminController.SelectCompany: Crypto:MetadataKey is not configured");
+                Log.Fatal("AdminController.SelectCompany: Crypto:MetadataKey is not configured");
                 return StatusCode(500);
             }
 

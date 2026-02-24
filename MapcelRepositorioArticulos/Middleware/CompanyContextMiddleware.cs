@@ -18,7 +18,6 @@ public sealed class CompanyContextMiddleware(RequestDelegate next, IConfiguratio
     private static readonly string[] ExemptPrefixes =
     [
         "/api/admin/select-company",
-        "/debug/"
     ];
 
     public async Task InvokeAsync(HttpContext context)

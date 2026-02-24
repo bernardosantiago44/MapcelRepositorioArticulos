@@ -48,7 +48,7 @@ var AdminAuth = (function () {
   function selectCompany(companyCode) {
     return ApiClient.postJSON(AuthConfig.SELECT_COMPANY_ENDPOINT, { companyCode: companyCode })
       .then(function (data) {
-        var token = typeof data === 'string' ? data : data.token;
+        var token = typeof data === 'string' ? data : data.encryptedContext;
         if (!token) throw new Error('No company context token received');
         sessionStorage.setItem(AuthConfig.ADMIN_COMPANY_TOKEN_KEY, token);
         return token;

@@ -24,9 +24,6 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Company>>> GetAll(CancellationToken cancellationToken)
     {
-        if (!IsAdmin(out _))
-            return Unauthorized("Admin access required.");
-
         try
         {
             var companies = await companiesService.GetAllAsync(cancellationToken);

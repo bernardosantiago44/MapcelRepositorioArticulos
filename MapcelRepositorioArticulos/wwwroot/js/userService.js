@@ -17,12 +17,6 @@ const UserService = (function() {
   
   // Mock users for testing
   const mockUsers = {
-    admin: {
-      id: 'user-admin-01',
-      name: 'Admin Usuario',
-      role: 'admin',
-      companyId: null
-    },
     regular: {
       id: 'user-regular-01',
       name: 'Usuario Regular',
@@ -32,7 +26,7 @@ const UserService = (function() {
   };
   
   // Current logged-in user
-  let currentUser = mockUsers.admin; // Default to admin for testing
+  let currentUser = mockUsers.regular; // Default to regular user
   
   /**
    * Get the current logged-in user

@@ -2,17 +2,31 @@ using MapcelRepositorioArticulos.DataService;
 using Microsoft.AspNetCore.Mvc;
 using MapcelRepositorioArticulos.Models;
 using Serilog;
-using System.Text.Json;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/companies")]
-public class CompanyController(ICompaniesService companiesService, IConfiguration configuration) : ControllerBase
+public class CompanyController(ICompaniesService companiesService) : ControllerBase
 {
+    private CompanyContext GetCompanyContext()
+        => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
+
+    /// <summary>
+    /// Returns <c>true</c> if the caller is an admin per the decrypted context.
+    /// </summary>
+    private bool IsAdmin(out CompanyContext ctx)
+    {
+        ctx = GetCompanyContext();
+        return ctx.IsAdmin;
+    }
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Company>>> GetAll(CancellationToken cancellationToken)
     {
+        if (!IsAdmin(out _))
+            return Unauthorized("Admin access required.");
+
         try
         {
             var companies = await companiesService.GetAllAsync(cancellationToken);
@@ -30,6 +44,9 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
+        if (!IsAdmin(out _))
+            return Unauthorized("Admin access required.");
+
         try
         {
             var company = await companiesService.GetByIdAsync(id, cancellationToken);
@@ -54,6 +71,9 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
+        if (!IsAdmin(out _))
+            return Unauthorized("Admin access required.");
+
         try
         {
             var updated = await companiesService.UpdateAsync(id, request, cancellationToken);
@@ -68,46 +88,6 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         {
             Log.Error(ex, "CompanyController.Update failed for id={Id}", id);
             return StatusCode(500);
-        }
-    }
-
-    /// <summary>
-    /// Retrieves a company by decrypting the encrypted metadata blob supplied in the
-    /// <c>data</c> query parameter.  Returns <c>403 Forbidden</c> on any decryption
-    /// failure or when the decoded company code does not exist, to prevent metadata probing.
-    /// </summary>
-    [HttpGet("secure")]
-    public async Task<ActionResult<Company>> GetByMetadata(
-        [FromQuery] string data,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(data))
-            return StatusCode(403);
-
-        try
-        {
-            var key = configuration["Crypto:MetadataKey"];
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                Log.Error("CompanyController.GetByMetadata: Crypto:MetadataKey is not configured");
-                return StatusCode(500);
-            }
-
-            var decrypted = SymmetricCipher.Decrypt(data, key);
-            var metadata = JsonSerializer.Deserialize<UserMetadata>(decrypted);
-
-            if (metadata is null || string.IsNullOrWhiteSpace(metadata.CompanyCode))
-                return StatusCode(403);
-
-            var company = await companiesService.GetByIdAsync(metadata.CompanyCode, cancellationToken);
-            if (company is null) return StatusCode(403);
-
-            return Ok(company);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "CompanyController.GetByMetadata: decryption or lookup failed");
-            return StatusCode(403);
         }
     }
 }

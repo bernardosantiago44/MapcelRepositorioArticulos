@@ -1,7 +1,6 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;
@@ -10,10 +9,11 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("/api/articles")]
 public class ArticlesController(IArticlesService service) : ControllerBase
 {
+    private CompanyContext GetCompanyContext()
+        => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
-        [FromQuery] string companyId,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
         [FromQuery] DateOnly? dateFrom = null,
@@ -23,9 +23,10 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        var ctx = GetCompanyContext();
         var query = new ArticleQuery
         {
-            CompanyId = companyId,
+            CompanyId = ctx.CompanyCode,
             Search = searchString,
             Status = status,
             DateFrom = dateFrom,
@@ -41,7 +42,6 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ArticleDetailsDto>> GetById(
         int id, 
-        [FromQuery] string companyId,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
         [FromQuery] DateOnly? dateFrom = null,
@@ -51,11 +51,11 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        if (companyId.IsNullOrEmpty()) return BadRequest("Company Id is required.");
+        var ctx = GetCompanyContext();
         var query = new ArticleQuery
         {
             ArticleId = id,
-            CompanyId = companyId,
+            CompanyId = ctx.CompanyCode,
             Search = searchString,
             Status = status,
             DateFrom = dateFrom,
@@ -92,15 +92,15 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     
     [HttpPost]
     public async Task<ActionResult<ArticleDetailsDto>> Create(
-        [FromQuery] string companyId,
         [FromBody] CreateArticleRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var createdArticle = await service.CreateAsync(companyId, request, cancellationToken);
+            var ctx = GetCompanyContext();
+            var createdArticle = await service.CreateAsync(ctx.CompanyCode, request, cancellationToken);
             
-            return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyId }, createdArticle);
+            return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id }, createdArticle);
         }
         catch (ArgumentException ex)
         {
@@ -108,14 +108,13 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticlesController.Create failed for companyId={CompanyId}", companyId);
+            Log.Error(ex, "ArticlesController.Create failed");
             return StatusCode(500);
         }
     }
     
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
-        [FromQuery] string companyId,
         [FromBody] BulkUpdateTagsRequest request,
         CancellationToken cancellationToken)
     {
@@ -129,8 +128,9 @@ public class ArticlesController(IArticlesService service) : ControllerBase
             var action = request.Action.Trim().ToLowerInvariant();
             if (action is not ("add" or "remove")) return BadRequest("Action must be 'add' or 'remove'.");
 
+            var ctx = GetCompanyContext();
             var updatedCount = await service.BulkUpdateSingleTagAsync(
-                companyId,
+                ctx.CompanyCode,
                 request.ArticleIds,
                 request.TagId,
                 action,
@@ -140,7 +140,6 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            // Tag not found for this company (tenant-safe)
             return NotFound(ex.Message);
         }
         catch (ArgumentException ex)
@@ -149,7 +148,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticlesController.BulkUpdateTags failed for companyId={CompanyId}", companyId);
+            Log.Error(ex, "ArticlesController.BulkUpdateTags failed");
             return StatusCode(500);
         }
     }
@@ -158,13 +157,13 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ArticleDetailsDto>> Update(
         [FromRoute] int id,
-        [FromQuery] string companyId,
         [FromBody] UpdateArticleRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await service.UpdateAsync(id, companyId, request, cancellationToken);
+            var ctx = GetCompanyContext();
+            var updated = await service.UpdateAsync(id, ctx.CompanyCode, request, cancellationToken);
             if (updated is null) return NotFound();
             return Ok(updated);
         }
@@ -174,7 +173,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticlesController.Update failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "ArticlesController.Update failed for id={Id}", id);
             return StatusCode(500);
         }
     }
@@ -182,12 +181,12 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,
-        [FromQuery] string companyId,
         CancellationToken cancellationToken)
     {
         try
         {
-            var deleted = await service.DeleteAsync(id, companyId, cancellationToken);
+            var ctx = GetCompanyContext();
+            var deleted = await service.DeleteAsync(id, ctx.CompanyCode, cancellationToken);
             if (!deleted) return NotFound();
             return NoContent();
         }
@@ -197,7 +196,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticlesController.Delete failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "ArticlesController.Delete failed for id={Id}", id);
             return StatusCode(500);
         }
     }

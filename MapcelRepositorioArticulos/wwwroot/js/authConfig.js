@@ -31,7 +31,7 @@ var AuthConfig = (function () {
   // HTTP header names
   // ---------------------------------------------------------------------------
   /** Header sent when the app is in company-scoped mode. */
-  var AUTH_CONTEXT_HEADER_NAME = 'X-App-Context';
+  var AUTH_CONTEXT_HEADER_NAME = 'X-Company-Context';
 
   /** Header sent when the app is in admin mode. */
   var ADMIN_HEADER_NAME = 'X-Admin-Session';

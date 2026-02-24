@@ -9,15 +9,17 @@ namespace MapcelRepositorioArticulos.Controllers;
 [Route("api/tags")]
 public sealed class TagsController(ITagsService tagsService) : ControllerBase
 {
+    private CompanyContext GetCompanyContext()
+        => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Tag>>> GetAll(
-        [FromQuery] string companyCode,
         [FromQuery] string? searchString = null,
         CancellationToken cancellationToken = default
     )
     {
-        var query = new TagsQuery { CompanyCode = companyCode,  Search = searchString };
+        var ctx = GetCompanyContext();
+        var query = new TagsQuery { CompanyCode = ctx.CompanyCode, Search = searchString };
         try
         {
             var tags = await tagsService.GetAllAsync(query, cancellationToken);
@@ -28,7 +30,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
             return BadRequest(ex.Message);
         } catch (Exception ex)
         {
-            Log.Error(ex, "TagsController.GetAll failed for companyCode={CompanyCode}", companyCode);
+            Log.Error(ex, "TagsController.GetAll failed for companyCode={CompanyCode}", ctx.CompanyCode);
             return StatusCode(500);
         }
     }
@@ -54,11 +56,12 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<Tag>> Create([FromQuery] string companyCode, [FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<Tag>> Create([FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
     {
         try
         {
-            var created = await tagsService.CreateAsync(companyCode, request, cancellationToken);
+            var ctx = GetCompanyContext();
+            var created = await tagsService.CreateAsync(ctx.CompanyCode, request, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
         catch (ArgumentException ex)
@@ -67,7 +70,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "TagsController.Create failed for companyCode={CompanyCode}", companyCode);
+            Log.Error(ex, "TagsController.Create failed");
             return StatusCode(500);
         }
     }

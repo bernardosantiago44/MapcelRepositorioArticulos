@@ -16,7 +16,8 @@ var AuthContext = (function () {
   function getAuthContextFromUrl() {
     var params = new URLSearchParams(window.location.search);
     var value = params.get(AuthConfig.AUTH_CONTEXT_PARAM_NAME);
-    return value || null;
+    if (!value) return null;
+    return encodeURIComponent(value) || null;
   }
 
   /**
@@ -34,7 +35,11 @@ var AuthContext = (function () {
    * @returns {string|null}
    */
   function getPersistedAuthContext() {
-    return sessionStorage.getItem(AuthConfig.AUTH_CONTEXT_STORAGE_KEY) || null;
+    // Undo form encoding / URL encoding and restore '+'
+    const raw = sessionStorage.getItem(AuthConfig.AUTH_CONTEXT_STORAGE_KEY);
+    if (!raw) return null;
+    const value = decodeURIComponent(raw).replace(/ /g, '+');
+    return value;
   }
 
   /**

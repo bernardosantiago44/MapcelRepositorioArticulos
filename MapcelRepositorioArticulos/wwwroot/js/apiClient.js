@@ -24,6 +24,10 @@ var ApiClient = (function () {
     if (AdminAuth.isAdminLoggedIn()) {
       var headers = {};
       headers[AuthConfig.ADMIN_HEADER_NAME] = '1';
+      var token = AdminAuth.getCompanyToken();
+      if (token) {
+        headers[AuthConfig.AUTH_CONTEXT_HEADER_NAME] = token;
+      }
       return headers;
     }
     throw new Error('No active auth session');

@@ -270,8 +270,11 @@ function initializeAdminView() {
       // Set initial company (first company)
       appState.selectedCompanyId = companies[0].id;
       
-      // Load articles for the selected company
-      return loadArticlesForCompany(appState.selectedCompanyId);
+      // Obtain a company context token then load articles
+      return AdminAuth.selectCompany(appState.selectedCompanyId)
+        .then(function() {
+          return loadArticlesForCompany(appState.selectedCompanyId);
+        });
     })
     .catch(function(error) {
       console.error('Error initializing admin view:', error);
@@ -663,8 +666,11 @@ function onCompanyChange(companyId) {
   appState.selectedArticleId = null;
   appState.sidebarCell.attachHTMLString(ArticleDetailUI.renderEmptyState());
   
-  // Reload articles for new company
-  loadArticlesForCompany(companyId)
+  // Obtain a new company context token then reload articles
+  AdminAuth.selectCompany(companyId)
+    .then(function() {
+      return loadArticlesForCompany(companyId);
+    })
     .catch(function(error) {
       console.error('Error loading articles after company change:', error);
       main_content.progressOff();

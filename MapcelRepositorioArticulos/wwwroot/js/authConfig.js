@@ -47,6 +47,12 @@ var AuthConfig = (function () {
   /** sessionStorage key that tracks whether admin has logged in. */
   var ADMIN_SESSION_KEY = 'ADMIN_LOGGED_IN';
 
+  /** sessionStorage key for the admin company context token. */
+  var ADMIN_COMPANY_TOKEN_KEY = 'ADMIN_COMPANY_TOKEN';
+
+  /** Endpoint used by admins to obtain a company context token. */
+  var SELECT_COMPANY_ENDPOINT = '/api/admin/select-company';
+
   // Public API
   return {
     AUTH_CONTEXT_SPEC: AUTH_CONTEXT_SPEC,
@@ -55,6 +61,8 @@ var AuthConfig = (function () {
     AUTH_CONTEXT_HEADER_NAME: AUTH_CONTEXT_HEADER_NAME,
     ADMIN_HEADER_NAME: ADMIN_HEADER_NAME,
     ADMIN_CREDENTIALS: ADMIN_CREDENTIALS,
-    ADMIN_SESSION_KEY: ADMIN_SESSION_KEY
+    ADMIN_SESSION_KEY: ADMIN_SESSION_KEY,
+    ADMIN_COMPANY_TOKEN_KEY: ADMIN_COMPANY_TOKEN_KEY,
+    SELECT_COMPANY_ENDPOINT: SELECT_COMPANY_ENDPOINT
   };
 })();

@@ -245,6 +245,8 @@ function bootApp() {
     appState.currentUser = UserService.getCurrentUser();
     initializeRegularUserView();
   } else {
+    UserService.setCurrentUser('admin');
+    appState.currentUser = UserService.getCurrentUser();
     initializeAdminView();
   }
 }

@@ -18,7 +18,6 @@ const ImageMetadataEditorUI = (function() {
     // Load image data first
     ImageService.getImageById(imageId)
       .then(image => {
-        console.log('Loaded image for editing:', image);
         if (!image) {
           dhtmlx.message({
             type: 'error',
@@ -180,7 +179,6 @@ const ImageMetadataEditorUI = (function() {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Guardando...';
       
-      console.log('image:', image.id, 'newDescription:', newDescription);
       // Call image service to update metadata
       ImageService.updateImageMetadata(image.id, newDescription)
         .then(updatedImage => {

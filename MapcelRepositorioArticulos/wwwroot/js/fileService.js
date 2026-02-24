@@ -261,8 +261,7 @@ const FileService = (function() {
       return response.json();
       })
       .then(function (data) {
-        // Store in cache
-        console.log(`Fetched files for article ${key}:`, data);
+        // Store in cache before filtering, so we have the full list available for future calls
         filesByArticleCache.set(key, data);
         return data.filter(file =>  file.isImage == imagesOnly);
       });

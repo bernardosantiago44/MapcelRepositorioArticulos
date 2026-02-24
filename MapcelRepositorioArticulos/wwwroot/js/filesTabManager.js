@@ -287,7 +287,6 @@ const FilesTabManager = (function() {
    * @param {string} fileId - Selected file ID
    */
   function handleFileSelect(fileId) {
-    console.log('File selected:', fileId);
     // TODO: Show file details in sidebar or modal
   }
   
@@ -302,7 +301,6 @@ const FilesTabManager = (function() {
     } else {
       selectedFileIds.push(fileId);
     }
-    console.log('Selected files:', selectedFileIds);
   }
   
   /**

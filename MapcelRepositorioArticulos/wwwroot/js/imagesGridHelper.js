@@ -64,7 +64,6 @@ const ImagesGridHelper = (function() {
     
     dataPromise
       .then(images => {
-        console.log('Loaded images:', images);
         images.forEach(image => {
           const rowId = image.id;
           

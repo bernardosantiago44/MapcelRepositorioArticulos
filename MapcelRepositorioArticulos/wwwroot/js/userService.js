@@ -22,6 +22,12 @@ const UserService = (function() {
       name: 'Usuario Regular',
       role: 'regular',
       companyId: 'co-01' // Assigned to Acme Corporation
+    },
+    admin: {
+      id: 'user-admin-01',
+      name: 'Administrador',
+      role: 'admin',
+      companyId: null // Admins can switch companies
     }
   };
   

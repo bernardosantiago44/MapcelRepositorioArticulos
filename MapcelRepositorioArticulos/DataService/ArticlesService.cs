@@ -61,10 +61,6 @@ public interface IArticlesService
 
 public sealed class ArticlesService(IConfiguration configuration) : BaseService(configuration), IArticlesService
 {
-    // -------------------
-    // --- SQL Queries ---
-    // -------------------
-    // TODO: Add date range filters
     private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
@@ -194,18 +190,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         WHERE a.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
-    private const string SqlSelectMultipleTags = @"
-        SELECT
-        t.tag_id,
-        t.company_code,
-        t.name,
-        t.color,
-        t.description
-    FROM dbo.tags AS t
-        INNER JOIN @TagIds AS ids ON t.tag_id = ids.Id
-    WHERE t.company_code = @CompanyCode
-    ORDER BY t.tag_id;
-    ";
     private const string SqlBulkAddTagToArticles = @"
         IF NOT EXISTS (SELECT 1 FROM dbo.tags WHERE tag_id = @TagId AND company_code = @CompanyCode)
         BEGIN
@@ -268,7 +252,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     ";
 
     
-    
     public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
     {
         var rows = new List<ArticleDetailsDto>();
@@ -282,6 +265,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         var companyCode = query.CompanyId;
         if (string.IsNullOrWhiteSpace(companyCode))
             throw new ArgumentNullException(nameof(query.CompanyId));
+
+        Log.Information("ArticlesService.GetAsync: companyCode={CompanyCode}, page={Page}, pageSize={PageSize}", companyCode, query.Page, query.PageSize);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -347,8 +332,10 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     
     public async Task<ArticleDetailsDto> CreateAsync(string companyId, CreateArticleRequest request, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId); // CompanyId should be a non-null string.
-        request.Validate(); // The request must contain a Title and a Status, at least.
+        ValidateCompany(companyId);
+        request.Validate();
+
+        Log.Information("ArticlesService.CreateAsync: companyCode={CompanyCode}", companyId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -430,7 +417,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     {
         ValidateCompany(companyId);
         ValidateId(articleId);
-        request.Validate(); // Must contain Title and Status at least.
+        request.Validate();
+
+        Log.Information("ArticlesService.UpdateAsync: articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -544,6 +533,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         ValidateCompany(companyId);
         ValidateId(articleId);
 
+        Log.Information("ArticlesService.DeleteAsync: articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -599,6 +590,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         var normalized = action.Trim().ToLowerInvariant();
         if (normalized is not ("add" or "remove")) throw new ArgumentException("Action must be 'add' or 'remove'.", nameof(action));
 
+        Log.Information("ArticlesService.BulkUpdateSingleTagAsync: companyCode={CompanyCode}, tagId={TagId}, action={Action}", companyId, tagId, action);
+
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -637,8 +630,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     private static void ValidateCompany(string companyId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(companyId, nameof(companyId));
-        ArgumentException.ThrowIfNullOrEmpty(companyId, nameof(companyId));
-        ArgumentNullException.ThrowIfNull(companyId, nameof(companyId));
     }
 
     private static void ValidateId(int articleId)

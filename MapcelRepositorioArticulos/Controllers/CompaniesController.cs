@@ -24,6 +24,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<Company>>> GetAll(CancellationToken cancellationToken)
     {
+        Log.Information("CompanyController.GetAll");
         try
         {
             var companies = await companiesService.GetAllAsync(cancellationToken);
@@ -41,6 +42,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
+        Log.Information("CompanyController.GetById: id={Id}", id);
         if (!IsAdmin(out _))
             return Unauthorized("Admin access required.");
 
@@ -68,6 +70,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
+        Log.Information("CompanyController.Update: id={Id}", id);
         if (!IsAdmin(out _))
             return Unauthorized("Admin access required.");
 

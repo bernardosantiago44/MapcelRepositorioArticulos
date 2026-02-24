@@ -48,23 +48,14 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         ORDER BY c.name;
     ";
     private const string SqlSelectCompanyByCode = @"
-        WITH CompanyCTE AS (
-            SELECT
-                company_code,
-                name,
-                allow_user_uploads,
-                allow_user_tag_creation,
-                require_client_comments
-            FROM dbo.companies
-            WHERE (@CompanyCode IS NULL OR company_code = @CompanyCode)
-        )
         SELECT
             company_code,
             name,
             allow_user_uploads,
             allow_user_tag_creation,
             require_client_comments
-        FROM CompanyCTE;
+        FROM dbo.companies
+        WHERE company_code = @CompanyCode;
     ";
     private const string SqlUpdateCompanyReturn = @"
         UPDATE [dbo].[companies]
@@ -84,6 +75,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     
     public async Task<IReadOnlyList<Company>> GetAllAsync(CancellationToken cancellationToken)
     {
+        Log.Information("CompaniesService.GetAllAsync");
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -124,6 +116,8 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     {
         ValidateCompany(companyCode);
 
+        Log.Information("CompaniesService.GetByIdAsync: companyCode={CompanyCode}", companyCode);
+
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -163,6 +157,8 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     {
         ValidateCompany(companyCode);
         request.Validate();
+
+        Log.Information("CompaniesService.UpdateAsync: companyCode={CompanyCode}", companyCode);
 
         var name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim();
 

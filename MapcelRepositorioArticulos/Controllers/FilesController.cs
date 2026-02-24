@@ -37,7 +37,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.ExecuteGetAllAsync failed");
             return StatusCode(500, exception.Message);
         }
     }
@@ -100,7 +100,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.GetForArticleId failed for articleId={ArticleId}", articleId);
             return StatusCode(500, exception.Message);
         }
     }
@@ -126,7 +126,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.GetFilesByIds failed");
             return StatusCode(500, exception.Message);
         }
     }

@@ -86,7 +86,6 @@ public interface IFilesService
 
 public class FilesService(IConfiguration configuration) : BaseService(configuration), IFilesService
 {
-    // Eliminar el With, innecesario 
     private const string SqlSelectFilesByArticleId = @"
         SELECT
             f.file_id,
@@ -101,17 +100,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         ORDER BY f.is_image DESC, f.upload_date DESC;
     ";
 
-    // Revisar eficiencia al terminar 
     private const string SqlSelectFilesByIdsCsv = @"
-        WITH FileBase AS (
-            SELECT f.file_id
-            FROM [dbo].[files] f
-            WHERE f.file_id IN (
-                SELECT TRY_CAST(value AS int)
-                FROM STRING_SPLIT(@idsCsv, ',')
-                WHERE TRY_CAST(value AS int) IS NOT NULL
-            )
-        )
         SELECT
             f.file_id,
             f.name,
@@ -119,8 +108,12 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             f.thumbnail_url,
             f.extension,
             f.is_image
-        FROM FileBase b
-        INNER JOIN [dbo].[files] f ON f.file_id = b.file_id
+        FROM [dbo].[files] f
+        WHERE f.file_id IN (
+            SELECT TRY_CAST(value AS int)
+            FROM STRING_SPLIT(@idsCsv, ',')
+            WHERE TRY_CAST(value AS int) IS NOT NULL
+        )
         ORDER BY f.is_image DESC, f.upload_date DESC;
     ";
     private const string SqlInsertFile = @"
@@ -218,6 +211,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         if (queryType == FileQuery.FileQueryType.ByCompany && companyCode.IsNullOrEmpty()) throw new ArgumentNullException(nameof(query));
         if (queryType == FileQuery.FileQueryType.ById && fileId == null) throw new ArgumentNullException(nameof(query));
         if (queryType == FileQuery.FileQueryType.Undefined) throw new ArgumentNullException(nameof(query));
+
+        Log.Information("FilesService.GetAsync: companyCode={CompanyCode}, page={Page}, pageSize={PageSize}", companyCode, query.Page, query.PageSize);
 
         // IMPORTANT: When adding additional filters to the query,
         // Add them both inside the `SELECT` of the `WITH FileBase AS`
@@ -336,6 +331,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(articleId);
 
+        Log.Information("FilesService.GetByArticleIdAsync: articleId={ArticleId}", articleId);
+
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
@@ -350,6 +347,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     {
         ArgumentNullException.ThrowIfNull(ids);
         if (ids.Length == 0) return Array.Empty<FileDto>();
+
+        Log.Information("FilesService.GetByIdsAsync: count={Count}", ids.Length);
 
         // remove invalid/duplicate ids
         var cleanIds = ids.Where(x => x > 0).Distinct().ToArray();
@@ -402,6 +401,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     {
         ValidateCompany(companyId);
         ValidateFile(file);
+
+        Log.Information("FilesService.CreateAsync: companyCode={CompanyCode}, fileName={FileName}", companyId, file.FileName);
 
         // Split filename into (name, extension)
         var originalFileName = Path.GetFileName(file.FileName);
@@ -468,6 +469,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         ValidateId(fileId);
         request.Validate();
 
+        Log.Information("FilesService.UpdateAsync: fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
+
         // Normalize to null when not provided / whitespace so SQL can keep current value
         var name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim();
         var description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
@@ -514,6 +517,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         ValidateCompany(companyId);
         ValidateId(fileId);
 
+        Log.Information("FilesService.DeleteAsync: fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
+
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
@@ -549,6 +554,8 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     {
         ValidateCompany(companyId);
         ValidateId(fileId);
+
+        Log.Information("FilesService.GetDownloadInfoAsync: fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);

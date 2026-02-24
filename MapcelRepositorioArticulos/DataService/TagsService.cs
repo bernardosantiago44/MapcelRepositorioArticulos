@@ -139,12 +139,12 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
             
     public async Task<IReadOnlyList<Tag>> GetAllAsync(TagsQuery query, CancellationToken cancellationToken)
     {
-        // The query is needed for the company id.
         if (query is null) throw new ArgumentException("Query can not be null", nameof(query));
         
         ValidateCompany(query.CompanyCode);
         var companyCode = query.CompanyCode;
-        
+
+        Log.Information("TagsService.GetAllAsync: companyCode={CompanyCode}", companyCode);
         try
         {
             await using var connection = new SqlConnection(ConnectionString);
@@ -178,7 +178,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         }
         catch (Exception ex)
         {
-            Log.Error(ex, $"TagsService.GetAllAsync(string:token) failed for companyCode={query.CompanyCode}");
+            Log.Error(ex, "TagsService.GetAllAsync(string:token) failed for companyCode={CompanyCode}", query.CompanyCode);
             throw;
         }
     }
@@ -186,6 +186,8 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
     public async Task<Tag?> GetByIdAsync(int tagId, CancellationToken cancellationToken)
     {
         ValidateId(tagId);
+
+        Log.Information("TagsService.GetByIdAsync: tagId={TagId}", tagId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -220,6 +222,8 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
     {
         ValidateCompany(companyCode);
         request.Validate();
+
+        Log.Information("TagsService.CreateAsync: companyCode={CompanyCode}", companyCode);
 
         var name = request.Name.Trim();
         var color = string.IsNullOrWhiteSpace(request.Color) ? null : request.Color.Trim();
@@ -263,6 +267,8 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         ValidateId(tagId);
         request.Validate();
 
+        Log.Information("TagsService.UpdateAsync: tagId={TagId}", tagId);
+
         // null/whitespace → no change 
         var name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim();
         var color = string.IsNullOrWhiteSpace(request.Color) ? null : request.Color.Trim();
@@ -303,6 +309,8 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
     public async Task<bool> DeleteAsync(int tagId, CancellationToken cancellationToken)
     {
         ValidateId(tagId);
+
+        Log.Information("TagsService.DeleteAsync: tagId={TagId}", tagId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);

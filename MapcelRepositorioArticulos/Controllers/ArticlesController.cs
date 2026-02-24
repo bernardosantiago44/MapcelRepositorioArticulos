@@ -23,6 +23,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        Log.Information("ArticlesController.GetAll: page={Page}, pageSize={PageSize}", page, pageSize);
         var ctx = GetCompanyContext();
         var query = new ArticleQuery
         {
@@ -51,6 +52,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        Log.Information("ArticlesController.GetById: id={Id}", id);
         var ctx = GetCompanyContext();
         var query = new ArticleQuery
         {
@@ -66,28 +68,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         };
         var result = await service.GetAsync(query, cancellationToken);
         if (result.Data.Count == 0) return NotFound();
-        try
-        {
-            var article = result.Data.First();
-            return Ok(article);
-        }
-        catch (ArgumentNullException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException)
-        {
-            return NotFound();
-        }
-        catch (TaskCanceledException)
-        {
-            return NoContent();
-        }
-        catch (Exception e)
-        {
-            Log.Error(e, "Error");
-            return StatusCode(500);
-        }
+        return Ok(result.Data[0]);
     }
     
     [HttpPost]
@@ -97,6 +78,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
+            Log.Information("ArticlesController.Create");
             var ctx = GetCompanyContext();
             var createdArticle = await service.CreateAsync(ctx.CompanyCode, request, cancellationToken);
             
@@ -120,6 +102,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
+            Log.Information("ArticlesController.BulkUpdateTags");
             if (request is null) return BadRequest("Request body is required.");
             if (request.ArticleIds is null || request.ArticleIds.Length == 0) return BadRequest("ArticleIds is required.");
             if (request.TagId <= 0) return BadRequest("TagId must be > 0.");
@@ -162,6 +145,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
+            Log.Information("ArticlesController.Update: id={Id}", id);
             var ctx = GetCompanyContext();
             var updated = await service.UpdateAsync(id, ctx.CompanyCode, request, cancellationToken);
             if (updated is null) return NotFound();
@@ -185,6 +169,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     {
         try
         {
+            Log.Information("ArticlesController.Delete: id={Id}", id);
             var ctx = GetCompanyContext();
             var deleted = await service.DeleteAsync(id, ctx.CompanyCode, cancellationToken);
             if (!deleted) return NotFound();

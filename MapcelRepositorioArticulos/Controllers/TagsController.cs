@@ -18,6 +18,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
         CancellationToken cancellationToken = default
     )
     {
+        Log.Information("TagsController.GetAll");
         var ctx = GetCompanyContext();
         var query = new TagsQuery { CompanyCode = ctx.CompanyCode, Search = searchString };
         try
@@ -38,6 +39,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<Tag>> GetById([FromRoute] int id, CancellationToken cancellationToken = default)
     {
+        Log.Information("TagsController.GetById: id={Id}", id);
         try
         {
             var tag = await tagsService.GetByIdAsync(id, cancellationToken);
@@ -58,6 +60,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Tag>> Create([FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
     {
+        Log.Information("TagsController.Create");
         try
         {
             var ctx = GetCompanyContext();
@@ -78,6 +81,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<Tag>> Update([FromRoute] int id, [FromBody] UpdateTagRequest request, CancellationToken cancellationToken = default)
     {
+        Log.Information("TagsController.Update: id={Id}", id);
         try
         {
             var updated = await tagsService.UpdateAsync(id, request, cancellationToken);
@@ -98,6 +102,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken = default)
     {
+        Log.Information("TagsController.Delete: id={Id}", id);
         try
         {
             var deleted = await tagsService.DeleteAsync(id, cancellationToken);

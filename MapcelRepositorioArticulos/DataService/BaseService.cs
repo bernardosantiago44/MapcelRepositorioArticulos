@@ -22,7 +22,7 @@ public abstract class BaseService
         }
         catch (Exception error)
         {
-            Log.Fatal($"DataService.BaseService:25 - ${error.Message}");
+            Log.Fatal(error, "BaseService: failed to load connection string '{ConnectionName}'", "DefaultConnection");
         }
     }
     

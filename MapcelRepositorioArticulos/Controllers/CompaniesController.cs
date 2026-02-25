@@ -1,6 +1,7 @@
 using MapcelRepositorioArticulos.DataService;
 using Microsoft.AspNetCore.Mvc;
 using MapcelRepositorioArticulos.Models;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 namespace MapcelRepositorioArticulos.Controllers;
@@ -12,6 +13,12 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
     private CompanyContext GetCompanyContext()
         => (CompanyContext)HttpContext.Items[CompanyContext.HttpContextKey]!;
 
+    private string ExtractCompanyCode(out CompanyContext ctx)
+    {
+        ctx = GetCompanyContext();
+        return ctx.CompanyCode;
+    }
+    
     /// <summary>
     /// Returns <c>true</c> if the caller is an admin per the decrypted context.
     /// </summary>
@@ -41,8 +48,7 @@ public class CompanyController(ICompaniesService companiesService) : ControllerB
         [FromRoute] string id,
         CancellationToken cancellationToken)
     {
-        if (!IsAdmin(out _))
-            return Unauthorized("Admin access required.");
+        if (ExtractCompanyCode(out _).IsNullOrEmpty()) return NotFound();
 
         try
         {

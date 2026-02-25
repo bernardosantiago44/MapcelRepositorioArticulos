@@ -12,12 +12,15 @@ namespace MapcelRepositorioArticulos.Middleware;
 /// </summary>
 public sealed class CompanyContextMiddleware(RequestDelegate next, IConfiguration configuration)
 {
+    
+    public const string ApiTokenRoute = "api/token";
+    
     /// <summary>
     /// Path prefixes that are exempt from requiring the <c>X-Company-Context</c> header.
     /// </summary>
     private static readonly string[] ExemptPrefixes =
     [
-        "/api/admin/select-company",
+        $"/{ApiTokenRoute}",
         "/api/companies"
     ];
 
@@ -67,15 +70,12 @@ public sealed class CompanyContextMiddleware(RequestDelegate next, IConfiguratio
                 return;
             }
 
-            // Validate checksum when present (admin-generated contexts always include one).
-            if (payload.IsAdmin)
+            // Validate checksum.
+            if (!payload.ValidateChecksum(key))
             {
-                if (!payload.ValidateChecksum(key))
-                {
-                    Log.Warning("CompanyContextMiddleware: checksum validation failed for {Path}", path);
-                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                Log.Warning("CompanyContextMiddleware: checksum validation failed for {Path}", path);
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
             }
 
             context.Items[CompanyContext.HttpContextKey] =

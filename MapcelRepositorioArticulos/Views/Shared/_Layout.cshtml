@@ -37,6 +37,12 @@
   
     <!-- UI Helpers -->
     <script src="./js/tagBadge.js"></script>
+    <!-- Si está autenticado le inyecto el botón de editar -->
+    @if ( Context.User.Identity?.IsAuthenticated ?? false ) 
+    {
+        
+    }
+    
     <script src="./js/articleDetailUI.js"></script>
     <script src="./js/companyFormUI.js"></script>
     <script src="./js/articlesGridHelper.js"></script>

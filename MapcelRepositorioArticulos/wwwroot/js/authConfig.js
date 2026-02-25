@@ -51,7 +51,7 @@ var AuthConfig = (function () {
   var ADMIN_COMPANY_TOKEN_KEY = 'ADMIN_COMPANY_TOKEN';
 
   /** Endpoint used by admins to obtain a company context token. */
-  var SELECT_COMPANY_ENDPOINT = '/api/admin/select-company';
+  var SELECT_COMPANY_ENDPOINT = '/api/token/admin';
 
   // Public API
   return {

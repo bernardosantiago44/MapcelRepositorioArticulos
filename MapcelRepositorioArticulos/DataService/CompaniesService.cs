@@ -147,46 +147,50 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         try
         {
             // Step 1: Check if the company already exists in the local config table.
-            await using var selectCmd = new SqlCommand(SqlSelectCompanyByCode, connection);
-            selectCmd.CommandType = CommandType.Text;
-            selectCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
-
-            await using var reader = await selectCmd.ExecuteReaderAsync(cancellationToken);
-            if (await reader.ReadAsync(cancellationToken))
             {
-                return ReadCompany(reader);
-            }
+                await using var selectCmd = new SqlCommand(SqlSelectCompanyByCode, connection);
+                selectCmd.CommandType = CommandType.Text;
+                selectCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
 
-            await reader.CloseAsync();
+                await using var reader = await selectCmd.ExecuteReaderAsync(cancellationToken);
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    return ReadCompany(reader);
+                }
+            }
 
             // Step 2: Lazy initialization — validate against the master enterprise table.
-            await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
-            masterCmd.CommandType = CommandType.Text;
-            masterCmd.Parameters.Add(new SqlParameter("@EnterpriseId", SqlDbType.VarChar, 20) { Value = companyCode });
-
-            await using var masterReader = await masterCmd.ExecuteReaderAsync(cancellationToken);
-            if (!await masterReader.ReadAsync(cancellationToken))
+            string enterpriseName;
             {
-                // Enterprise does not exist in the master table.
-                return null;
-            }
+                await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
+                masterCmd.CommandType = CommandType.Text;
+                masterCmd.Parameters.Add(new SqlParameter("@EnterpriseId", SqlDbType.VarChar, 20) { Value = companyCode });
 
-            var enterpriseName = masterReader.GetString(1);
-            await masterReader.CloseAsync();
+                await using var masterReader = await masterCmd.ExecuteReaderAsync(cancellationToken);
+                if (!await masterReader.ReadAsync(cancellationToken))
+                {
+                    // Enterprise does not exist in the master table.
+                    return null;
+                }
+
+                enterpriseName = masterReader.GetString(1);
+            }
 
             // Step 3: Insert new local config record with default settings.
-            await using var insertCmd = new SqlCommand(SqlInsertCompany, connection);
-            insertCmd.CommandType = CommandType.Text;
-            insertCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
-            insertCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 150) { Value = enterpriseName });
-
-            await using var insertReader = await insertCmd.ExecuteReaderAsync(cancellationToken);
-            if (!await insertReader.ReadAsync(cancellationToken))
             {
-                return null;
-            }
+                await using var insertCmd = new SqlCommand(SqlInsertCompany, connection);
+                insertCmd.CommandType = CommandType.Text;
+                insertCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+                insertCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 150) { Value = enterpriseName });
 
-            return ReadCompany(insertReader);
+                await using var insertReader = await insertCmd.ExecuteReaderAsync(cancellationToken);
+                if (!await insertReader.ReadAsync(cancellationToken))
+                {
+                    return null;
+                }
+
+                return ReadCompany(insertReader);
+            }
         }
         catch (Exception ex)
         {

@@ -40,33 +40,37 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
-    [HttpGet]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyId}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
+        query.CompanyId = companyId;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("images")] // Specific filter for images
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyId}/images")] // Specific filter for images
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
+        query.CompanyId = companyId;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("images/{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyId}/images/{id:int}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
         query.Id = id;
+        query.CompanyId = companyId;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyId}/{id:int}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
         query.Id = id;
+        query.CompanyId = companyId;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
@@ -122,10 +126,10 @@ public class FilesController(IFilesService service) : ControllerBase
     }
     
     [Authorize]
-    [HttpPost]
+    [HttpPost("{companyId}")]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<FileAsset>> Create(
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
@@ -154,10 +158,10 @@ public class FilesController(IFilesService service) : ControllerBase
     }
     
     [Authorize]
-    [HttpPut("{id:int}")]
+    [HttpPut("{companyId}/{id:int}")]
     public async Task<ActionResult<FileDto>> Update(
         [FromRoute] int id,
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromBody] UpdateFileRequest request,
         CancellationToken cancellationToken)
     {
@@ -179,10 +183,10 @@ public class FilesController(IFilesService service) : ControllerBase
     }
     
     [Authorize]
-    [HttpDelete("{id:int}")]
+    [HttpDelete("{companyId}/{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         CancellationToken cancellationToken)
     {
         try
@@ -202,10 +206,10 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
-    [HttpGet("{id:int}/download")]
+    [HttpGet("{companyId}/{id:int}/download")]
     public async Task<IActionResult> Download(
         [FromRoute] int id,
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         CancellationToken cancellationToken)
     {
         try

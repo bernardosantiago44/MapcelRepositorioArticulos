@@ -61,7 +61,7 @@ public class TagsQuery
 /// <param name="PageSize">int</param>
 public class FileQuery
 {
-    public string? CompanyId { get; init; }
+    public string? CompanyId { get; set; }
     public string? SearchTerm { get; set; } = null;
     public bool ImagesOnly { get; set; } = false;
     public int? Id { get; set; } = null;

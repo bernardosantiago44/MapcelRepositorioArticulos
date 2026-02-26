@@ -11,9 +11,9 @@ namespace MapcelRepositorioArticulos.Controllers;
 public sealed class TagsController(ITagsService tagsService) : ControllerBase
 {
 
-    [HttpGet]
+    [HttpGet("{companyCode}")]
     public async Task<ActionResult<IReadOnlyList<Tag>>> GetAll(
-        [FromQuery] string companyCode,
+        [FromRoute] string companyCode,
         [FromQuery] string? searchString = null,
         CancellationToken cancellationToken = default
     )

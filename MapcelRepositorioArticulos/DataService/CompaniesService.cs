@@ -146,7 +146,6 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
 
         try
         {
-            // Step 1: Check if the company already exists in the local config table.
             {
                 await using var selectCmd = new SqlCommand(SqlSelectCompanyByCode, connection);
                 selectCmd.CommandType = CommandType.Text;
@@ -158,8 +157,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
                     return ReadCompany(reader);
                 }
             }
-
-            // Step 2: Lazy initialization — validate against the master enterprise table.
+            
             string enterpriseName;
             {
                 await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
@@ -175,8 +173,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
 
                 enterpriseName = masterReader.GetString(1);
             }
-
-            // Step 3: Insert new local config record with default settings.
+            
             {
                 await using var insertCmd = new SqlCommand(SqlInsertCompany, connection);
                 insertCmd.CommandType = CommandType.Text;

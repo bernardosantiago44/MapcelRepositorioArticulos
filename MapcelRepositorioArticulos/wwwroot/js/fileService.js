@@ -59,13 +59,11 @@ const FileService = (function() {
    */
   function getFiles(companyId, page = 1, pageSize = 10) {
     const params = new URLSearchParams({
-      companyId,
-      imagesOnly: false,
       page,
       pageSize
     });
 
-    return fetch(`/api/files?${params}`)
+    return fetch(`/api/files/${encodeURIComponent(companyId)}?${params}`)
       .then(response => {
         if (response.status === 404) {
           // Cache empty result to prevent future calls
@@ -87,8 +85,8 @@ const FileService = (function() {
    * @param {string} fileId - The file ID
    * @returns {Promise<Object|null>} Promise resolving to file object or null
    */
-  function getFileById(fileId) {
-    return fetch(`/api/files/${fileId}`)
+  function getFileById(fileId, companyId) {
+    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`)
       .then(response => {
         if (response.status === 404) {
           return null;
@@ -122,7 +120,7 @@ const FileService = (function() {
       const formData = new FormData();
       formData.append('file', file);
       
-      return fetch(`/api/files?companyId=${encodeURIComponent(companyId)}`, {
+      return fetch(`/api/files/${encodeURIComponent(companyId)}`, {
         method: 'POST',
         body: formData
       })
@@ -144,10 +142,8 @@ const FileService = (function() {
    * @param {string} newDescription - New description text
    * @returns {Promise<Object>} Promise resolving to updated file object
    */
-  function updateFileMetadata(fileId, newDescription) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+  function updateFileMetadata(fileId, newDescription, companyId) {
+    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -169,10 +165,8 @@ const FileService = (function() {
    * @param {string} fileId - The file ID to delete
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function deleteFile(fileId) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}?companyId=${encodeURIComponent(companyId)}`, {
+  function deleteFile(fileId, companyId) {
+    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
       method: 'DELETE'
     })
       .then(response => {
@@ -188,10 +182,8 @@ const FileService = (function() {
    * @param {string} fileId - The file ID to download
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function downloadFile(fileId) {
-    const companyId = appState.selectedCompanyId;
-    
-    return fetch(`/api/files/${fileId}/download?companyId=${encodeURIComponent(companyId)}`)
+  function downloadFile(fileId, companyId) {
+    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download file: ${response.statusText}`);

@@ -211,8 +211,6 @@ const ArticleService = (function() {
   async function getArticles(params = {}) {
     const qs = new URLSearchParams();
 
-    if (params.companyId) qs.set("companyId", params.companyId);
-
     // FIX: ensure search is string, not function
     const searchValue =
       typeof params.search === "function"
@@ -234,7 +232,7 @@ const ArticleService = (function() {
     qs.set("page", String(params.page ?? 1));
     qs.set("pageSize", String(params.pageSize ?? 50));
 
-    const url = `/api/articles?${qs.toString()}`;
+    const url = `/api/articles/${encodeURIComponent(params.companyId)}?${qs.toString()}`;
 
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }
@@ -283,7 +281,7 @@ const ArticleService = (function() {
   async function getArticleById(articleId, companyId = appState.selectedCompanyId) {
     if (!articleId) return null;
 
-    const url = `/api/articles/${encodeURIComponent(articleId)}?companyId=${encodeURIComponent(companyId)}`;
+    const url = `/api/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(articleId)}`;
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }
     });
@@ -389,7 +387,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles?companyId=${appState.selectedCompanyId}`, requestOptions)
+    return fetch(`/api/articles/${encodeURIComponent(appState.selectedCompanyId)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create article: " + response.status);
@@ -436,7 +434,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${id}?companyId=${appState.selectedCompanyId}`, requestOptions)
+    return fetch(`/api/articles/${encodeURIComponent(appState.selectedCompanyId)}/${encodeURIComponent(id)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update article: " + response.status);
@@ -482,7 +480,7 @@ const ArticleService = (function() {
 
     const companyId = appState.selectedCompanyId;
 
-    return fetch(`/api/articles/bulk-tags?companyId=${companyId}`, requestOptions)
+    return fetch(`/api/articles/${encodeURIComponent(companyId)}/bulk-tags`, requestOptions)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("Failed to bulk update tags: " + response.status);

@@ -8,13 +8,13 @@ using Serilog;
 namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
-[Route("/api/articles")]
+[Route("/api/articles/{companyId}")]
 public class ArticlesController(IArticlesService service) : ControllerBase
 {
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
         [FromQuery] DateOnly? dateFrom = null,
@@ -42,7 +42,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<ArticleDetailsDto>> GetById(
         int id, 
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
         [FromQuery] DateOnly? dateFrom = null,
@@ -94,7 +94,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [Authorize]
     [HttpPost]
     public async Task<ActionResult<ArticleDetailsDto>> Create(
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromBody] CreateArticleRequest request,
         CancellationToken cancellationToken)
     {
@@ -118,7 +118,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [Authorize]
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         [FromBody] BulkUpdateTagsRequest request,
         CancellationToken cancellationToken)
     {
@@ -161,8 +161,8 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [Authorize]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ArticleDetailsDto>> Update(
+        [FromRoute] string companyId,
         [FromRoute] int id,
-        [FromQuery] string companyId,
         [FromBody] UpdateArticleRequest request,
         CancellationToken cancellationToken)
     {
@@ -187,7 +187,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,
-        [FromQuery] string companyId,
+        [FromRoute] string companyId,
         CancellationToken cancellationToken)
     {
         try

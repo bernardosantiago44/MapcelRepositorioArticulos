@@ -59,8 +59,11 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map API controllers (/api/...)
 app.MapControllers();
+
+app.MapControllerRoute(
+    name: "all_companies",
+    pattern: "/Companies/{controller=Companies}/{action=Index}");
 
 app.MapControllerRoute(
     name: "company_route",

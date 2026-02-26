@@ -95,7 +95,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             f.thumbnail_url,
             f.extension,
             f.is_image
-        FROM [dbo].[files] f
+        FROM [RepositorioArticulos].[dbo].[files] f
         INNER JOIN [dbo].[file_articles] fa ON f.file_id = fa.file_id
         WHERE fa.article_id = @articleId
         ORDER BY f.is_image DESC, f.upload_date DESC;
@@ -105,7 +105,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     private const string SqlSelectFilesByIdsCsv = @"
         WITH FileBase AS (
             SELECT f.file_id
-            FROM [dbo].[files] f
+            FROM [RepositorioArticulos].[dbo].[files] f
             WHERE f.file_id IN (
                 SELECT TRY_CAST(value AS int)
                 FROM STRING_SPLIT(@idsCsv, ',')
@@ -120,11 +120,11 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             f.extension,
             f.is_image
         FROM FileBase b
-        INNER JOIN [dbo].[files] f ON f.file_id = b.file_id
+        INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = b.file_id
         ORDER BY f.is_image DESC, f.upload_date DESC;
     ";
     private const string SqlInsertFile = @"
-        INSERT INTO [dbo].[files]
+        INSERT INTO [RepositorioArticulos].[dbo].[files]
         (
             company_code,
             name,
@@ -151,7 +151,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         );
     ";
     private const string SqlUpdateFileReturnDto = @"
-        UPDATE [dbo].[files]
+        UPDATE [RepositorioArticulos].[dbo].[files]
         SET
             name = COALESCE(NULLIF(@Name, ''), name),
             description = COALESCE(NULLIF(@Description, ''), description)
@@ -173,20 +173,20 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             f.extension,
             f.thumbnail_url,
             f.is_image
-        FROM [dbo].[files] f
+        FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
     ";
     private const string SqlDeleteFileArticles = @"
         DELETE fa
-        FROM [dbo].[file_articles] fa
-        INNER JOIN dbo.files f ON f.file_id = fa.file_id
+        FROM [RepositorioArticulos].[dbo].[file_articles] fa
+        INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = fa.file_id
         WHERE fa.file_id = @FileId
           AND f.company_code = @CompanyCode;
     ";
     private const string SqlDeleteFile = @"
         DELETE f
-        FROM [dbo].[files] f
+        FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
     ";
@@ -194,7 +194,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         SELECT
             f.name,
             f.extension
-        FROM [dbo].[files] f
+        FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
     ";

@@ -69,7 +69,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
                 t.name,
                 t.color,
                 t.description
-            FROM [dbo].[tags] t
+            FROM [RepositorioArticulos].[dbo].[tags] t
             WHERE t.company_code = @companyCode
             AND (
                 @search IS NULL
@@ -86,11 +86,11 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
             t.color,
             t.description,
             t.company_code
-        FROM [dbo].[tags] t
+        FROM [RepositorioArticulos].[dbo].[tags] t
         WHERE t.tag_id = @TagId;
     ";
     private const string SqlInsertTagReturn = @"
-        INSERT INTO dbo.tags
+        INSERT INTO [RepositorioArticulos].[dbo].[tags]
         (
             company_code,
             name,
@@ -112,7 +112,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         );
     ";
     private const string SqlUpdateTagReturn = @"
-        UPDATE dbo.tags
+        UPDATE [RepositorioArticulos].[dbo].[tags]
         SET
             name = COALESCE(NULLIF(@Name, ''), name),
             color = COALESCE(NULLIF(@Color, ''), color),
@@ -127,11 +127,11 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
     ";
     private const string SqlDeleteTagBatchReturn = @"
         DELETE at
-        FROM [dbo].[article_tags] at
+        FROM [RepositorioArticulos].[dbo].[article_tags] at
         WHERE at.tag_id = @TagId;
 
         DELETE t
-        FROM [dbo].[tags] t
+        FROM [RepositorioArticulos].[dbo].[tags] t
         WHERE t.tag_id = @TagId;
 
         SELECT @@ROWCOUNT;

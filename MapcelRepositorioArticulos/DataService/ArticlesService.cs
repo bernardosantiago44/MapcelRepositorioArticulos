@@ -68,7 +68,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
-                FROM [dbo].[articles] a
+                FROM [RepositorioArticulos].[dbo].[articles] a
                 WHERE a.company_code = @companyCode
                   AND (@status IS NULL OR a.status = @status)
                   AND (@articleId IS NULL OR a.article_id = @articleId)
@@ -99,7 +99,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 client_comments,
                 external_link
             FROM ArticleBase b
-            JOIN [dbo].[articles] a ON b.article_id = a.article_id
+            JOIN [RepositorioArticulos].[dbo].[articles] a ON b.article_id = a.article_id
             OUTER APPLY (
                 SELECT STRING_AGG(t.tag_id, ',') AS tags
                 FROM article_tags at
@@ -115,7 +115,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
 
             -- 2. Get the total count using the EXACT SAME filters
             SELECT COUNT(1)
-            FROM [dbo].[articles] a
+            FROM [RepositorioArticulos].[dbo].[articles] a
             WHERE a.company_code = @companyCode
               AND (@status IS NULL OR a.status = @status)
               AND (@articleId IS NULL OR a.article_id = @articleId)
@@ -133,7 +133,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                   );
         ";
     private const string SqlInsertArticle = @"
-        INSERT INTO [dbo].[articles]
+        INSERT INTO [RepositorioArticulos].[dbo].[articles]
         (
             company_code,
             title,
@@ -154,7 +154,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         );
     ";
     private const string SqlUpdateArticle = @"
-        UPDATE [dbo].[articles]
+        UPDATE [RepositorioArticulos].[dbo].[articles]
         SET
             title = @Title,
             description = @Description,

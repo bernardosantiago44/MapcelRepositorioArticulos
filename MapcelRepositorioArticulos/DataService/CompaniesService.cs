@@ -37,6 +37,9 @@ public interface ICompaniesService
 
 public sealed class CompaniesService(IConfiguration configuration) : BaseService(configuration), ICompaniesService
 {
+    private const string SqlSelectCompaniesVisor = @"
+        SELECT ENTERPRISE_ID, ENTERPRISE_NAME, ENT_CodigoRND FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
+    ";
     private const string SqlSelectAllCompanies = @"
         SELECT
             c.company_code,
@@ -44,7 +47,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             c.allow_user_uploads,
             c.allow_user_tag_creation,
             c.require_client_comments
-        FROM dbo.companies c
+        FROM [RepositorioArticulos].[dbo].[companies] c
         ORDER BY c.name;
     ";
     private const string SqlSelectCompanyByCode = @"
@@ -55,7 +58,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
                 allow_user_uploads,
                 allow_user_tag_creation,
                 require_client_comments
-            FROM dbo.companies
+            FROM [RepositorioArticulos].[dbo].[companies]
             WHERE (@CompanyCode IS NULL OR company_code = @CompanyCode)
         )
         SELECT
@@ -67,7 +70,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         FROM CompanyCTE;
     ";
     private const string SqlUpdateCompanyReturn = @"
-        UPDATE [dbo].[companies]
+        UPDATE [RepositorioArticulos].[dbo].[companies]
         SET
             name = COALESCE(NULLIF(@Name, ''), name),
             allow_user_uploads = COALESCE(@AllowUserUploads, allow_user_uploads),
@@ -209,7 +212,6 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             throw;
         }
     }
-
     /// <summary>
     /// Validates that companyCode is not null or empty.
     /// </summary>

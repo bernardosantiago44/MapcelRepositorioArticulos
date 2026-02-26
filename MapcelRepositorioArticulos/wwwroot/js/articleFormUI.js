@@ -1221,7 +1221,7 @@ var ArticleFormUI = (function() {
     
     if (formState.currentMode === 'create') {
       // Create new article
-      ArticleService.createArticle(formData)
+      ArticleService.createArticle(formData, formState.companyId)
         .then(function(response) {
           if (response.status === 'success') {
             dhtmlx.message({
@@ -1257,7 +1257,7 @@ var ArticleFormUI = (function() {
         .then(function(existingArticle) {
           formData.createdAt = existingArticle ? existingArticle.createdAt : null;
           
-          return ArticleService.updateArticle(formState.articleId, formData);
+          return ArticleService.updateArticle(formState.articleId, formData, formState.companyId);
         })
         .then(function(response) {
           if (response.status === 'success') {

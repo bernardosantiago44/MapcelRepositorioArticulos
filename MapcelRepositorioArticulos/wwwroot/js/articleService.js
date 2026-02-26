@@ -50,7 +50,7 @@ const ArticleService = (function() {
       return Promise.resolve(tagCache.get(companyId));
     }
 
-    return fetch(`/api/tags?companyCode=${encodeURIComponent(companyId)}`, {
+    return fetch(`/api/tags/${encodeURIComponent(companyId)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -278,7 +278,7 @@ const ArticleService = (function() {
  * @param {string} companyId
  * @returns {Promise<Object|null>}
  */
-  async function getArticleById(articleId, companyId = appState.selectedCompanyId) {
+  async function getArticleById(articleId, companyId) {
     if (!articleId) return null;
 
     const url = `/api/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(articleId)}`;
@@ -365,7 +365,7 @@ const ArticleService = (function() {
    * @param {Object} data - Article data object
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the created article
    */
-  function createArticle(data) {
+  function createArticle(data, companyId) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -387,7 +387,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${encodeURIComponent(appState.selectedCompanyId)}`, requestOptions)
+    return fetch(`/api/articles/${encodeURIComponent(companyId)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create article: " + response.status);
@@ -411,7 +411,7 @@ const ArticleService = (function() {
    * @param {Object} data - Updated article data
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the updated article
    */
-  function updateArticle(id, data) {
+  function updateArticle(id, data, companyId) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -434,7 +434,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${encodeURIComponent(appState.selectedCompanyId)}/${encodeURIComponent(id)}`, requestOptions)
+    return fetch(`/api/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(id)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update article: " + response.status);
@@ -461,7 +461,7 @@ const ArticleService = (function() {
    * @param {('add'|'remove')} action - Whether to 'add' or 'remove' the tag
    * @returns {Promise<{status: string, updatedCount: number}>} Promise resolving to the result
    */
-  function bulkUpdateTags(articleIds, tagId, action) {
+  function bulkUpdateTags(articleIds, tagId, action, companyId) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -477,8 +477,6 @@ const ArticleService = (function() {
       body: raw,
       redirect: "follow"
     };
-
-    const companyId = appState.selectedCompanyId;
 
     return fetch(`/api/articles/${encodeURIComponent(companyId)}/bulk-tags`, requestOptions)
       .then(function (response) {

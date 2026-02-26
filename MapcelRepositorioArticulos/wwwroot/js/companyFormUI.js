@@ -357,7 +357,7 @@ const CompanyFormUI = (function() {
     function openSettingsForm(companyId, onSaveCallback) {
         resetFormState();
         
-        formState.companyId = appState.selectedCompanyId || companyId;
+        formState.companyId = CompanyRouting.getCompanyIdFromUrl() || companyId;
         formState.onSaveCallback = onSaveCallback;
         
         // Load company data and settings

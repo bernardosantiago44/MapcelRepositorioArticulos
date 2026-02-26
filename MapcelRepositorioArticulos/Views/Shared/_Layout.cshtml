@@ -17,6 +17,10 @@
 </head>
 <body>
 @RenderBody()
+@if (User.Identity?.IsAuthenticated ?? false)
+{
+    <script src="~/js/adminComponents.js" asp-append-version="true"></script>
+}
     
 <!-- Data Models and Services -->
 <script src="./js/utils.js"></script>
@@ -24,6 +28,7 @@
 <script src="./js/articleService.js"></script>
 <script src="./js/userService.js"></script>
 <script src="./js/companyService.js"></script>
+<script src="./js/companyRouting.js"></script>
 <script src="./js/gridFilterService.js"></script>
 <script src="./js/fileService.js"></script>
 <script src="./js/imageService.js"></script>

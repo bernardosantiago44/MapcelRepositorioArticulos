@@ -1,5 +1,6 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 
@@ -53,6 +54,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<Tag>> Create([FromQuery] string companyCode, [FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
     {
@@ -72,6 +74,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<Tag>> Update([FromRoute] int id, [FromBody] UpdateTagRequest request, CancellationToken cancellationToken = default)
     {
@@ -92,6 +95,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken = default)
     {

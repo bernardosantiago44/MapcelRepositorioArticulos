@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
@@ -120,6 +121,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
+    [Authorize]
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<FileAsset>> Create(
@@ -151,6 +153,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
+    [Authorize]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<FileDto>> Update(
         [FromRoute] int id,
@@ -175,6 +178,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
+    [Authorize]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,

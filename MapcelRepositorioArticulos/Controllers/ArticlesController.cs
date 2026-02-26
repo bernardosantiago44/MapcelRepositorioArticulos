@@ -1,5 +1,6 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -90,6 +91,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
     }
     
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<ArticleDetailsDto>> Create(
         [FromQuery] string companyId,
@@ -113,6 +115,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
     }
     
+    [Authorize]
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
         [FromQuery] string companyId,
@@ -155,6 +158,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     }
 
     
+    [Authorize]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<ArticleDetailsDto>> Update(
         [FromRoute] int id,
@@ -179,6 +183,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MapcelRepositorioArticulos.Models;
 using Serilog;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
@@ -47,7 +48,7 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         }
     }
 
-    
+    [Authorize]
     [HttpPut("{id}")]
     public async Task<ActionResult<Company>> Update(
         [FromRoute] string id,

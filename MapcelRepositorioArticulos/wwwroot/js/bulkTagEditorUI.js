@@ -35,7 +35,7 @@ var BulkTagEditorUI = (function() {
    */
   function openBulkTagEditor(companyId, selectedArticles, onUpdate) {
     // Check admin access
-    if (!UserService.isAdministrator()) {
+    if (typeof AdminBulkTagEditor === 'undefined') {
       dhtmlx.alert({
         title: 'Acceso denegado',
         text: 'Solo los administradores pueden realizar edición masiva de etiquetas.'
@@ -315,7 +315,7 @@ var BulkTagEditorUI = (function() {
       '</div>';
     }
     
-    ArticleService.bulkUpdateTags(articleIds, tagId, action)
+    ArticleService.bulkUpdateTags(articleIds, tagId, action, bulkTagEditorState.currentCompanyId)
       .then(function(response) {
         if (response.status === 'success') {
           var actionVerb = action === 'add' ? 'añadida' : 'eliminada';

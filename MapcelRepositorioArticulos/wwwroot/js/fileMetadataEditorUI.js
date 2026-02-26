@@ -15,7 +15,7 @@ const FileMetadataEditorUI = (function() {
    */
   function openEditModal(fileId, onSaveComplete) {
     // Load file data first
-    FileService.getFileById(fileId)
+    FileService.getFileById(fileId, CompanyRouting.getCompanyIdFromUrl())
       .then(file => {
         if (!file) {
           dhtmlx.message({
@@ -136,7 +136,7 @@ const FileMetadataEditorUI = (function() {
       saveBtn.textContent = 'Guardando...';
       
       // Call file service to update metadata
-      FileService.updateFileMetadata(file.id, newDescription)
+      FileService.updateFileMetadata(file.id, newDescription, CompanyRouting.getCompanyIdFromUrl())
         .then(updatedFile => {
           // Show success message
           dhtmlx.message({

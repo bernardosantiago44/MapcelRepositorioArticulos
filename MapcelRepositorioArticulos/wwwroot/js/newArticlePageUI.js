@@ -996,7 +996,7 @@ var NewArticlePageUI = (function() {
         });
 
         // Create the article
-        return ArticleService.createArticle(formData);
+        return ArticleService.createArticle(formData, pageState.companyId);
       })
       .then(function(response) {
         if (response.status === 'success') {
@@ -1036,7 +1036,7 @@ var NewArticlePageUI = (function() {
    */
   function openPage(layoutCell, companyId, companyName, onNavigateBack) {
     // Check permissions
-    if (!UserService.isAdministrator()) {
+    if (typeof AdminNewArticlePage === 'undefined') {
       dhtmlx.alert({
         title: 'Acceso denegado',
         text: 'No tienes permiso para crear artículos.'
@@ -1060,7 +1060,7 @@ var NewArticlePageUI = (function() {
     // to ensure they maintain full control over content management
     CompanyService.canUsersUpload(companyId)
       .then(function(canUpload) {
-        pageState.canUserUpload = UserService.isAdministrator() || canUpload;
+        pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
         
         // Render the page
         layoutCell.attachHTMLString(renderPageHtml());

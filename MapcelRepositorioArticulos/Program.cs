@@ -62,10 +62,13 @@ app.UseAuthorization();
 // Map API controllers (/api/...)
 app.MapControllers();
 
-// Existing MVC route
+app.MapControllerRoute(
+    name: "company_route",
+    pattern: "{companyId}/{controller=Home}/{action=Index}/{id?}");
+
+
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}"
-);
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

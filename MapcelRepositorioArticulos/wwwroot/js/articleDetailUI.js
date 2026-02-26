@@ -306,7 +306,7 @@ const ArticleDetailUI = (function() {
    */
   function handleFileClick(fileId) {
     if (fileId && typeof FileService !== 'undefined') {
-      FileService.downloadFile(fileId)
+      FileService.downloadFile(fileId, CompanyRouting.getCompanyIdFromUrl())
         .then(function() {
           if (typeof dhtmlx !== 'undefined') {
             dhtmlx.message({ type: 'success', text: 'Descargando archivo...' });
@@ -448,13 +448,12 @@ const ArticleDetailUI = (function() {
    *   - createdAt {string}: Creation date (YYYY-MM-DD)
    *   - updatedAt {string}: Last update date (YYYY-MM-DD)
    * @param {string} companyName - Company name to display
-   * @param {boolean} showEditButton - Whether to show edit button (true for administrators, false for regular users)
    * @returns {string} Complete HTML string for article detail sidebar
    */
-  function renderArticleDetailSidebar(article, companyName, showEditButton) {
+  function renderArticleDetailSidebar(article, companyName) {
     const statusConfig = getStatusConfiguration(article.status);
     
-    const editButtonHtml = showEditButton ? `
+    const editButtonHtml = typeof AdminEditArticleButton !== 'undefined' ? `
       <button
         id="edit-article-btn"
         class="w-full p-3 bg-green-500 hover:bg-green-400 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200"

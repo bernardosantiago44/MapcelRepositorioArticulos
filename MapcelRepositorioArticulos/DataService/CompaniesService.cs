@@ -37,37 +37,61 @@ public interface ICompaniesService
 
 public sealed class CompaniesService(IConfiguration configuration) : BaseService(configuration), ICompaniesService
 {
-    private const string SqlSelectCompaniesVisor = @"
-        SELECT ENTERPRISE_ID, ENTERPRISE_NAME, ENT_CodigoRND FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
-    ";
+    /// <summary>
+    /// LEFT JOIN from the master enterprise table to the local config table.
+    /// Any local config fields that are NULL (no local record) default to false.
+    /// </summary>
     private const string SqlSelectAllCompanies = @"
         SELECT
-            c.company_code,
-            c.name,
-            c.allow_user_uploads,
-            c.allow_user_tag_creation,
-            c.require_client_comments
-        FROM [RepositorioArticulos].[dbo].[companies] c
-        ORDER BY c.name;
+            m.ENTERPRISE_ID   AS company_code,
+            m.ENTERPRISE_NAME AS name,
+            ISNULL(c.allow_user_uploads, 0)        AS allow_user_uploads,
+            ISNULL(c.allow_user_tag_creation, 0)    AS allow_user_tag_creation,
+            ISNULL(c.require_client_comments, 0)    AS require_client_comments
+        FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES] m
+        LEFT JOIN [RepositorioArticulos].[dbo].[companies] c
+            ON m.ENTERPRISE_ID = c.company_code
+        ORDER BY m.ENTERPRISE_NAME;
     ";
+
+    /// <summary>
+    /// Retrieves a single company by code from the local config table.
+    /// </summary>
     private const string SqlSelectCompanyByCode = @"
-        WITH CompanyCTE AS (
-            SELECT
-                company_code,
-                name,
-                allow_user_uploads,
-                allow_user_tag_creation,
-                require_client_comments
-            FROM [RepositorioArticulos].[dbo].[companies]
-            WHERE (@CompanyCode IS NULL OR company_code = @CompanyCode)
-        )
         SELECT
             company_code,
             name,
             allow_user_uploads,
             allow_user_tag_creation,
             require_client_comments
-        FROM CompanyCTE;
+        FROM [RepositorioArticulos].[dbo].[companies]
+        WHERE company_code = @CompanyCode;
+    ";
+
+    /// <summary>
+    /// Checks whether an enterprise exists in the master table and returns its name.
+    /// </summary>
+    private const string SqlSelectEnterpriseById = @"
+        SELECT ENTERPRISE_ID, ENTERPRISE_NAME
+        FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
+        WHERE ENTERPRISE_ID = @EnterpriseId;
+    ";
+
+    /// <summary>
+    /// Inserts a new local config record for an enterprise that has been activated.
+    /// Returns the inserted row via OUTPUT.
+    /// </summary>
+    private const string SqlInsertCompany = @"
+        INSERT INTO [RepositorioArticulos].[dbo].[companies]
+            (company_code, name, allow_user_uploads, allow_user_tag_creation, require_client_comments)
+        OUTPUT
+            INSERTED.company_code,
+            INSERTED.name,
+            INSERTED.allow_user_uploads,
+            INSERTED.allow_user_tag_creation,
+            INSERTED.require_client_comments
+        VALUES
+            (@CompanyCode, @Name, 0, 0, 0);
     ";
     private const string SqlUpdateCompanyReturn = @"
         UPDATE [RepositorioArticulos].[dbo].[companies]
@@ -101,17 +125,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             while (await reader.ReadAsync(cancellationToken))
             {
                 
-                companies.Add(new Company
-                {
-                    Id = reader.GetString(0),
-                    Name = reader.GetString(1),
-                    Settings = new CompanySettings
-                    {
-                        AllowUserUploads = reader.GetBoolean(2),
-                        AllowUserTagCreation = reader.GetBoolean(3),
-                        RequireClientComments = reader.GetBoolean(4)
-                    }
-                });
+                companies.Add(ReadCompany(reader));
             }
 
             return companies;
@@ -132,28 +146,47 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
 
         try
         {
-            await using var cmd = new SqlCommand(SqlSelectCompanyByCode, connection);
-            cmd.CommandType = CommandType.Text;
+            // Step 1: Check if the company already exists in the local config table.
+            await using var selectCmd = new SqlCommand(SqlSelectCompanyByCode, connection);
+            selectCmd.CommandType = CommandType.Text;
+            selectCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
 
-            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
-
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken)) return null;
-
-            // Read by index (explicit select list)
-            var company = new Company
+            await using var reader = await selectCmd.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
             {
-                Id = reader.GetString(0),
-                Name = reader.GetString(1),
-                Settings = new CompanySettings
-                {
-                    AllowUserUploads = reader.GetBoolean(2),
-                    AllowUserTagCreation = reader.GetBoolean(3),
-                    RequireClientComments = reader.GetBoolean(4)
-                }
-            };
+                return ReadCompany(reader);
+            }
 
-            return company;
+            await reader.CloseAsync();
+
+            // Step 2: Lazy initialization — validate against the master enterprise table.
+            await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
+            masterCmd.CommandType = CommandType.Text;
+            masterCmd.Parameters.Add(new SqlParameter("@EnterpriseId", SqlDbType.VarChar, 20) { Value = companyCode });
+
+            await using var masterReader = await masterCmd.ExecuteReaderAsync(cancellationToken);
+            if (!await masterReader.ReadAsync(cancellationToken))
+            {
+                // Enterprise does not exist in the master table.
+                return null;
+            }
+
+            var enterpriseName = masterReader.GetString(1);
+            await masterReader.CloseAsync();
+
+            // Step 3: Insert new local config record with default settings.
+            await using var insertCmd = new SqlCommand(SqlInsertCompany, connection);
+            insertCmd.CommandType = CommandType.Text;
+            insertCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+            insertCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 150) { Value = enterpriseName });
+
+            await using var insertReader = await insertCmd.ExecuteReaderAsync(cancellationToken);
+            if (!await insertReader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            return ReadCompany(insertReader);
         }
         catch (Exception ex)
         {
@@ -192,19 +225,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken)) return null; // not found
 
-            var updated = new Company
-            {
-                Id = reader.GetString(0),
-                Name = reader.GetString(1),
-                Settings = new CompanySettings
-                {
-                    AllowUserUploads = reader.GetBoolean(2),
-                    AllowUserTagCreation = reader.GetBoolean(3),
-                    RequireClientComments = reader.GetBoolean(4)
-                }
-            };
-
-            return updated;
+            return ReadCompany(reader);
         }
         catch (Exception ex)
         {
@@ -212,6 +233,22 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             throw;
         }
     }
+    /// <summary>
+    /// Maps a reader row (company_code, name, allow_user_uploads, allow_user_tag_creation,
+    /// require_client_comments) to a <see cref="Company"/> instance.
+    /// </summary>
+    private static Company ReadCompany(SqlDataReader reader) => new()
+    {
+        Id = reader.GetString(0),
+        Name = reader.GetString(1),
+        Settings = new CompanySettings
+        {
+            AllowUserUploads = reader.GetBoolean(2),
+            AllowUserTagCreation = reader.GetBoolean(3),
+            RequireClientComments = reader.GetBoolean(4)
+        }
+    };
+
     /// <summary>
     /// Validates that companyCode is not null or empty.
     /// </summary>

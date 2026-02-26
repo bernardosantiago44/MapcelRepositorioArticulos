@@ -881,7 +881,10 @@ function openBulkTagEditor() {
             selectedIdsArray.forEach(function(articleId) {
               try {
                 appState.articlesGrid.cells(articleId, 0).setValue(1);
-              } catch (e) {}
+              } catch (e) {
+                // Row may no longer exist after refresh (e.g., concurrent deletion); ignore safely.
+                console.debug('Skipped restoring selection for missing article row:', articleId);
+              }
             });
 
             // If the currently selected article is one of the edited ones, refresh sidebar

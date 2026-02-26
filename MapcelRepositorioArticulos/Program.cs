@@ -1,5 +1,6 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Data.SqlClient;
 using Serilog;
 
@@ -27,6 +28,15 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddTransient<SqlConnection>(_ =>
     new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.HttpOnly = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.LoginPath = "/Account/Login";
+    });
+
 // Add all the needed services
 builder.Services.AddScoped<IArticlesService, ArticlesService>();
 builder.Services.AddScoped<ITagsService, TagsService>();
@@ -46,6 +56,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Map API controllers (/api/...)

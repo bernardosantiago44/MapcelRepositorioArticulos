@@ -1,0 +1,100 @@
+@model LoginViewModel
+
+@{
+    ViewData["Title"] = "Inicio de Sesión";
+}
+
+<div class="login-container">
+    <div class="login-card">
+        <h2 class="login-header">Inicio de Sesión — Administrador</h2>
+        
+        <form asp-action="Login" asp-controller="Account" method="post">
+            @* Global error message for invalid credentials *@
+            <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Username" class="login-label">Usuario</label>
+                <input asp-for="Username" class="form-control login-input" placeholder="Ingrese su usuario" autocomplete="off" />
+                <span asp-validation-for="Username" class="text-danger small"></span>
+            </div>
+
+            <div class="form-group mb-4">
+                <label asp-for="Password" class="login-label">Contraseña</label>
+                <input asp-for="Password" type="password" class="form-control login-input" placeholder="••••••••" />
+                <span asp-validation-for="Password" class="text-danger small"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 login-button">
+                Ingresar
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
+
+<style>
+    /* Centers the card perfectly on the screen */
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        background-color: #f8f9fa; /* Light grey background like the screenshot */
+    }
+
+    /* The white card container */
+    .login-card {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 450px;
+    }
+
+    .login-header {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #444;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .login-label {
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    /* Stylized inputs to match the screenshot's soft look */
+    .login-input {
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 0.75rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .login-input:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    /* The big blue button */
+    .login-button {
+        background-color: #007bff;
+        border: none;
+        padding: 0.75rem;
+        font-weight: 600;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: background-color 0.2s;
+    }
+
+    .login-button:hover {
+        background-color: #0056b3;
+    }
+</style>

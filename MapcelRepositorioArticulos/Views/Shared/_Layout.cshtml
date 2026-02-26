@@ -16,45 +16,46 @@
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 </head>
 <body>
-    @RenderBody()
+@RenderBody()
     
-    <!-- Data Models and Services -->
-    <script src="./js/utils.js"></script>
-    <script src="./js/dataModels.js"></script>
-    <script src="./js/articleService.js"></script>
-    <script src="./js/userService.js"></script>
-    <script src="./js/companyService.js"></script>
-    <script src="./js/gridFilterService.js"></script>
-    <script src="./js/fileService.js"></script>
-    <script src="./js/imageService.js"></script>
+<!-- Data Models and Services -->
+<script src="./js/utils.js"></script>
+<script src="./js/dataModels.js"></script>
+<script src="./js/articleService.js"></script>
+<script src="./js/userService.js"></script>
+<script src="./js/companyService.js"></script>
+<script src="./js/gridFilterService.js"></script>
+<script src="./js/fileService.js"></script>
+<script src="./js/imageService.js"></script>
   
-    <!-- UI Helpers -->
-    <script src="./js/tagBadge.js"></script>
-    <script src="./js/articleDetailUI.js"></script>
-    <script src="./js/companyFormUI.js"></script>
-    <script src="./js/articlesGridHelper.js"></script>
-    <script src="./js/tagManagerUI.js"></script>
-    <script src="./js/tagPickerUI.js"></script>
-    <script src="./js/articleFormUI.js"></script>
-    <script src="./js/bulkTagEditorUI.js"></script>
-    <script src="./js/filesGridHelper.js"></script>
-    <script src="./js/filesCardViewUI.js"></script>
-    <script src="./js/fileUploadUI.js"></script>
-    <script src="./js/fileMetadataEditorUI.js"></script>
-    <script src="./js/filesTabManager.js"></script>
-    <script src="./js/imagesGridHelper.js"></script>
-    <script src="./js/imagesGalleryViewUI.js"></script>
-    <script src="./js/imageMetadataEditorUI.js"></script>
-    <script src="./js/imagePreviewModal.js"></script>
-    <script src="./js/imageUploadUI.js"></script>
-    <script src="./js/imagesTabManager.js"></script>
-    <script src="./js/newArticlePageUI.js"></script>
-    <!-- Main Application -->
-    <script src="./js/app.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script>
+<!-- UI Helpers -->
+<script src="./js/tagBadge.js"></script>
+<script src="./js/articleDetailUI.js"></script>
+<script src="./js/companyFormUI.js"></script>
+<script src="./js/articlesGridHelper.js"></script>
+<script src="./js/tagManagerUI.js"></script>
+<script src="./js/tagPickerUI.js"></script>
+<script src="./js/articleFormUI.js"></script>
+<script src="./js/bulkTagEditorUI.js"></script>
+<script src="./js/filesGridHelper.js"></script>
+<script src="./js/filesCardViewUI.js"></script>
+<script src="./js/fileUploadUI.js"></script>
+<script src="./js/fileMetadataEditorUI.js"></script>
+<script src="./js/filesTabManager.js"></script>
+<script src="./js/imagesGridHelper.js"></script>
+<script src="./js/imagesGalleryViewUI.js"></script>
+<script src="./js/imageMetadataEditorUI.js"></script>
+<script src="./js/imagePreviewModal.js"></script>
+<script src="./js/imageUploadUI.js"></script>
+<script src="./js/imagesTabManager.js"></script>
+<script src="./js/newArticlePageUI.js"></script>
+<!-- Main Application -->
+<script src="./js/app.js"></script>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
     lucide.createIcons();
   </script>
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

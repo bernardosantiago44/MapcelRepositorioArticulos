@@ -760,15 +760,13 @@ function onArticleSelect(articleId) {
         // Load images and files for the attachments section
         ArticleDetailUI.loadAttachments(articleId);
         
-        // Attach edit button event if admin
-        if (showEditButton) {
+        // Attach edit button event if the admin component injected it
+        if (typeof AdminEditArticleButton !== 'undefined') {
           var editBtn = document.getElementById('edit-article-btn');
           if (editBtn) {
             editBtn.onclick = function() {
               openEditArticleForm(articleId, appState.selectedCompanyId);
             };
-          } else {
-            console.warn('Edit button not found in DOM');
           }
         }
       });

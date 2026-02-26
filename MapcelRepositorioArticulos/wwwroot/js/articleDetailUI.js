@@ -173,7 +173,7 @@ const ArticleDetailUI = (function() {
   function renderImageThumbnail(image) {
     const escapedId = Utils.escapeHtml(image.id);
     const escapedName = Utils.escapeHtml(image.name);
-    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnail_url);
+    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     
     return `
       <div 
@@ -401,10 +401,11 @@ const ArticleDetailUI = (function() {
     
     // Fetch images and files in parallel
     Promise.all([
-      ImageService.getImagesByArticle(articleId),
-      FileService.getFilesByArticle(articleId)
+      FileService.getFilesByArticle(articleId, true), // Fetch image files
+      FileService.getFilesByArticle(articleId, false) // Fetch non-image files
     ])
       .then(function(results) {
+        console.log('Attachments loaded:', results);
         const images = results[0];
         const files = results[1];
         

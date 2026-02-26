@@ -14,16 +14,15 @@ const ImagePreviewModal = (function() {
    */
   function openPreview(imageId) {
     ImageService.getImageById(imageId)
-      .then(image => {
-        if (!image) {
+      .then(response => {
+        if (!response) {
           dhtmlx.message({
             type: 'error',
             text: 'Imagen no encontrada'
           });
           return;
         }
-        
-        showPreviewModal(image);
+        showPreviewModal(response);
       })
       .catch(error => {
         console.error('Error loading image:', error);
@@ -47,13 +46,13 @@ const ImagePreviewModal = (function() {
     const escapedDescription = Utils.escapeHtml(image.description);
     const escapedDimensions = Utils.escapeHtml(image.dimensions);
     const escapedSize = Utils.escapeHtml(image.size);
-    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnail_url);
+    const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     const escapedId = Utils.escapeHtml(image.id);
     
     // Build higher resolution URL (with safe base URL)
-    const highResUrl = image.thumbnail_url ? 
-      Utils.escapeHtml(image.thumbnail_url.replace('/400/', '/1200/').replace('/225', '/675')) : '';
-    
+    const highResUrl = image.thumbnailUrl ? 
+      Utils.escapeHtml(image.thumbnailUrl.replace('/400/', '/1200/').replace('/225', '/675')) : '';
+      
     // Create modal HTML
     const modalHTML = `
       <div 

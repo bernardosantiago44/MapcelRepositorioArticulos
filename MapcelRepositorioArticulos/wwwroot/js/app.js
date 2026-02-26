@@ -213,7 +213,7 @@ function initializeApplication() {
  */
 function initializeAdminView() {
   // Load companies and populate company picker
-  ArticleService.getCompanies()
+  CompanyService.getAllCompanies()
     .then(function(companies) {
       if (companies.length === 0) {
         throw new Error('No companies found');
@@ -272,7 +272,7 @@ function initializeRegularUserView() {
   createFilterFormForRegularUser();
 
   // Add the company title to the header bar
-  ArticleService.getCompanyById(companyId)
+  CompanyService.getCompanyById(companyId)
     .then(function(company) {
       if (company) {
         var companyTitleHtml = createCompanyTitleHtml(company.name);
@@ -550,7 +550,7 @@ function buildGridWithArticles(articles) {
   
   // Attach row selection event
   appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-    onArticleSelect(rowId);
+    onArticleSelect(rowId, appState.selectedCompanyId);
   });
   
   // Clear sidebar if the selected article is no longer visible
@@ -680,7 +680,7 @@ function initializeImagesTab(companyId) {
  * @returns {Promise} Promise that resolves when articles are loaded
  */
 function loadArticlesForCompany(companyId) {
-  return ArticleService.getArticles(companyId)
+  return ArticleService.getArticles({companyId: companyId})
     .then(function(articles) {
       // Precompute search index for O(n) filtering performance
       GridFilterService.precomputeSearchIndex(articles);
@@ -725,7 +725,7 @@ function loadArticlesForCompany(companyId) {
       
       // Attach row selection event
       appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-        onArticleSelect(rowId);
+        onArticleSelect(rowId, companyId);
       });
       
       // Initialize Files tab with current company
@@ -742,14 +742,15 @@ function loadArticlesForCompany(companyId) {
 /**
  * Handle article selection in the grid
  * @param {string} articleId - Selected article ID
+ * @param {string} companyId
  */
 function onArticleSelect(articleId) {
   appState.selectedArticleId = articleId;
   
   // Fetch article details and company info
   Promise.all([
-    ArticleService.getArticleById(articleId),
-    ArticleService.getCompanyById(appState.selectedCompanyId)
+    ArticleService.getArticleById(articleId, appState.selectedCompanyId),
+    CompanyService.getCompanyById(appState.selectedCompanyId)
   ])
     .then(function(results) {
       var article = results[0];
@@ -781,7 +782,7 @@ function onArticleSelect(articleId) {
           var editBtn = document.getElementById('edit-article-btn');
           if (editBtn) {
             editBtn.onclick = function() {
-              openEditArticleForm(articleId);
+              openEditArticleForm(articleId, appState.selectedCompanyId);
             };
           } else {
             console.warn('Edit button not found in DOM');
@@ -896,7 +897,7 @@ function openBulkTagEditor() {
           .then(function() {
             // If the currently selected article is one of the edited ones, refresh sidebar
             if (appState.selectedArticleId && selectedIdsArray.indexOf(appState.selectedArticleId) !== -1) {
-              onArticleSelect(appState.selectedArticleId);
+              onArticleSelect(appState.selectedArticleId, appState.selectedCompanyId);
             }
           })
           .catch(function(error) {
@@ -981,7 +982,7 @@ function openNewArticleForm() {
   }
   
   // Get company name for display
-  ArticleService.getCompanyById(appState.selectedCompanyId)
+  CompanyService.getCompanyById(appState.selectedCompanyId)
     .then(function(company) {
       var companyName = company ? company.name : '';
       
@@ -1039,7 +1040,7 @@ function onNavigateBackFromNewArticle(newArticleData) {
       // If a new article was created, select it in the grid
       if (newArticleData && newArticleData.id && appState.articlesGrid) {
         appState.articlesGrid.selectRowById(newArticleData.id, false, true, true);
-        onArticleSelect(newArticleData.id);
+        onArticleSelect(newArticleData.id, appState.selectedCompanyId);
       }
     })
     .catch(function(error) {
@@ -1117,7 +1118,7 @@ function rebuildArticlesTabLayout() {
   
   // Recreate filters
   if (UserService.isAdministrator()) {
-    ArticleService.getCompanies().then(function(companies) {
+    CompanyService.getAllCompanies().then(function(companies) {
       createGridFilters(companies);
     });
   } else {
@@ -1128,9 +1129,10 @@ function rebuildArticlesTabLayout() {
 /**
  * Open the form for editing an existing article
  * @param {string} articleId - ID of the article to edit
+ * @param {string} companyId - ID of the company the article belongs to
  */
-function openEditArticleForm(articleId) {
-  ArticleService.getArticleById(articleId)
+function openEditArticleForm(articleId, companyId) {
+  ArticleService.getArticleById(articleId, companyId)
     .then(function(article) {
       if (!article) {
         dhtmlx.alert({
@@ -1158,6 +1160,7 @@ function openEditArticleForm(articleId) {
  */
 function onArticleFormSaved(articleData, mode) {
   // Reload articles for the current company to refresh the grid
+  ArticleService.clearCache(); // Clear cache to ensure fresh data is loaded
   loadArticlesForCompany(appState.selectedCompanyId)
     .then(function() {
       if (mode === 'create') {
@@ -1171,6 +1174,10 @@ function onArticleFormSaved(articleData, mode) {
         if (appState.selectedArticleId === articleData.id) {
           onArticleSelect(articleData.id);
         }
+      } else if (mode === 'delete') {
+        // Clear sidebar after article deletion
+        appState.sidebarCell.attachHTMLString(ArticleDetailUI.renderEmptyState());
+        appState.selectedArticleId = null;
       }
     })
     .catch(function(error) {

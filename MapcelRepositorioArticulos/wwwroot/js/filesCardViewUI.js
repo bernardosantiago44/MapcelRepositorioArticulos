@@ -37,6 +37,11 @@ const FilesCardViewUI = (function() {
     const iconClass = getFileIconClass(fileExtension);
     const formattedDate = formatDate(file.upload_date);
     
+    // Escape user-controlled data to prevent XSS
+    const escapedName = Utils.escapeHtml(file.name || '');
+    const escapedSize = Utils.escapeHtml(file.size || '');
+    const escapedDescription = Utils.escapeHtml(file.description || '');
+    
     return `
       <div 
         class="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow cursor-pointer relative"
@@ -60,18 +65,16 @@ const FilesCardViewUI = (function() {
         
         <!-- File Info -->
         <div class="text-center mb-3">
-          <h3 class="text-sm font-semibold text-gray-900 mb-1 truncate" title="${file.name}">
-            ${file.name}
+          <h3 class="text-sm font-semibold text-gray-900 mb-1 truncate" title="${escapedName}">
+            ${escapedName || 'Sin nombre'}
           </h3>
-          <p class="text-xs text-gray-500">
-            ${file.size}
-          </p>
+          ${escapedSize ? '<p class="text-xs text-gray-500">' + escapedSize + '</p>' : ''}
         </div>
         
         <!-- Description -->
-        ${file.description ? `
-          <p class="text-xs text-gray-600 mb-3 line-clamp-2" title="${file.description}">
-            ${file.description}
+        ${escapedDescription ? `
+          <p class="text-xs text-gray-600 mb-3 line-clamp-2" title="${escapedDescription}">
+            ${escapedDescription}
           </p>
         ` : ''}
         

@@ -1,3 +1,9 @@
 const AdminNewArticleButton = '';
-
-console.log("Admin is authenticated");
+const AdminEditCompanyButton = '';
+const AdminManageTagsButton = '';
+const AdminBulkEditTagsButton = '';
+const AdminEditArticleButton = '';
+const AdminCompanyPicker = '';
+const AdminNewArticlePage = '';
+const AdminBulkTagEditor = '';
+const AdminUploadOverride = '';

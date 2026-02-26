@@ -67,7 +67,7 @@ const FilesTabManager = (function() {
    */
   function applyUploadPermissions() {
     // Admins always have full access
-    if (UserService.isAdministrator()) {
+    if (typeof AdminUploadOverride !== 'undefined') {
       return;
     }
     

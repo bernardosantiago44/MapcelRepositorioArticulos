@@ -67,7 +67,7 @@ const ImagesTabManager = (function() {
    */
   function applyUploadPermissions() {
     // Admins always have full access
-    if (UserService.isAdministrator()) {
+    if (typeof AdminUploadOverride !== 'undefined') {
       return;
     }
     
@@ -510,7 +510,7 @@ const ImagesTabManager = (function() {
    * @param {string} imageId - Image ID to download
    */
   function downloadImage(imageId) {
-    ImageService.downloadImage(imageId)
+    ImageService.downloadImage(imageId, currentCompanyId)
       .then(() => {
         dhtmlx.message({
           type: 'success',
@@ -543,7 +543,7 @@ const ImagesTabManager = (function() {
    */
   function deleteSingleImage(imageId) {
     // Get image name for confirmation message
-    ImageService.getImageById(imageId)
+    ImageService.getImageById(imageId, currentCompanyId)
       .then(image => {
         if (!image) {
           dhtmlx.message({
@@ -560,7 +560,7 @@ const ImagesTabManager = (function() {
           '¿Eliminar imagen?',
           `¿Estás seguro de que deseas eliminar "${escapedName}"?`,
           () => {
-            ImageService.deleteImage(imageId)
+            ImageService.deleteImage(imageId, currentCompanyId)
               .then(() => {
                 
                 dhtmlx.message({
@@ -614,7 +614,7 @@ const ImagesTabManager = (function() {
    * Execute bulk delete operation
    */
   function executeBulkDelete() {
-    ImageService.bulkDeleteImages(selectedImageIds)
+    ImageService.bulkDeleteImages(selectedImageIds, currentCompanyId)
       .then(result => {
         dhtmlx.message({
           type: 'success',

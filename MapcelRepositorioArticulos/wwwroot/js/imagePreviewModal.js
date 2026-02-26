@@ -13,7 +13,7 @@ const ImagePreviewModal = (function() {
    * @param {string} imageId - Image ID to preview
    */
   function openPreview(imageId) {
-    ImageService.getImageById(imageId)
+    ImageService.getImageById(imageId, CompanyRouting.getCompanyIdFromUrl())
       .then(response => {
         if (!response) {
           dhtmlx.message({
@@ -237,7 +237,7 @@ const ImagePreviewModal = (function() {
    * @param {string} imageId - Image ID
    */
   function downloadImage(imageId) {
-    ImageService.downloadImage(imageId)
+    ImageService.downloadImage(imageId, CompanyRouting.getCompanyIdFromUrl())
       .then(() => {
         dhtmlx.message({
           type: 'success',

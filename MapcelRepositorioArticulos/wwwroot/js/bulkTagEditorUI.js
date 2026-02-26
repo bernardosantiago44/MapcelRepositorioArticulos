@@ -370,7 +370,7 @@ var BulkTagEditorUI = (function() {
     ArticleService.clearCache()
     
     // Fetch updated articles using bulk method
-    return ArticleService.getArticlesByIds(articleIds)
+    return ArticleService.getArticlesByIds(articleIds, bulkTagEditorState.currentCompanyId)
       .then(function(updatedArticles) {
         // Filter out any null results
         bulkTagEditorState.selectedArticles = updatedArticles.filter(function(article) {

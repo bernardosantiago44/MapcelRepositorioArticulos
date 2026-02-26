@@ -853,10 +853,12 @@ function openBulkTagEditor() {
   }
   
   // Convert to array (getSelectedRowId returns comma-separated string for multiselect)
-  var selectedIdsArray = selectedIds.split(',');
+  var selectedIdsArray = selectedIds.split(',').filter(function(id) {
+    return id && id.trim() !== '';
+  });
   
   // Fetch the full article objects for selected IDs using bulk fetch
-  ArticleService.getArticlesByIds(selectedIdsArray)
+  ArticleService.getArticlesByIds(selectedIdsArray, appState.selectedCompanyId)
     .then(function(selectedArticles) {
       // Filter out any null results
       var validArticles = selectedArticles.filter(function(article) {
@@ -876,6 +878,15 @@ function openBulkTagEditor() {
         // Callback when tags are updated - reload articles
         loadArticlesForCompany(appState.selectedCompanyId)
           .then(function() {
+            selectedIdsArray.forEach(function(articleId) {
+              try {
+                appState.articlesGrid.cells(articleId, 0).setValue(1);
+              } catch (e) {
+                // Row may no longer exist after refresh (e.g., concurrent deletion); ignore safely.
+                console.debug('Skipped restoring selection for missing article row:', articleId);
+              }
+            });
+
             // If the currently selected article is one of the edited ones, refresh sidebar
             if (appState.selectedArticleId && selectedIdsArray.indexOf(appState.selectedArticleId) !== -1) {
               onArticleSelect(appState.selectedArticleId, appState.selectedCompanyId);

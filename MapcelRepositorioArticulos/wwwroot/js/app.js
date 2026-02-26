@@ -194,46 +194,45 @@ appState.imagesTabInitialized = false;
  * Initialize the application on load
  */
 function initializeApplication() {
-  // Show loading indicator on main content cell
   main_content.progressOn();
   
-  // Get current user
   appState.currentUser = UserService.getCurrentUser();
   
-  // Initialize based on user role
-  if (UserService.isAdministrator()) {
-    initializeAdminView();
+  // Derive companyId from URL path
+  var companyIdFromUrl = CompanyRouting.getCompanyIdFromUrl();
+  
+  if (companyIdFromUrl) {
+    appState.selectedCompanyId = companyIdFromUrl;
+    initializeAppForCompany(companyIdFromUrl);
   } else {
-    initializeRegularUserView();
+    // No companyId in URL - check if admin with company picker
+    if (typeof AdminCompanyPicker !== 'undefined') {
+      initializeAdminCompanySelection();
+    } else {
+      main_content.progressOff();
+      dhtmlx.alert({
+        title: 'Error',
+        text: 'No se encontró un identificador de empresa en la URL.'
+      });
+    }
   }
 }
 
 /**
- * Initialize view for Administrator users
+ * Initialize admin company selection when no companyId is in the URL.
+ * Redirects to the first available company.
  */
-function initializeAdminView() {
-  // Load companies and populate company picker
+function initializeAdminCompanySelection() {
   CompanyService.getAllCompanies()
     .then(function(companies) {
       if (companies.length === 0) {
         throw new Error('No companies found');
       }
-      
-      // Create filter form 
-      createGridFilters(companies);
-
-      // Attach company combo to header bar
-      var companyCombo = createCompanyComboOptions(companies);
-      header_trailing.attachHTMLString(companyCombo);
-      
-      // Set initial company (first company)
-      appState.selectedCompanyId = companies[0].id;
-      
-      // Load articles for the selected company
-      return loadArticlesForCompany(appState.selectedCompanyId);
+      // Navigate to the first company's URL
+      CompanyRouting.navigateToCompany(companies[0].id);
     })
     .catch(function(error) {
-      console.error('Error initializing admin view:', error);
+      console.error('Error loading companies:', error);
       main_content.progressOff();
       dhtmlx.alert({
         title: 'Error',
@@ -243,47 +242,58 @@ function initializeAdminView() {
 }
 
 /**
- * Initialize view for Regular users
+ * Initialize the application for a specific company.
+ * Handles both admin and regular user views based on injected admin components.
+ * @param {string} companyId - The company ID derived from the URL
  */
-function initializeRegularUserView() {
-  // Hide the "Nuevo artículo" button for regular users
-  header_toolbar.hideItem('new_article');
-  header_toolbar.hideItem('edit_company');
-  // Hide the "Administrar Etiquetas" button for regular users
-  grid_toolbar.hideItem('manage_tags');
-  // Hide the "Editar Etiquetas (Selección)" button for regular users (Admin-only feature)
-  grid_toolbar.hideItem('bulk_edit_tags');
-  grid_toolbar.hideItem('sep_bulk');
-  
-  // Regular users have a fixed company
-  const companyId = UserService.getCurrentUserCompanyId();
-  appState.selectedCompanyId = companyId;
-  
-  if (!appState.selectedCompanyId) {
-    main_content.progressOff();
-    dhtmlx.alert({
-      title: 'Error',
-      text: 'Usuario sin empresa asignada'
-    });
-    return;
+function initializeAppForCompany(companyId) {
+  // Hide admin-only toolbar buttons if the admin components are not injected
+  if (typeof AdminNewArticleButton === 'undefined') {
+    header_toolbar.hideItem('new_article');
+  }
+  if (typeof AdminEditCompanyButton === 'undefined') {
+    header_toolbar.hideItem('edit_company');
+  }
+  if (typeof AdminManageTagsButton === 'undefined') {
+    grid_toolbar.hideItem('manage_tags');
+  }
+  if (typeof AdminBulkEditTagsButton === 'undefined') {
+    grid_toolbar.hideItem('bulk_edit_tags');
+    grid_toolbar.hideItem('sep_bulk');
   }
   
-  // Create simplified filter form for regular users (no company picker)
-  createFilterFormForRegularUser();
-
-  // Add the company title to the header bar
-  CompanyService.getCompanyById(companyId)
-    .then(function(company) {
-      if (company) {
-        var companyTitleHtml = createCompanyTitleHtml(company.name);
-        header_trailing.attachHTMLString(companyTitleHtml);
-      }
-    });
+  // Build filter + header UI
+  if (typeof AdminCompanyPicker !== 'undefined') {
+    CompanyService.getAllCompanies()
+      .then(function(companies) {
+        createGridFilters(companies);
+        var companyCombo = createCompanyComboOptions(companies);
+        header_trailing.attachHTMLString(companyCombo);
+        
+        // Pre-select current company in the dropdown
+        var companySelect = document.getElementById('filter-company');
+        if (companySelect) {
+          companySelect.value = companyId;
+        }
+      })
+      .catch(function(error) {
+        console.error('Error loading companies for picker:', error);
+      });
+  } else {
+    createFilterFormForRegularUser();
+    CompanyService.getCompanyById(companyId)
+      .then(function(company) {
+        if (company) {
+          var companyTitleHtml = createCompanyTitleHtml(company.name);
+          header_trailing.attachHTMLString(companyTitleHtml);
+        }
+      });
+  }
   
-  // Load articles for user's company
-  loadArticlesForCompany(appState.selectedCompanyId)
+  // Load articles
+  loadArticlesForCompany(companyId)
     .catch(function(error) {
-      console.error('Error initializing regular user view:', error);
+      console.error('Error initializing app for company:', error);
       main_content.progressOff();
       dhtmlx.alert({
         title: 'Error',
@@ -304,7 +314,7 @@ function createGridFilters(companies) {
   
   // Initialize all filter controls after DOM is ready
   requestAnimationFrame(function() {
-    initializeFilterControls(companies, true);
+    initializeFilterControls(companies, typeof AdminCompanyPicker !== 'undefined');
   });
 }
 
@@ -411,9 +421,9 @@ function createFilterContainerHtml(companies) {
  * @param {Array<Company>|null} companies - Companies array for admin
  * @param {boolean} isAdmin - Whether user is admin
  */
-function initializeFilterControls(companies, isAdmin) {
+function initializeFilterControls(companies, showCompanyPicker) {
   // Company picker (admin only)
-  if (isAdmin && companies) {
+  if (showCompanyPicker && companies) {
     var companySelect = document.getElementById('filter-company');
     if (companySelect) {
       companySelect.addEventListener('change', function() {
@@ -605,33 +615,7 @@ function clearAllFilters() {
  * @param {string} companyId - Selected company ID
  */
 function onCompanyChange(companyId) {
-  main_content.progressOn();
-  
-  appState.selectedCompanyId = companyId;
-  UserService.setCurrentCompanyForAdmin(companyId);
-  
-  // Clear tag cache when company changes
-  ArticleService.clearTagCache();
-  
-  // Clear current grid
-  if (appState.articlesGrid) {
-    appState.articlesGrid.clearAll();
-  }
-  
-  // Clear sidebar
-  appState.selectedArticleId = null;
-  appState.sidebarCell.attachHTMLString(ArticleDetailUI.renderEmptyState());
-  
-  // Reload articles for new company
-  loadArticlesForCompany(companyId)
-    .catch(function(error) {
-      console.error('Error loading articles after company change:', error);
-      main_content.progressOff();
-      dhtmlx.alert({
-        title: 'Error',
-        text: 'Error al cargar artículos: ' + error.message
-      });
-    });
+  CompanyRouting.navigateToCompany(companyId);
 }
 
 /**
@@ -761,7 +745,7 @@ function onArticleSelect(articleId) {
       }
       
       var companyName = company ? company.name : 'Desconocida';
-      var showEditButton = UserService.isAdministrator();
+      var showEditButton = typeof AdminEditArticleButton !== 'undefined';
       
       // Render article details in sidebar
       var detailHtml = ArticleDetailUI.renderArticleDetailSidebar(article, companyName, showEditButton);
@@ -812,7 +796,7 @@ function openTagManager() {
   }
   
   // Check if user is admin
-  if (!UserService.isAdministrator()) {
+  if (typeof AdminManageTagsButton === 'undefined') {
     dhtmlx.alert({
       title: 'Acceso denegado',
       text: 'Solo los administradores pueden gestionar etiquetas.'
@@ -835,7 +819,7 @@ function openTagManager() {
  */
 function openBulkTagEditor() {
   // Check if user is admin
-  if (!UserService.isAdministrator()) {
+  if (typeof AdminBulkTagEditor === 'undefined') {
     dhtmlx.alert({
       title: 'Acceso denegado',
       text: 'Solo los administradores pueden realizar edición masiva de etiquetas.'
@@ -918,7 +902,7 @@ function openBulkTagEditor() {
 // Company Settings Functions
 // ============================================================================
 function openCompanySettingsForm() {
-  if (appState.currentUser.role !== 'admin') return;
+  if (typeof AdminEditCompanyButton === 'undefined') return;
   
   if (!appState.selectedCompanyId) {
     dhtmlx.alert({
@@ -944,7 +928,7 @@ function refreshAppStateForSettings(newSettings) {
   CompanyService.clearCache();
   
   // Refresh upload button visibility for non-admin users
-  if (UserService.isRegularUser()) {
+  if (typeof AdminUploadOverride === 'undefined') {
     updateUploadButtonVisibility('files-upload-btn', newSettings.allow_user_uploads);
     updateUploadButtonVisibility('images-upload-btn', newSettings.allow_user_uploads);
   }
@@ -971,7 +955,7 @@ function updateUploadButtonVisibility(buttonId, isVisible) {
  * Navigates to the dedicated New Article page
  */
 function openNewArticleForm() {
-  if (appState.currentUser.role !== 'admin') return;
+  if (typeof AdminNewArticlePage === 'undefined') return;
   // Check if a company is selected
   if (!appState.selectedCompanyId) {
     dhtmlx.alert({
@@ -1093,7 +1077,7 @@ function rebuildArticlesTabLayout() {
   });
   
   // Hide toolbar items for non-admin users
-  if (!UserService.isAdministrator()) {
+  if (typeof AdminBulkEditTagsButton === 'undefined') {
     grid_toolbar.hideItem('manage_tags');
     grid_toolbar.hideItem('bulk_edit_tags');
     grid_toolbar.hideItem('sep_bulk');
@@ -1117,7 +1101,7 @@ function rebuildArticlesTabLayout() {
   sidebar_cell.attachHTMLString(ArticleDetailUI.renderEmptyState());
   
   // Recreate filters
-  if (UserService.isAdministrator()) {
+  if (typeof AdminCompanyPicker !== 'undefined') {
     CompanyService.getAllCompanies().then(function(companies) {
       createGridFilters(companies);
     });

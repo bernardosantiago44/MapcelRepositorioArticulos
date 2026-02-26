@@ -311,7 +311,7 @@ const ArticleService = (function() {
    * @param {Array<string>} articleIds - Array of article IDs
    * @returns {Promise<Array<Article>>} Promise resolving to array of articles (with resolved tags)
    */
-    function getArticlesByIds(articleIds) {
+    function getArticlesByIds(articleIds, companyId) {
       const resultsMap = new Map();
       const idsToFetch = [];
 
@@ -333,7 +333,7 @@ const ArticleService = (function() {
 
       // 3. Create an array of Promises for the missing articles
       const fetchPromises = idsToFetch.map(id => {
-        return getArticleById(id)
+        return getArticleById(id, companyId)
           .then(article => {
             if (article) {
               articlesCache.set(id, article); // Hydrate cache for future use

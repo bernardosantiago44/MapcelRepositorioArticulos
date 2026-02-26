@@ -419,7 +419,7 @@ function createFilterContainerHtml(companies) {
 /**
  * Initialize filter controls and attach event listeners
  * @param {Array<Company>|null} companies - Companies array for admin
- * @param {boolean} isAdmin - Whether user is admin
+ * @param {boolean} showCompanyPicker - Whether to show the company picker control
  */
 function initializeFilterControls(companies, showCompanyPicker) {
   // Company picker (admin only)
@@ -745,10 +745,9 @@ function onArticleSelect(articleId) {
       }
       
       var companyName = company ? company.name : 'Desconocida';
-      var showEditButton = typeof AdminEditArticleButton !== 'undefined';
       
       // Render article details in sidebar
-      var detailHtml = ArticleDetailUI.renderArticleDetailSidebar(article, companyName, showEditButton);
+      var detailHtml = ArticleDetailUI.renderArticleDetailSidebar(article, companyName);
       appState.sidebarCell.attachHTMLString(detailHtml);
       if (typeof lucide !== 'undefined') {
         lucide.createIcons();

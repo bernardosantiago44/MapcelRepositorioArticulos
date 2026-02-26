@@ -37,6 +37,9 @@ public interface ICompaniesService
 
 public sealed class CompaniesService(IConfiguration configuration) : BaseService(configuration), ICompaniesService
 {
+    private const string SqlSelectCompaniesVisor = @"
+        SELECT ENTERPRISE_ID, ENTERPRISE_NAME, ENT_CodigoRND FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
+    ";
     private const string SqlSelectAllCompanies = @"
         SELECT
             c.company_code,
@@ -209,7 +212,6 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             throw;
         }
     }
-
     /// <summary>
     /// Validates that companyCode is not null or empty.
     /// </summary>

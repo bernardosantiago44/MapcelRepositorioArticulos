@@ -126,7 +126,6 @@ const ArticleService = (function() {
       return response.json();
     })
     .then(function (result) {
-      console.log("Tag created successfully:", result);
       // Clear tag cache to force refresh on next getTags call
       clearTagCache();
       return { status: "success", data: result };
@@ -164,7 +163,6 @@ const ArticleService = (function() {
       return response.json();
     })
     .then(function (result) {
-      console.log("Tag updated successfully:", result);
       // Clear tag cache to force refresh on next getTags call
       clearTagCache();
       return { status: "success", data: result };
@@ -191,7 +189,6 @@ const ArticleService = (function() {
       if (!response.ok) {
         throw new Error("Failed to delete tag: " + response.status);
       }
-      console.log("Tag deleted successfully:", tagId);
       // Clear tag cache to force refresh on next getTags call
       clearTagCache();
       return { status: "success" };
@@ -369,7 +366,6 @@ const ArticleService = (function() {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
-    console.log(data);
     const raw = JSON.stringify({
       title: data.title,
       description: data.description,
@@ -396,7 +392,6 @@ const ArticleService = (function() {
     })
     .then(function (result) {
       articlesCache.set(result.id, result);
-      console.log("Article created successfully:", result);
       return { status: "success", data: result };
     })
     .catch(function (error) {
@@ -415,7 +410,6 @@ const ArticleService = (function() {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
-    console.log(data);
     const raw = JSON.stringify({
       title: data.title || null,
       description: data.description || null,
@@ -425,7 +419,6 @@ const ArticleService = (function() {
       tagIds: data.tags || null,
       fileIds: data.fileIds || null
     });
-    console.log(raw);
 
     const requestOptions = {
       method: "PUT",
@@ -443,7 +436,6 @@ const ArticleService = (function() {
     })
     .then(function (result) {
       articlesCache.set(id, result);
-      console.log("Article updated successfully:", result);
       return { status: "success", data: result };
     })
     .catch(function (error) {

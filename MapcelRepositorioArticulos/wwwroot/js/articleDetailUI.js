@@ -405,7 +405,6 @@ const ArticleDetailUI = (function() {
       FileService.getFilesByArticle(articleId, false) // Fetch non-image files
     ])
       .then(function(results) {
-        console.log('Attachments loaded:', results);
         const images = results[0];
         const files = results[1];
         

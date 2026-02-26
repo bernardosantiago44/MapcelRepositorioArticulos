@@ -264,7 +264,6 @@ const FileService = (function() {
       })
       .then(function (data) {
         // Store in cache
-        console.log(`Fetched files for article ${key}:`, data);
         filesByArticleCache.set(key, data);
         return data.filter(file =>  file.isImage == imagesOnly);
       });

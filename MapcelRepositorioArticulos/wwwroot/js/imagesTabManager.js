@@ -492,7 +492,6 @@ const ImagesTabManager = (function() {
    * @param {string} imageId - Selected image ID
    */
   function handleImageSelect(imageId) {
-    console.log('Image selected:', imageId);
     // Open preview when clicking on the card
     openImagePreview(imageId);
   }

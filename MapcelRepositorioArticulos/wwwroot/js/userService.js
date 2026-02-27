@@ -12,7 +12,7 @@ const UserService = (function() {
    * @property {string} id - Unique user identifier
    * @property {string} name - User's display name
    * @property {('admin'|'regular')} role - User's role in the system
-   * @property {string|null} companyId - Assigned company ID (null for admins, required for regular users)
+   * @property {string|null} companyCode - Assigned company code (null for admins, required for regular users)
    */
   
   // Mock users for testing
@@ -21,13 +21,13 @@ const UserService = (function() {
       id: 'user-admin-01',
       name: 'Admin Usuario',
       role: 'admin',
-      companyId: null
+      companyCode: null
     },
     regular: {
       id: 'user-regular-01',
       name: 'Usuario Regular',
       role: 'regular',
-      companyId: 'co-01' // Assigned to Acme Corporation
+      companyCode: null
     }
   };
   
@@ -59,24 +59,24 @@ const UserService = (function() {
   }
   
   /**
-   * Get the company ID for the current user
+   * Get the company code for the current user
    * For admins, this can be set/changed via setCurrentCompanyForAdmin
-   * For regular users, this is their assigned companyId
-   * @returns {string|null} Company ID or null
+   * For regular users, this is their assigned companyCode
+   * @returns {string|null} Company code or null
    */
-  function getCurrentUserCompanyId() {
-    return currentUser ? currentUser.companyId : null;
+  function getCurrentUserCompanyCode() {
+    return currentUser ? currentUser.companyCode : null;
   }
   
   /**
    * Set the current company for admin users
    * This allows admins to switch between companies
-   * @param {string} companyId - The company ID to set
+   * @param {string} companyCode - The company code to set
    * @returns {boolean} True if company was set, false if user is not admin
    */
-  function setCurrentCompanyForAdmin(companyId) {
+  function setCurrentCompanyForAdmin(companyCode) {
     if (isAdministrator()) {
-      currentUser.companyId = companyId;
+      currentUser.companyCode = companyCode;
       return true;
     } else {
       console.warn('Only administrators can switch companies');
@@ -112,7 +112,7 @@ const UserService = (function() {
     getCurrentUser: getCurrentUser,
     isAdministrator: isAdministrator,
     isRegularUser: isRegularUser,
-    getCurrentUserCompanyId: getCurrentUserCompanyId,
+    getCurrentUserCompanyCode: getCurrentUserCompanyCode,
     setCurrentCompanyForAdmin: setCurrentCompanyForAdmin,
     toggleUserRole: toggleUserRole,
     setCurrentUser: setCurrentUser

@@ -43,14 +43,14 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// </summary>
     private const string SqlSelectAllCompanies = @"
         SELECT
-            m.ENTERPRISE_ID   AS company_code,
+            m.ENT_CodigoRND   AS company_code,
             m.ENTERPRISE_NAME AS name,
             ISNULL(c.allow_user_uploads, 0)        AS allow_user_uploads,
             ISNULL(c.allow_user_tag_creation, 0)    AS allow_user_tag_creation,
             ISNULL(c.require_client_comments, 0)    AS require_client_comments
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES] m
         LEFT JOIN [RepositorioArticulos].[dbo].[companies] c
-            ON m.ENTERPRISE_ID = c.company_code
+            ON company_code = c.company_code
         ORDER BY m.ENTERPRISE_NAME;
     ";
 
@@ -72,9 +72,9 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// Checks whether an enterprise exists in the master table and returns its name.
     /// </summary>
     private const string SqlSelectEnterpriseById = @"
-        SELECT ENTERPRISE_ID, ENTERPRISE_NAME
+        SELECT ENT_CodigRND, ENTERPRISE_NAME
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
-        WHERE ENTERPRISE_ID = @EnterpriseId;
+        WHERE ENT_CodigRND = @EnterpriseCode;
     ";
 
     /// <summary>
@@ -162,7 +162,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             {
                 await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
                 masterCmd.CommandType = CommandType.Text;
-                masterCmd.Parameters.Add(new SqlParameter("@EnterpriseId", SqlDbType.UniqueIdentifier) { Value = companyCode });
+                masterCmd.Parameters.Add(new SqlParameter("@EnterpriseCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await using var masterReader = await masterCmd.ExecuteReaderAsync(cancellationToken);
                 if (!await masterReader.ReadAsync(cancellationToken))

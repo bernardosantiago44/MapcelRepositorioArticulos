@@ -6,16 +6,16 @@ public class Tag
     public string Name { get; set; }
     public string Color { get; set; }
     public string Description { get; set; }
-    public string CompanyId { get; set; }
+    public Guid CompanyCode { get; set; }
     
     public Tag() {}
-    public Tag(string id, string name, string color, string description, string companyId)
+    public Tag(string id, string name, string color, string description, Guid companyCode)
     {
         Id = id;
         Name = name;
         Color = color;
         Description = description;
-        CompanyId = companyId;
+        CompanyCode = companyCode;
     }
 }
 

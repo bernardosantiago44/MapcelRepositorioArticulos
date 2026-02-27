@@ -5,7 +5,7 @@ namespace MapcelRepositorioArticulos.DataService;
 /// </summary>
 public class ArticleQuery
 {
-    public required string CompanyId { get; init; }
+    public required Guid CompanyCode { get; init; }
     public int? ArticleId { get; init; }
     public string? Search { get; init; } 
     public string? Status { get; init; } 
@@ -44,14 +44,14 @@ public class ArticleQuery
 /// </summary>
 public class TagsQuery
 {
-    public required string CompanyCode { get; init; }
+    public required Guid CompanyCode { get; init; }
     public string? Search { get; init; }
 }
 
 /// <summary>
 /// Query parameters for Files to fetch.
 /// </summary>
-/// <param name="CompanyId">string?</param>
+/// <param name="CompanyCode">Guid?</param>
 /// <param name="SearchTerm">string?</param>
 /// <param name="ImagesOnly">bool</param>
 /// <param name="IncludeFileExtensions">string[]?</param>
@@ -61,7 +61,7 @@ public class TagsQuery
 /// <param name="PageSize">int</param>
 public class FileQuery
 {
-    public string? CompanyId { get; set; }
+    public Guid? CompanyCode { get; set; }
     public string? SearchTerm { get; set; } = null;
     public bool ImagesOnly { get; set; } = false;
     public int? Id { get; set; } = null;
@@ -92,18 +92,18 @@ public class FileQuery
 
     /// <summary>
     /// Returns true if query contains a
-    /// CompanyId OR a particular Id, or both.
+    /// CompanyCode OR a particular Id, or both.
     /// </summary>
     /// <returns></returns>
     public bool IsValidQuery()
     {
-        return CompanyId != null || Id != null;
+        return CompanyCode != null || Id != null;
     }
 
     public FileQueryType GetFileQueryType()
     {
         if (Id != null) return FileQueryType.ById;
-        if (CompanyId != null) return FileQueryType.ByCompany;
+        if (CompanyCode != null) return FileQueryType.ByCompany;
         return FileQueryType.Undefined;
     }
 

@@ -2,19 +2,19 @@ namespace MapcelRepositorioArticulos.Models;
 
 public class Company
 {
-    public string Id { get; set; }
+    public Guid CompanyCode { get; set; }
     public string Name { get; set; }
     public CompanySettings Settings { get; set; }
 
     public Company()
     {
-        Id = string.Empty;
+        CompanyCode = Guid.Empty;
         Name = string.Empty;
         Settings = new CompanySettings();
     }
-    public Company(string id, string name, CompanySettings settings)
+    public Company(Guid companyCode, string name, CompanySettings settings)
     {
-        Id = id;
+        CompanyCode = companyCode;
         Name = name;
         Settings = settings;
     }

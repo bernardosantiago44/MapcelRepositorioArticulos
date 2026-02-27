@@ -20,7 +20,7 @@ var TagManagerUI = (function() {
   
   // State management
   var tagManagerState = {
-    currentCompanyId: null,
+    currentCompanyCode: null,
     tags: [],
     editingTagId: null,
     modalOverlay: null,
@@ -49,15 +49,15 @@ var TagManagerUI = (function() {
   
   /**
    * Open the Tag Manager modal for a specific company
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code
    * @param {Function} onTagsChanged - Callback when tags are modified (optional)
    */
-  function openTagManager(companyId, onTagsChanged) {
-    tagManagerState.currentCompanyId = companyId;
+  function openTagManager(companyCode, onTagsChanged) {
+    tagManagerState.currentCompanyCode = companyCode;
     tagManagerState.onTagsChangedCallback = onTagsChanged || null;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags(companyCode)
       .then(function(tags) {
         tagManagerState.tags = tags;
         renderTagManagerModal();
@@ -514,7 +514,7 @@ var TagManagerUI = (function() {
       name: name,
       color: color,
       description: description,
-      companyId: tagManagerState.currentCompanyId
+      companyCode: tagManagerState.currentCompanyCode
     };
     
     var promise;
@@ -536,7 +536,7 @@ var TagManagerUI = (function() {
           closeTagForm();
           
           // Reload tags and refresh the list
-          return ArticleService.getTags(tagManagerState.currentCompanyId);
+          return ArticleService.getTags(tagManagerState.currentCompanyCode);
         }
       })
       .then(function(tags) {
@@ -601,7 +601,7 @@ var TagManagerUI = (function() {
           });
           
           // Reload tags and refresh the list
-          return ArticleService.getTags(tagManagerState.currentCompanyId);
+          return ArticleService.getTags(tagManagerState.currentCompanyCode);
         }
       })
       .then(function(tags) {
@@ -672,7 +672,7 @@ var TagManagerUI = (function() {
     }
     
     // Clean up state
-    tagManagerState.currentCompanyId = null;
+    tagManagerState.currentCompanyCode = null;
     tagManagerState.tags = [];
     tagManagerState.editingTagId = null;
     tagManagerState.onTagsChangedCallback = null;

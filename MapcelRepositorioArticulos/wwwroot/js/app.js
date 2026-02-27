@@ -199,7 +199,7 @@ function initializeApplication() {
   appState.currentUser = UserService.getCurrentUser();
   
   // Derive companyId from URL path
-  var companyIdFromUrl = CompanyRouting.getCompanyIdFromUrl();
+  var companyIdFromUrl = CompanyRouting.getCompanyCodeFromUrl();
   
   if (companyIdFromUrl) {
     appState.selectedCompanyId = companyIdFromUrl;

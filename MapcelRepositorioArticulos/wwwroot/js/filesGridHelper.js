@@ -244,7 +244,7 @@ const FilesGridHelper = (function() {
    * @param {string} fileId - File ID
    */
   function handleViewFile(fileId) {
-    FileService.getFileById(fileId, CompanyRouting.getCompanyIdFromUrl())
+    FileService.getFileById(fileId, CompanyRouting.getCompanyCodeFromUrl())
       .then(file => {
         if (file) {
           dhtmlx.message({
@@ -264,7 +264,7 @@ const FilesGridHelper = (function() {
    * @param {string} fileId - File ID
    */
   function handleDownloadFile(fileId) {
-    FileService.downloadFile(fileId, CompanyRouting.getCompanyIdFromUrl())
+    FileService.downloadFile(fileId, CompanyRouting.getCompanyCodeFromUrl())
       .then(() => {
         dhtmlx.message({
           type: 'success',
@@ -304,7 +304,7 @@ const FilesGridHelper = (function() {
       cancel: 'Cancelar',
       callback: function(result) {
         if (result) {
-          FileService.deleteFile(fileId, CompanyRouting.getCompanyIdFromUrl())
+          FileService.deleteFile(fileId, CompanyRouting.getCompanyCodeFromUrl())
             .then(() => {
               dhtmlx.message({
                 type: 'success',

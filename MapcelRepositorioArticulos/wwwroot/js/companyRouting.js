@@ -1,42 +1,44 @@
 /**
  * Company Routing Module
- * Extracts the companyId from the URL path and provides navigation helpers.
+ * Extracts the companyCode from the URL path and provides navigation helpers.
  *
- * URL Pattern: /{companyId}
- * Example: https://example.com/co-01  →  companyId = "co-01"
+ * URL Pattern: /{companyCode}
+ * Example: https://example.com/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  →  companyCode = "xxxxxxxx-..."
  *
- * The first non-empty path segment is treated as the companyId.
+ * The first non-empty path segment at position 3 is treated as the companyCode.
  */
 
 const CompanyRouting = (function () {
   'use strict';
 
   /**
-   * Extract the companyId from the current URL path.
-   * Treats the first non-empty segment as the companyId.
+   * Extract the companyCode from the current URL path.
+   * Treats the segment at position 3 as the companyCode.
    *
-   * @returns {string|null} The companyId or null when none is present.
+   * @returns {string|null} The companyCode (UUID) or null when none is present or invalid.
    */
-  function getCompanyIdFromUrl() {
+  function getCompanyCodeFromUrl() {
     const positionalLocationOfCompanyCode = 3; // `/nuevos/repositorioarticulos/produccion/companyCode`
     var segments = window.location.pathname.split('/').filter(Boolean);
-    return segments.length > positionalLocationOfCompanyCode ? decodeURIComponent(segments[positionalLocationOfCompanyCode]) : null;
+    var value = segments.length > positionalLocationOfCompanyCode ? decodeURIComponent(segments[positionalLocationOfCompanyCode]) : null;
+    if (value && !Utils.isValidUUID(value)) return null;
+    return value;
   }
 
   /**
-   * Navigate the browser to a new companyId URL.
+   * Navigate the browser to a new companyCode URL.
    * Replaces the first path segment while preserving query / hash.
    *
-   * @param {string} companyId - The new company ID to navigate to.
+   * @param {string} companyCode - The new company code (UUID) to navigate to.
    */
-  function navigateToCompany(companyId) {
-    if (!companyId) return;
-    var newPath = '/nuevos/repositorioarticulos/produccion/' + encodeURIComponent(companyId);
+  function navigateToCompany(companyCode) {
+    if (!companyCode || !Utils.isValidUUID(companyCode)) return;
+    var newPath = '/nuevos/repositorioarticulos/produccion/' + encodeURIComponent(companyCode);
     window.location.href = newPath + window.location.search + window.location.hash;
   }
 
   return {
-    getCompanyIdFromUrl: getCompanyIdFromUrl,
+    getCompanyCodeFromUrl: getCompanyCodeFromUrl,
     navigateToCompany: navigateToCompany
   };
 })();

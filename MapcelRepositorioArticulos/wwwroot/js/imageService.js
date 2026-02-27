@@ -19,7 +19,7 @@ const ImageService = (function() {
       pageSize
     });
 
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/images?${params}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/images?${params}`)
       .then(response => {
         if (response.status === 404) {
           // remove that id from cache if not found
@@ -51,7 +51,7 @@ const ImageService = (function() {
     }
 
     // We call the specific endpoint for an image by ID
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/images/${encodeURIComponent(imageId)}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/images/${encodeURIComponent(imageId)}`)
       .then(response => {
         // If the server returns 404, we return null to match your original logic
         if (response.status === 404) {
@@ -106,7 +106,7 @@ const ImageService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(imageId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(imageId)}`, requestOptions)
       .then(response => {
         if (response.status === 404) {
           console.warn(`Image with ID ${imageId} not found for update.`);
@@ -133,7 +133,7 @@ const ImageService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to delete image: ${response.statusText}`);
@@ -153,7 +153,7 @@ const ImageService = (function() {
     }
     
     const idsParam = imageIds.join(',');
-    return fetch(`/api/files/ids=${idsParam}`)
+    return fetch(`${API_BASE_URL}/files/ids=${idsParam}`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to fetch images: ${response.statusText}`);
@@ -184,7 +184,7 @@ const ImageService = (function() {
         method: "DELETE",
         redirect: "follow"
       };
-      return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to delete image ${imageId}: ${response.statusText}`);
@@ -213,7 +213,7 @@ const ImageService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function downloadImage(imageId, companyId) {
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}/download`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download image: ${response.statusText}`);
@@ -290,7 +290,7 @@ const ImageService = (function() {
         redirect: "follow"
       };
       
-      return fetch(`/api/files/${encodeURIComponent(companyId)}`, requestOptions)
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to upload ${file.name}: ${response.statusText}`);
@@ -321,7 +321,7 @@ const ImageService = (function() {
       return Promise.resolve([]);
     }
     
-    return fetch(`/api/files/forArticleId=${encodeURIComponent(articleId)}`)
+    return fetch(`${API_BASE_URL}/files/forArticleId=${encodeURIComponent(articleId)}`)
       .then(response => {
         if (response.status === 404) {
           return [];

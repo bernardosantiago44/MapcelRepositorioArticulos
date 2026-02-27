@@ -157,3 +157,5 @@ const Utils = (function() {
     renderMarkdown
   };
 })();
+
+const API_BASE_URL = '/nuevos/repositorioarticulos/produccion/api/';

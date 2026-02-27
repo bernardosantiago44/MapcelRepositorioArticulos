@@ -50,7 +50,7 @@ const ArticleService = (function() {
       return Promise.resolve(tagCache.get(companyId));
     }
 
-    return fetch(`/api/tags/${encodeURIComponent(companyId)}`, {
+    return fetch(`${API_BASE_URL}/tags/${encodeURIComponent(companyId)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -86,7 +86,7 @@ const ArticleService = (function() {
     }
 
     // Otherwise, fetch specific one from server
-    return fetch(`/api/tags/${encodeURIComponent(tagId)}`, {
+    return fetch(`${API_BASE_URL}/tags/${encodeURIComponent(tagId)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -118,7 +118,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags?companyCode=${encodeURIComponent(tagData.companyId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/tags?companyCode=${encodeURIComponent(tagData.companyId)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create tag: " + response.status);
@@ -155,7 +155,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags/${tagId}`, requestOptions)
+    return fetch(`${API_BASE_URL}/tags/${tagId}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update tag: " + response.status);
@@ -184,7 +184,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/tags/${tagId}`, requestOptions)
+    return fetch(`${API_BASE_URL}/tags/${tagId}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to delete tag: " + response.status);
@@ -383,7 +383,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${encodeURIComponent(companyId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create article: " + response.status);
@@ -427,7 +427,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(id)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(id)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update article: " + response.status);
@@ -470,7 +470,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`/api/articles/${encodeURIComponent(companyId)}/bulk-tags`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}/bulk-tags`, requestOptions)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("Failed to bulk update tags: " + response.status);

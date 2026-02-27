@@ -52,7 +52,7 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        if (companyId.IsNullOrEmpty()) return BadRequest("Company Id is required.");
+        if (string.IsNullOrEmpty(companyId)) return BadRequest("Company Id is required.");
         var query = new ArticleQuery
         {
             ArticleId = id,

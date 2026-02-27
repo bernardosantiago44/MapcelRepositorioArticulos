@@ -18,8 +18,9 @@ const CompanyRouting = (function () {
    * @returns {string|null} The companyId or null when none is present.
    */
   function getCompanyIdFromUrl() {
+    const positionalLocationOfCompanyCode = 3; // `/nuevos/repositorioarticulos/produccion/companyCode`
     var segments = window.location.pathname.split('/').filter(Boolean);
-    return segments.length > 0 ? decodeURIComponent(segments[0]) : null;
+    return segments.length > positionalLocationOfCompanyCode ? decodeURIComponent(segments[positionalLocationOfCompanyCode]) : null;
   }
 
   /**
@@ -30,7 +31,7 @@ const CompanyRouting = (function () {
    */
   function navigateToCompany(companyId) {
     if (!companyId) return;
-    var newPath = '/' + encodeURIComponent(companyId);
+    var newPath = '/nuevos/repositorioarticulos/produccion/' + encodeURIComponent(companyId);
     window.location.href = newPath + window.location.search + window.location.hash;
   }
 

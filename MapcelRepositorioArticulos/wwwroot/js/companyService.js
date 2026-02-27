@@ -19,7 +19,7 @@ const CompanyService = (function() {
     companiesCache.clear();
   }
   function getAllCompanies() {
-    return fetch(`/api/companies`)
+    return fetch(`${API_BASE_URL}/companies`)
       .then(function(response) {
         if (!response.ok) {
           throw new Error('Failed to fetch companies');
@@ -47,7 +47,7 @@ const CompanyService = (function() {
       return Promise.resolve(companiesCache.get(companyId));
     }
 
-    return fetch(`/api/companies/${companyId}`)
+    return fetch(`${API_BASE_URL}/companies/${companyId}`)
       .then(function(response) {
         if (response.status === 404) {
           return null; // Company not found
@@ -141,7 +141,7 @@ const CompanyService = (function() {
         redirect: "follow"
       };
 
-      fetch(`/api/companies/${companyId}`, requestOptions)
+      fetch(`${API_BASE_URL}/companies/${companyId}`, requestOptions)
         .then(function(response) {
           if (!response.ok) {
             throw new Error('Failed to update company settings: ' + response.status);

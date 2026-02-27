@@ -51,15 +51,15 @@ const FilesGridHelper = (function() {
   /**
    * Load files data into the grid
    * @param {Object} grid - DHTMLX Grid instance
-   * @param {string} companyId - Company ID to filter files by
+   * @param {string} companyCode - Company code to filter files by
    * @param {string} searchTerm - Optional search term
    */
-  function loadFilesData(grid, companyId, searchTerm) {
+  function loadFilesData(grid, companyCode, searchTerm) {
     grid.clearAll();
     
     const dataPromise = searchTerm 
-      ? FileService.searchFiles(companyId, searchTerm)
-      : FileService.getFiles(companyId);
+      ? FileService.searchFiles(companyCode, searchTerm)
+      : FileService.getFiles(companyCode);
     
     dataPromise
       .then(files => {

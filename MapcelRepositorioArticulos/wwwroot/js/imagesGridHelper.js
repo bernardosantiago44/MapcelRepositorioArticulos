@@ -52,15 +52,15 @@ const ImagesGridHelper = (function() {
   /**
    * Load images data into the grid
    * @param {Object} grid - DHTMLX Grid instance
-   * @param {string} companyId - Company ID to filter images by
+   * @param {string} companyCode - Company code to filter images by
    * @param {string} searchTerm - Optional search term
    */
-  function loadImagesData(grid, companyId, searchTerm) {
+  function loadImagesData(grid, companyCode, searchTerm) {
     grid.clearAll();
     
     const dataPromise = searchTerm 
-      ? ImageService.searchImages(companyId, searchTerm)
-      : ImageService.getImages(companyId);
+      ? ImageService.searchImages(companyCode, searchTerm)
+      : ImageService.getImages(companyCode);
     
     dataPromise
       .then(images => {

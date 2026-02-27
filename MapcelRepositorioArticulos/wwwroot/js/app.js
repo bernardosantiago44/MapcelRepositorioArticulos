@@ -31,7 +31,7 @@ var LAYOUT_CONFIG = {
 
 var appState = {
   currentUser: null,
-  selectedCompanyId: null,
+  selectedCompanyCode: null,
   selectedArticleId: null,
   articlesGrid: null,
   companyCombo: null,
@@ -198,14 +198,14 @@ function initializeApplication() {
   
   appState.currentUser = UserService.getCurrentUser();
   
-  // Derive companyId from URL path
-  var companyIdFromUrl = CompanyRouting.getCompanyCodeFromUrl();
+  // Derive companyCode from URL path
+  var companyCodeFromUrl = CompanyRouting.getCompanyCodeFromUrl();
   
-  if (companyIdFromUrl) {
-    appState.selectedCompanyId = companyIdFromUrl;
-    initializeAppForCompany(companyIdFromUrl);
+  if (companyCodeFromUrl) {
+    appState.selectedCompanyCode = companyCodeFromUrl;
+    initializeAppForCompany(companyCodeFromUrl);
   } else {
-    // No companyId in URL - check if admin with company picker
+    // No companyCode in URL - check if admin with company picker
     if (typeof AdminCompanyPicker !== 'undefined') {
       initializeAdminCompanySelection();
     } else {
@@ -219,7 +219,7 @@ function initializeApplication() {
 }
 
 /**
- * Initialize admin company selection when no companyId is in the URL.
+ * Initialize admin company selection when no companyCode is in the URL.
  * Redirects to the first available company.
  */
 function initializeAdminCompanySelection() {
@@ -229,7 +229,7 @@ function initializeAdminCompanySelection() {
         throw new Error('No companies found');
       }
       // Navigate to the first company's URL
-      CompanyRouting.navigateToCompany(companies[0].id);
+      CompanyRouting.navigateToCompany(companies[0].companyCode);
     })
     .catch(function(error) {
       console.error('Error loading companies:', error);
@@ -244,9 +244,9 @@ function initializeAdminCompanySelection() {
 /**
  * Initialize the application for a specific company.
  * Handles both admin and regular user views based on injected admin components.
- * @param {string} companyId - The company ID derived from the URL
+ * @param {string} companyCode - The company code derived from the URL
  */
-function initializeAppForCompany(companyId) {
+function initializeAppForCompany(companyCode) {
   // Hide admin-only toolbar buttons if the admin components are not injected
   if (typeof AdminNewArticleButton === 'undefined') {
     header_toolbar.hideItem('new_article');
@@ -273,7 +273,7 @@ function initializeAppForCompany(companyId) {
         // Pre-select current company in the dropdown
         var companySelect = document.getElementById('filter-company');
         if (companySelect) {
-          companySelect.value = companyId;
+          companySelect.value = companyCode;
         }
       })
       .catch(function(error) {
@@ -281,7 +281,7 @@ function initializeAppForCompany(companyId) {
       });
   } else {
     createFilterFormForRegularUser();
-    CompanyService.getCompanyById(companyId)
+    CompanyService.getCompanyByCode(companyCode)
       .then(function(company) {
         if (company) {
           var companyTitleHtml = createCompanyTitleHtml(company.name);
@@ -291,7 +291,7 @@ function initializeAppForCompany(companyId) {
   }
   
   // Load articles
-  loadArticlesForCompany(companyId)
+  loadArticlesForCompany(companyCode)
     .catch(function(error) {
       console.error('Error initializing app for company:', error);
       main_content.progressOff();
@@ -341,7 +341,7 @@ function createCompanyComboOptions(companies) {
   var companyPickerHtml = '';
 if (companies && companies.length > 0) {
     var optionsHtml = companies.map(function(company, index) {
-      return '<option value="' + company.id + '"' + (index === 0 ? ' selected' : '') + '>' + company.name + '</option>';
+      return '<option value="' + company.companyCode + '"' + (index === 0 ? ' selected' : '') + '>' + company.name + '</option>';
     }).join('');
     
     companyPickerHtml = '<div class="p-4 space-y-3">' +
@@ -485,12 +485,12 @@ function initializeFilterControls(companies, showCompanyPicker) {
  * Open the tag picker for filtering
  */
 function openTagFilterPicker() {
-  if (!appState.selectedCompanyId) {
+  if (!appState.selectedCompanyCode) {
     return;
   }
   
   TagPickerUI.openTagPicker(
-    appState.selectedCompanyId,
+    appState.selectedCompanyCode,
     appState.selectedFilterTags.map(function(tag) { return tag.id; }),
     function(selectedTags) {
       appState.selectedFilterTags = selectedTags;
@@ -560,7 +560,7 @@ function buildGridWithArticles(articles) {
   
   // Attach row selection event
   appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-    onArticleSelect(rowId, appState.selectedCompanyId);
+    onArticleSelect(rowId, appState.selectedCompanyCode);
   });
   
   // Clear sidebar if the selected article is no longer visible
@@ -612,17 +612,17 @@ function clearAllFilters() {
 
 /**
  * Handle company change event (admin only)
- * @param {string} companyId - Selected company ID
+ * @param {string} companyCode - Selected company code
  */
-function onCompanyChange(companyId) {
-  CompanyRouting.navigateToCompany(companyId);
+function onCompanyChange(companyCode) {
+  CompanyRouting.navigateToCompany(companyCode);
 }
 
 /**
  * Initialize the Files tab for the selected company
- * @param {string} companyId - Company ID
+ * @param {string} companyCode - Company code
  */
-function initializeFilesTab(companyId) {
+function initializeFilesTab(companyCode) {
   if (!appState.filesTab) {
     console.error('Files tab not available');
     return;
@@ -630,19 +630,19 @@ function initializeFilesTab(companyId) {
   
   // Initialize files tab only once
   if (!appState.filesTabInitialized) {
-    FilesTabManager.initializeFilesTab(appState.filesTab, companyId);
+    FilesTabManager.initializeFilesTab(appState.filesTab, companyCode);
     appState.filesTabInitialized = true;
   } else {
     // Update company if already initialized
-    FilesTabManager.updateCompany(companyId);
+    FilesTabManager.updateCompany(companyCode);
   }
 }
 
 /**
  * Initialize the Images tab for the selected company
- * @param {string} companyId - Company ID
+ * @param {string} companyCode - Company code
  */
-function initializeImagesTab(companyId) {
+function initializeImagesTab(companyCode) {
   if (!appState.imagesTab) {
     console.error('Images tab not available');
     return;
@@ -650,21 +650,21 @@ function initializeImagesTab(companyId) {
   
   // Initialize images tab only once
   if (!appState.imagesTabInitialized) {
-    ImagesTabManager.initializeImagesTab(appState.imagesTab, companyId);
+    ImagesTabManager.initializeImagesTab(appState.imagesTab, companyCode);
     appState.imagesTabInitialized = true;
   } else {
     // Update company if already initialized
-    ImagesTabManager.updateCompany(companyId);
+    ImagesTabManager.updateCompany(companyCode);
   }
 }
 
 /**
  * Load articles for a specific company and populate the grid
- * @param {string} companyId - Company ID to load articles for
+ * @param {string} companyCode - Company code to load articles for
  * @returns {Promise} Promise that resolves when articles are loaded
  */
-function loadArticlesForCompany(companyId) {
-  return ArticleService.getArticles({companyId: companyId})
+function loadArticlesForCompany(companyCode) {
+  return ArticleService.getArticles({companyCode: companyCode})
     .then(function(articles) {
       // Precompute search index for O(n) filtering performance
       GridFilterService.precomputeSearchIndex(articles);
@@ -709,14 +709,14 @@ function loadArticlesForCompany(companyId) {
       
       // Attach row selection event
       appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
-        onArticleSelect(rowId, companyId);
+        onArticleSelect(rowId, companyCode);
       });
       
       // Initialize Files tab with current company
-      initializeFilesTab(companyId);
+      initializeFilesTab(companyCode);
       
       // Initialize Images tab with current company
-      initializeImagesTab(companyId);
+      initializeImagesTab(companyCode);
       
       main_content.progressOff();
       return articles;
@@ -726,15 +726,14 @@ function loadArticlesForCompany(companyId) {
 /**
  * Handle article selection in the grid
  * @param {string} articleId - Selected article ID
- * @param {string} companyId
  */
 function onArticleSelect(articleId) {
   appState.selectedArticleId = articleId;
   
   // Fetch article details and company info
   Promise.all([
-    ArticleService.getArticleById(articleId, appState.selectedCompanyId),
-    CompanyService.getCompanyById(appState.selectedCompanyId)
+    ArticleService.getArticleById(articleId, appState.selectedCompanyCode),
+    CompanyService.getCompanyByCode(appState.selectedCompanyCode)
   ])
     .then(function(results) {
       var article = results[0];
@@ -765,7 +764,7 @@ function onArticleSelect(articleId) {
           var editBtn = document.getElementById('edit-article-btn');
           if (editBtn) {
             editBtn.onclick = function() {
-              openEditArticleForm(articleId, appState.selectedCompanyId);
+              openEditArticleForm(articleId, appState.selectedCompanyCode);
             };
           }
         }
@@ -784,7 +783,7 @@ function onArticleSelect(articleId) {
  */
 function openTagManager() {
   // Check if a company is selected
-  if (!appState.selectedCompanyId) {
+  if (!appState.selectedCompanyCode) {
     dhtmlx.alert({
       title: 'Atención',
       text: 'Por favor seleccione una empresa primero.'
@@ -802,9 +801,9 @@ function openTagManager() {
   }
   
   // Open the tag manager
-  TagManagerUI.openTagManager(appState.selectedCompanyId, function() {
+  TagManagerUI.openTagManager(appState.selectedCompanyCode, function() {
     // Callback when tags are changed - reload articles to reflect changes
-    loadArticlesForCompany(appState.selectedCompanyId)
+    loadArticlesForCompany(appState.selectedCompanyCode)
       .catch(function(error) {
         console.error('Error reloading articles after tag changes:', error);
       });
@@ -825,7 +824,7 @@ function openBulkTagEditor() {
   }
   
   // Check if a company is selected
-  if (!appState.selectedCompanyId) {
+  if (!appState.selectedCompanyCode) {
     dhtmlx.alert({
       title: 'Atención',
       text: 'Por favor seleccione una empresa primero.'
@@ -858,7 +857,7 @@ function openBulkTagEditor() {
   });
   
   // Fetch the full article objects for selected IDs using bulk fetch
-  ArticleService.getArticlesByIds(selectedIdsArray, appState.selectedCompanyId)
+  ArticleService.getArticlesByIds(selectedIdsArray, appState.selectedCompanyCode)
     .then(function(selectedArticles) {
       // Filter out any null results
       var validArticles = selectedArticles.filter(function(article) {
@@ -874,9 +873,9 @@ function openBulkTagEditor() {
       }
       
       // Open the bulk tag editor
-      BulkTagEditorUI.openBulkTagEditor(appState.selectedCompanyId, validArticles, function() {
+      BulkTagEditorUI.openBulkTagEditor(appState.selectedCompanyCode, validArticles, function() {
         // Callback when tags are updated - reload articles
-        loadArticlesForCompany(appState.selectedCompanyId)
+        loadArticlesForCompany(appState.selectedCompanyCode)
           .then(function() {
             selectedIdsArray.forEach(function(articleId) {
               try {
@@ -889,7 +888,7 @@ function openBulkTagEditor() {
 
             // If the currently selected article is one of the edited ones, refresh sidebar
             if (appState.selectedArticleId && selectedIdsArray.indexOf(appState.selectedArticleId) !== -1) {
-              onArticleSelect(appState.selectedArticleId, appState.selectedCompanyId);
+              onArticleSelect(appState.selectedArticleId, appState.selectedCompanyCode);
             }
           })
           .catch(function(error) {
@@ -912,7 +911,7 @@ function openBulkTagEditor() {
 function openCompanySettingsForm() {
   if (typeof AdminEditCompanyButton === 'undefined') return;
   
-  if (!appState.selectedCompanyId) {
+  if (!appState.selectedCompanyCode) {
     dhtmlx.alert({
       title: 'Atención',
       text: 'Por favor seleccione una empresa primero.'
@@ -920,7 +919,7 @@ function openCompanySettingsForm() {
     return;
   }
   
-  CompanyFormUI.openSettingsForm(appState.selectedCompanyId, (newSettings) => {
+  CompanyFormUI.openSettingsForm(appState.selectedCompanyCode, (newSettings) => {
     // Callback when settings are saved - refresh the current view to apply permission changes
     refreshAppStateForSettings(newSettings);
   });
@@ -965,7 +964,7 @@ function updateUploadButtonVisibility(buttonId, isVisible) {
 function openNewArticleForm() {
   if (typeof AdminNewArticlePage === 'undefined') return;
   // Check if a company is selected
-  if (!appState.selectedCompanyId) {
+  if (!appState.selectedCompanyCode) {
     dhtmlx.alert({
       title: 'Atención',
       text: 'Por favor seleccione una empresa primero.'
@@ -974,7 +973,7 @@ function openNewArticleForm() {
   }
   
   // Get company name for display
-  CompanyService.getCompanyById(appState.selectedCompanyId)
+  CompanyService.getCompanyByCode(appState.selectedCompanyCode)
     .then(function(company) {
       var companyName = company ? company.name : '';
       
@@ -1003,7 +1002,7 @@ function showNewArticlePage(companyName) {
   // This will replace the content in the articles tab
   NewArticlePageUI.openPage(
     articles,  // Use the articles tab cell
-    appState.selectedCompanyId,
+    appState.selectedCompanyCode,
     companyName,
     onNavigateBackFromNewArticle
   );
@@ -1027,12 +1026,12 @@ function onNavigateBackFromNewArticle(newArticleData) {
   rebuildArticlesTabLayout();
   
   // Reload articles for the current company to refresh the grid
-  loadArticlesForCompany(appState.selectedCompanyId)
+  loadArticlesForCompany(appState.selectedCompanyCode)
     .then(function() {
       // If a new article was created, select it in the grid
       if (newArticleData && newArticleData.id && appState.articlesGrid) {
         appState.articlesGrid.selectRowById(newArticleData.id, false, true, true);
-        onArticleSelect(newArticleData.id, appState.selectedCompanyId);
+        onArticleSelect(newArticleData.id, appState.selectedCompanyCode);
       }
     })
     .catch(function(error) {
@@ -1121,10 +1120,10 @@ function rebuildArticlesTabLayout() {
 /**
  * Open the form for editing an existing article
  * @param {string} articleId - ID of the article to edit
- * @param {string} companyId - ID of the company the article belongs to
+ * @param {string} companyCode - Code of the company the article belongs to
  */
-function openEditArticleForm(articleId, companyId) {
-  ArticleService.getArticleById(articleId, companyId)
+function openEditArticleForm(articleId, companyCode) {
+  ArticleService.getArticleById(articleId, companyCode)
     .then(function(article) {
       if (!article) {
         dhtmlx.alert({
@@ -1153,7 +1152,7 @@ function openEditArticleForm(articleId, companyId) {
 function onArticleFormSaved(articleData, mode) {
   // Reload articles for the current company to refresh the grid
   ArticleService.clearCache(); // Clear cache to ensure fresh data is loaded
-  loadArticlesForCompany(appState.selectedCompanyId)
+  loadArticlesForCompany(appState.selectedCompanyCode)
     .then(function() {
       if (mode === 'create') {
         // Select the newly created row in the grid

@@ -8,7 +8,7 @@ public class FileAsset
     public string Extension { get; set; }
     public long SizeBytes { get; set; }
     public DateOnly UploadDate { get; set; }
-    public string CompanyId { get; set; }
+    public Guid CompanyCode { get; set; }
     public IReadOnlyList<string> LinkedArticles { get; set; }
     public Uri? ThumbnailUrl { get; set; }
     public long? Width { get; set; }
@@ -23,7 +23,7 @@ public class FileAsset
         Name = string.Empty;
         Description = string.Empty;
         Extension = string.Empty;
-        CompanyId = string.Empty;
+        CompanyCode = Guid.Empty;
     }
 
     // Regular Constructor
@@ -34,7 +34,7 @@ public class FileAsset
         string extension, 
         long sizeBytes, 
         DateOnly uploadDate, 
-        string companyId, 
+        Guid companyCode, 
         IReadOnlyList<string> linkedArticles,
         Uri? thumbnailUrl,
         long? width,
@@ -46,7 +46,7 @@ public class FileAsset
         Extension = extension;
         SizeBytes = sizeBytes;
         UploadDate = uploadDate;
-        CompanyId = companyId;
+        CompanyCode = companyCode;
         LinkedArticles = linkedArticles;
         ThumbnailUrl = thumbnailUrl;
         Width = width;

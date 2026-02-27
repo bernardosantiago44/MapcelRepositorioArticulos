@@ -8,7 +8,7 @@ namespace MapcelRepositorioArticulos.Models;
 public sealed class UserMetadata
 {
     [JsonPropertyName("company_code")]
-    public string CompanyCode { get; init; } = string.Empty;
+    public Guid CompanyCode { get; init; }
 
     [JsonPropertyName("user_id")]
     public string UserId { get; init; } = string.Empty;

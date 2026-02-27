@@ -21,7 +21,7 @@ public interface ICompaniesService
     /// <param name="cancellationToken"></param>
     /// <returns>Company?</returns>
     /// <exception cref="ArgumentException">If the provided companyCode is not valid.</exception>
-    Task<Company?> GetByIdAsync(string companyCode, CancellationToken cancellationToken);
+    Task<Company?> GetByIdAsync(Guid companyCode, CancellationToken cancellationToken);
     
     /// <summary>
     /// Updates a company's data given the update request.
@@ -31,7 +31,7 @@ public interface ICompaniesService
     /// <param name="cancellationToken"></param>
     /// <returns>Company?</returns>
     /// <exception cref="ArgumentException">If the company code or the request are (any) invalid.</exception>
-    Task<Company?> UpdateAsync(string companyCode, UpdateCompanyRequest request, CancellationToken cancellationToken);
+    Task<Company?> UpdateAsync(Guid companyCode, UpdateCompanyRequest request, CancellationToken cancellationToken);
 }
 
 
@@ -43,14 +43,14 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// </summary>
     private const string SqlSelectAllCompanies = @"
         SELECT
-            m.ENTERPRISE_ID   AS company_code,
+            m.ENT_CodigoRND   AS company_code,
             m.ENTERPRISE_NAME AS name,
             ISNULL(c.allow_user_uploads, 0)        AS allow_user_uploads,
             ISNULL(c.allow_user_tag_creation, 0)    AS allow_user_tag_creation,
             ISNULL(c.require_client_comments, 0)    AS require_client_comments
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES] m
         LEFT JOIN [RepositorioArticulos].[dbo].[companies] c
-            ON m.ENTERPRISE_ID = c.company_code
+            ON company_code = c.company_code
         ORDER BY m.ENTERPRISE_NAME;
     ";
 
@@ -72,9 +72,9 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// Checks whether an enterprise exists in the master table and returns its name.
     /// </summary>
     private const string SqlSelectEnterpriseById = @"
-        SELECT ENTERPRISE_ID, ENTERPRISE_NAME
+        SELECT ENT_CodigRND, ENTERPRISE_NAME
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
-        WHERE ENTERPRISE_ID = @EnterpriseId;
+        WHERE ENT_CodigRND = @EnterpriseCode;
     ";
 
     /// <summary>
@@ -137,7 +137,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         }
     }
     
-    public async Task<Company?> GetByIdAsync(string companyCode, CancellationToken cancellationToken)
+    public async Task<Company?> GetByIdAsync(Guid companyCode, CancellationToken cancellationToken)
     {
         ValidateCompany(companyCode);
 
@@ -149,7 +149,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             {
                 await using var selectCmd = new SqlCommand(SqlSelectCompanyByCode, connection);
                 selectCmd.CommandType = CommandType.Text;
-                selectCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+                selectCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await using var reader = await selectCmd.ExecuteReaderAsync(cancellationToken);
                 if (await reader.ReadAsync(cancellationToken))
@@ -162,7 +162,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             {
                 await using var masterCmd = new SqlCommand(SqlSelectEnterpriseById, connection);
                 masterCmd.CommandType = CommandType.Text;
-                masterCmd.Parameters.Add(new SqlParameter("@EnterpriseId", SqlDbType.VarChar, 20) { Value = companyCode });
+                masterCmd.Parameters.Add(new SqlParameter("@EnterpriseCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await using var masterReader = await masterCmd.ExecuteReaderAsync(cancellationToken);
                 if (!await masterReader.ReadAsync(cancellationToken))
@@ -177,7 +177,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             {
                 await using var insertCmd = new SqlCommand(SqlInsertCompany, connection);
                 insertCmd.CommandType = CommandType.Text;
-                insertCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+                insertCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                 insertCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 150) { Value = enterpriseName });
 
                 await using var insertReader = await insertCmd.ExecuteReaderAsync(cancellationToken);
@@ -191,12 +191,12 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "CompaniesService.GetByIdAsync(string:token) failed for companyCode={CompanyCode}", companyCode);
+            Log.Error(ex, "CompaniesService.GetByIdAsync(Guid:token) failed for companyCode={CompanyCode}", companyCode);
             throw;
         }
     }
 
-    public async Task<Company?> UpdateAsync(string companyCode, UpdateCompanyRequest request, CancellationToken cancellationToken)
+    public async Task<Company?> UpdateAsync(Guid companyCode, UpdateCompanyRequest request, CancellationToken cancellationToken)
     {
         ValidateCompany(companyCode);
         request.Validate();
@@ -211,7 +211,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             await using var cmd = new SqlCommand(SqlUpdateCompanyReturn, connection);
             cmd.CommandType = CommandType.Text;
 
-            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             cmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 150) { Value = (object?)name ?? DBNull.Value });
 
             cmd.Parameters.Add(new SqlParameter("@AllowUserUploads", SqlDbType.Bit)
@@ -240,7 +240,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// </summary>
     private static Company ReadCompany(SqlDataReader reader) => new()
     {
-        Id = reader.GetString(0),
+        CompanyCode = reader.GetGuid(0),
         Name = reader.GetString(1),
         Settings = new CompanySettings
         {
@@ -255,9 +255,9 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// </summary>
     /// <param name="companyCode"></param>
     /// <exception cref="ArgumentException"></exception>
-    private static void ValidateCompany(string companyCode)
+    private static void ValidateCompany(Guid companyCode)
     {
-        if (string.IsNullOrWhiteSpace(companyCode))
-            throw new ArgumentException("company id (companyCode) is required.", nameof(companyCode));
+        if (companyCode == Guid.Empty)
+            throw new ArgumentException("company code (companyCode) is required.", nameof(companyCode));
     }
 }

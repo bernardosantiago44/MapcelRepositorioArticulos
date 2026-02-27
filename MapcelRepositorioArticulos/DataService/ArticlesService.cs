@@ -19,14 +19,14 @@ public interface IArticlesService
     
     /// <summary>
     /// Creates a new Article record in the SQL Database
-    /// for the given company id with the given request.
+    /// for the given company code with the given request.
     /// </summary>
-    /// <param name="companyId">string</param>
+    /// <param name="companyCode">Guid</param>
     /// <param name="request">CreateArticleRequest</param>
     /// <param name="cancellationToken"></param>
     /// <returns>ArticleRowDto</returns>
     /// <exception cref="ArgumentException"></exception>
-    public Task<ArticleDetailsDto> CreateAsync(string companyId, CreateArticleRequest request, CancellationToken cancellationToken);
+    public Task<ArticleDetailsDto> CreateAsync(Guid companyCode, CreateArticleRequest request, CancellationToken cancellationToken);
     
     /// <summary>
     /// Updates all fields of the given article id for
@@ -34,23 +34,23 @@ public interface IArticlesService
     /// matching the given request.
     /// </summary>
     /// <param name="articleId">int</param>
-    /// <param name="companyId">string</param>
+    /// <param name="companyCode">Guid</param>
     /// <param name="request">UpdateArticleRequest</param>
     /// <param name="cancellationToken"></param>
     /// <returns>ArticleDetailsDto?</returns>
-    public Task<ArticleDetailsDto?> UpdateAsync(int articleId, string companyId, UpdateArticleRequest request, CancellationToken cancellationToken);
+    public Task<ArticleDetailsDto?> UpdateAsync(int articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken);
     
     /// <summary>
-    /// Deletes the specified article id within the given company id.
+    /// Deletes the specified article id within the given company code.
     /// </summary>
     /// <param name="articleId">int</param>
-    /// <param name="companyId">string</param>
+    /// <param name="companyCode">Guid</param>
     /// <param name="cancellationToken"></param>
     /// <returns>True if the operation was successful, false otherwise.</returns>
-    public Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken);
+    public Task<bool> DeleteAsync(int articleId, Guid companyCode, CancellationToken cancellationToken);
     
     Task<int> BulkUpdateSingleTagAsync(
-        string companyId,
+        Guid companyCode,
         int[] articleIds,
         int tagId,
         string action,
@@ -279,9 +279,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
 
         int offset = (query.Page - 1) * query.PageSize;
 
-        var companyCode = query.CompanyId;
-        if (string.IsNullOrWhiteSpace(companyCode))
-            throw new ArgumentNullException(nameof(query.CompanyId));
+        var companyCode = query.CompanyCode;
+        if (companyCode == Guid.Empty)
+            throw new ArgumentException("CompanyCode is required.", nameof(query.CompanyCode));
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -292,7 +292,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         // Mandatory parameters
         command.Parameters.Add(new SqlParameter("@offset", SqlDbType.Int) { Value = offset });
         command.Parameters.Add(new SqlParameter("@pageSize", SqlDbType.Int) { Value = query.PageSize });
-        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.NVarChar, 20) { Value = companyCode });
+        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
         
         // Optional parameters
         command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
@@ -321,7 +321,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 rows.Add(new ArticleDetailsDto
                 {
                     Id = reader.GetInt32(idPos).ToString(),
-                    CompanyId = companyCode,
+                    CompanyCode = companyCode,
                     Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
                     Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
                     Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
@@ -345,9 +345,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         
     }
     
-    public async Task<ArticleDetailsDto> CreateAsync(string companyId, CreateArticleRequest request, CancellationToken cancellationToken)
+    public async Task<ArticleDetailsDto> CreateAsync(Guid companyCode, CreateArticleRequest request, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId); // CompanyId should be a non-null string.
+        ValidateCompany(companyCode); // CompanyCode should be a non-empty Guid.
         request.Validate(); // The request must contain a Title and a Status, at least.
 
         await using var connection = new SqlConnection(ConnectionString);
@@ -359,7 +359,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var createArticleCommand = new SqlCommand(SqlInsertArticle, connection);
             createArticleCommand.CommandType = CommandType.Text;
 
-            createArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            createArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             createArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
             createArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
             createArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
@@ -368,7 +368,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             
             // Execute the creation
             var articleResult = await createArticleCommand.ExecuteScalarAsync(cancellationToken);
-            if (articleResult is null) throw new InvalidOperationException("ArticleService.CreateAsync(string:request:token): Failed to create article.");
+            if (articleResult is null) throw new InvalidOperationException("ArticleService.CreateAsync(Guid:request:token): Failed to create article.");
             var newArticleId = Convert.ToInt32(articleResult);
             
             // If the request carries tags, insert each tag into the article_tags table
@@ -380,7 +380,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 insertArticleTagsCommand.CommandType = CommandType.Text;
                 
                 insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
-                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                 insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
                 await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -395,7 +395,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 insertFileArticlesCommand.CommandType = CommandType.Text;
 
                 insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
-                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                 insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
                 await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -404,7 +404,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             var created = new ArticleDetailsDto
             {
                 Id = newArticleId.ToString(),
-                CompanyId = companyId,
+                CompanyCode = companyCode,
                 Title = request.Title,
                 Description = request.Description,
                 ClientComments = request.ClientComments,
@@ -421,14 +421,14 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticleService.CreateAsync(string:request:token) failed for companyCode={CompanyCode}", companyId);
+            Log.Error(ex, "ArticleService.CreateAsync(Guid:request:token) failed for companyCode={CompanyCode}", companyCode);
             throw;
         }
     }
     
-    public async Task<ArticleDetailsDto?> UpdateAsync(int articleId, string companyId, UpdateArticleRequest request, CancellationToken cancellationToken)
+    public async Task<ArticleDetailsDto?> UpdateAsync(int articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateId(articleId);
         request.Validate(); // Must contain Title and Status at least.
 
@@ -442,7 +442,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             updateArticleCommand.CommandType = CommandType.Text;
 
             updateArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-            updateArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             updateArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
             updateArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
             updateArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
@@ -463,7 +463,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 deleteArticleTagsCommand.CommandType = CommandType.Text;
 
                 deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -476,7 +476,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     insertArticleTagsCommand.CommandType = CommandType.Text;
 
                     insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                     insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
                     await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -494,7 +494,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 deleteFileArticlesCommand.CommandType = CommandType.Text;
 
                 deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -507,7 +507,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     insertFileArticlesCommand.CommandType = CommandType.Text;
 
                     insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                     insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
                     await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -517,7 +517,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             var updated = new ArticleDetailsDto
             {
                 Id = articleId.ToString(),
-                CompanyId = companyId,
+                CompanyCode = companyCode,
                 Title = request.Title,
                 Description = request.Description,
                 ClientComments = request.ClientComments,
@@ -534,14 +534,14 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticleService.UpdateAsync(int:string:request:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+            Log.Error(ex, "ArticleService.UpdateAsync(int:Guid:request:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyCode);
             throw;
         }
     }
     
-    public async Task<bool> DeleteAsync(int articleId, string companyId, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(int articleId, Guid companyCode, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateId(articleId);
 
         await using var connection = new SqlConnection(ConnectionString);
@@ -554,7 +554,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             deleteFileArticlesCommand.CommandType = CommandType.Text;
 
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -563,7 +563,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             deleteArticleTagsCommand.CommandType = CommandType.Text;
 
             deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -572,26 +572,26 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             deleteArticleCommand.CommandType = CommandType.Text;
 
             deleteArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
-            deleteArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             var deleted = await deleteArticleCommand.ExecuteNonQueryAsync(cancellationToken);
             return deleted != 0;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticleService.DeleteAsync(int:string:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyId);
+            Log.Error(ex, "ArticleService.DeleteAsync(int:Guid:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyCode);
             throw;
         }
     }
     
     public async Task<int> BulkUpdateSingleTagAsync(
-        string companyId,
+        Guid companyCode,
         int[] articleIds,
         int tagId,
         string action,
         CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         if (articleIds is null || articleIds.Length == 0) throw new ArgumentException("ArticleIds is required.", nameof(articleIds));
         if (tagId <= 0) throw new ArgumentOutOfRangeException(nameof(tagId), "TagId must be > 0.");
         if (string.IsNullOrWhiteSpace(action)) throw new ArgumentException("Action is required.", nameof(action));
@@ -611,7 +611,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var command = new SqlCommand(sql, connection);
             command.CommandType = CommandType.Text;
 
-            command.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            command.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             command.Parameters.Add(new SqlParameter("@TagId", SqlDbType.Int) { Value = tagId });
             command.Parameters.Add(new SqlParameter("@ArticleIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
@@ -622,23 +622,22 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
 
             // -1 indicates the tag does not exist for this tenant
             if (updatedCount == -1)
-                throw new KeyNotFoundException("Tag was not found for the provided companyId.");
+                throw new KeyNotFoundException("Tag was not found for the provided companyCode.");
 
             return updatedCount;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticleService.BulkUpdateSingleTagAsync failed for companyCode={CompanyCode}, tagId={TagId}, action={Action}", companyId, tagId, action);
+            Log.Error(ex, "ArticleService.BulkUpdateSingleTagAsync failed for companyCode={CompanyCode}, tagId={TagId}, action={Action}", companyCode, tagId, action);
             throw;
         }
     }
     
     // ----------- Helper Validation Functions -----------
-    private static void ValidateCompany(string companyId)
+    private static void ValidateCompany(Guid companyCode)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(companyId, nameof(companyId));
-        ArgumentException.ThrowIfNullOrEmpty(companyId, nameof(companyId));
-        ArgumentNullException.ThrowIfNull(companyId, nameof(companyId));
+        if (companyCode == Guid.Empty)
+            throw new ArgumentException("companyCode is required and cannot be empty.", nameof(companyCode));
     }
 
     private static void ValidateId(int articleId)

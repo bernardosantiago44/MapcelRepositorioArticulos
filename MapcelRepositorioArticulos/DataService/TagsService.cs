@@ -37,7 +37,7 @@ public interface ITagsService
     /// <param name="cancellationToken"></param>
     /// <returns>Tag</returns>
     /// <exception cref="ArgumentException"></exception>
-    Task<Tag> CreateAsync(string companyCode, CreateTagRequest request, CancellationToken cancellationToken);
+    Task<Tag> CreateAsync(Guid companyCode, CreateTagRequest request, CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates an existing Tag record in the SQL Database
@@ -153,7 +153,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
             await using var command = new SqlCommand(SqlGetAllWithFilters, connection);
             command.CommandType = CommandType.Text;
 
-            command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+            command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, 250)
                 { Value = query.Search.IsNullOrEmpty() ? DBNull.Value : query.Search! });
 
@@ -206,7 +206,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
                 Name = reader.GetString(1),
                 Color = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Description = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                CompanyId = reader.GetString(4)
+                CompanyCode = reader.GetGuid(4)
             };
         }
         catch (Exception ex)
@@ -216,7 +216,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
         }
     }
 
-    public async Task<Tag> CreateAsync(string companyCode, CreateTagRequest request, CancellationToken cancellationToken)
+    public async Task<Tag> CreateAsync(Guid companyCode, CreateTagRequest request, CancellationToken cancellationToken)
     {
         ValidateCompany(companyCode);
         request.Validate();
@@ -233,7 +233,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
             await using var cmd = new SqlCommand(SqlInsertTagReturn, connection);
             cmd.CommandType = CommandType.Text;
 
-            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 20) { Value = companyCode });
+            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             cmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 100) { Value = name });
             cmd.Parameters.Add(new SqlParameter("@Color", SqlDbType.VarChar, 20) { Value = (object?)color ?? DBNull.Value });
             cmd.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 250) { Value = (object?)description ?? DBNull.Value });
@@ -248,12 +248,12 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
                 Name = reader.GetString(1),
                 Color = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Description = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                CompanyId = reader.GetString(4)
+                CompanyCode = reader.GetGuid(4)
             };
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "TagsService.CreateAsync(string:request:token) failed for companyCode={CompanyCode}", companyCode);
+            Log.Error(ex, "TagsService.CreateAsync(Guid:request:token) failed for companyCode={CompanyCode}", companyCode);
             throw;
         }
     }
@@ -290,7 +290,7 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
                 Name = reader.GetString(1),
                 Color = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Description = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
-                CompanyId = reader.GetString(4)
+                CompanyCode = reader.GetGuid(4)
             };
         }
         catch (Exception ex)
@@ -328,9 +328,9 @@ public sealed class TagsService(IConfiguration configuration) : BaseService(conf
     }
     
     // ------------ Helper Validation Methods ------------
-    private static void ValidateCompany(string companyCode)
+    private static void ValidateCompany(Guid companyCode)
     {
-        if (string.IsNullOrWhiteSpace(companyCode))
+        if (companyCode == Guid.Empty)
             throw new ArgumentException("companyCode is required.", nameof(companyCode));
     }
 

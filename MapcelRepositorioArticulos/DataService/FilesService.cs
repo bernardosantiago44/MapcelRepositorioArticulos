@@ -42,46 +42,46 @@ public interface IFilesService
     /// <summary>
     /// Creates a new File record in the database, asynchronously.
     /// </summary>
-    /// <param name="companyId">string</param>
+    /// <param name="companyCode">Guid</param>
     /// <param name="file">IFormFile</param>
     /// <param name="cancellationToken"></param>
     /// <returns>FileAsset</returns>
-    /// <exception cref="ArgumentException">If companyId is empty.</exception>
+    /// <exception cref="ArgumentException">If companyCode is empty.</exception>
     /// <exception cref="ArgumentNullException">If provided file is null, empty or invalid.</exception>
-    Task<FileAsset> CreateAsync(string companyId, IFormFile file, CancellationToken cancellationToken);
+    Task<FileAsset> CreateAsync(Guid companyCode, IFormFile file, CancellationToken cancellationToken);
     
     /// <summary>
     /// Updates all the fields of the provided fileId with the given request.
     /// </summary>
     /// <param name="fileId"></param>
-    /// <param name="companyId"></param>
+    /// <param name="companyCode"></param>
     /// <param name="request"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    Task<FileDto?> UpdateAsync(int fileId, string companyId, UpdateFileRequest request, CancellationToken cancellationToken);
+    Task<FileDto?> UpdateAsync(int fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken);
     
     /// <summary>
     /// Deletes the file associated with the given fileId from the database.
     /// </summary>
     /// <param name="fileId">The file to be deleted.</param>
-    /// <param name="companyId">The company this file belongs to.</param>
+    /// <param name="companyCode">The company this file belongs to.</param>
     /// <param name="cancellationToken"></param>
     /// <returns>Bool: True if the file existed, false otherwise.</returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    Task<bool> DeleteAsync(int fileId, string companyId, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(int fileId, Guid companyCode, CancellationToken cancellationToken);
     
     /// <summary>
     /// Returns the name and file extension
-    /// for the given fileId within the given companyId.
+    /// for the given fileId within the given companyCode.
     /// </summary>
     /// <param name="fileId"></param>
-    /// <param name="companyId"></param>
+    /// <param name="companyCode"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>(Name, Extension)</returns>
-    Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, string companyId, CancellationToken cancellationToken);
+    Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken);
 }
 
 public class FilesService(IConfiguration configuration) : BaseService(configuration), IFilesService
@@ -211,11 +211,11 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
 
         int offset = (query.Page - 1) * query.PageSize;
 
-        var companyCode = query.CompanyId;
+        var companyCode = query.CompanyCode;
         var fileId = query.Id;
         
         var queryType = query.GetFileQueryType();
-        if (queryType == FileQuery.FileQueryType.ByCompany && companyCode.IsNullOrEmpty()) throw new ArgumentNullException(nameof(query));
+        if (queryType == FileQuery.FileQueryType.ByCompany && companyCode == null) throw new ArgumentNullException(nameof(query));
         if (queryType == FileQuery.FileQueryType.ById && fileId == null) throw new ArgumentNullException(nameof(query));
         if (queryType == FileQuery.FileQueryType.Undefined) throw new ArgumentNullException(nameof(query));
 
@@ -291,7 +291,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         command.Parameters.Add(new SqlParameter("@pageSize", SqlDbType.Int) { Value = query.PageSize });
         
         // Optional parameters
-        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.VarChar, 20) { Value = companyCode == null ? DBNull.Value : companyCode });
+        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.UniqueIdentifier) { Value = companyCode == null ? DBNull.Value : companyCode.Value });
         command.Parameters.Add(new SqlParameter("@fileId", SqlDbType.Int) { Value = fileId == null ? DBNull.Value : fileId! });
         command.Parameters.Add(new SqlParameter("@extensions", SqlDbType.VarChar, 2000) { Value = query.IsFilteringExtensions() ? query.GetFileExtensionsString() : DBNull.Value });
         command.Parameters.Add(new SqlParameter("@isImage", SqlDbType.Bit) { Value = query.ImagesOnly ? 1 : 0 });
@@ -398,9 +398,9 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         return rows;
     }
     
-    public async Task<FileAsset> CreateAsync(string companyId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<FileAsset> CreateAsync(Guid companyCode, IFormFile file, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateFile(file);
 
         // Split filename into (name, extension)
@@ -419,7 +419,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             await using var insertFileCommand = new SqlCommand(SqlInsertFile, connection);
             insertFileCommand.CommandType = CommandType.Text;
 
-            insertFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            insertFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             insertFileCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = name });
             insertFileCommand.Parameters.Add(new SqlParameter("@SizeBytes", SqlDbType.BigInt) { Value = file.Length });
             insertFileCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = DBNull.Value }); // POST only carries file
@@ -446,7 +446,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
                 Extension = extension,
                 SizeBytes = file.Length,
                 UploadDate = DateOnly.FromDateTime(DateTime.UtcNow),
-                CompanyId = companyId,
+                CompanyCode = companyCode,
                 LinkedArticles = [],
                 ThumbnailUrl = null,
                 Width = null,
@@ -457,14 +457,14 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesService.CreateAsync(string:file:token) failed for companyCode={CompanyCode}", companyId);
+            Log.Error(ex, "FilesService.CreateAsync(Guid:file:token) failed for companyCode={CompanyCode}", companyCode);
             throw;
         }
     }
     
-    public async Task<FileDto?> UpdateAsync(int fileId, string companyId, UpdateFileRequest request, CancellationToken cancellationToken)
+    public async Task<FileDto?> UpdateAsync(int fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateId(fileId);
         request.Validate();
 
@@ -482,7 +482,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             updateCommand.CommandType = CommandType.Text;
 
             updateCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
-            updateCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            updateCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             updateCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = (object?)name ?? DBNull.Value });
             updateCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = (object?)description ?? DBNull.Value });
 
@@ -504,14 +504,14 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesService.UpdateAsync(int:string:request:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
+            Log.Error(ex, "FilesService.UpdateAsync(int:Guid:request:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyCode);
             throw;
         }
     }
     
-    public async Task<bool> DeleteAsync(int fileId, string companyId, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateId(fileId);
 
         await using var connection = new SqlConnection(ConnectionString);
@@ -524,7 +524,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             deleteFileArticlesCommand.CommandType = CommandType.Text;
 
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
 
@@ -533,21 +533,21 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             deleteFileCommand.CommandType = CommandType.Text;
 
             deleteFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
-            deleteFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            deleteFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             var deleted = await deleteFileCommand.ExecuteNonQueryAsync(cancellationToken);
             return deleted > 0;
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesService.DeleteAsync(int:string:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
+            Log.Error(ex, "FilesService.DeleteAsync(int:Guid:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyCode);
             throw;
         }
     }
     
-    public async Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, string companyId, CancellationToken cancellationToken)
+    public async Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyId);
+        ValidateCompany(companyCode);
         ValidateId(fileId);
 
         await using var connection = new SqlConnection(ConnectionString);
@@ -559,7 +559,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             cmd.CommandType = CommandType.Text;
 
             cmd.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
-            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.VarChar, 50) { Value = companyId });
+            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken)) return null;
@@ -571,7 +571,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesService.GetDownloadInfoAsync(int:string:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyId);
+            Log.Error(ex, "FilesService.GetDownloadInfoAsync(int:Guid:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyCode);
             throw;
         }
     }
@@ -579,13 +579,14 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
     // ----------- Helper Validation Functions -----------
     
     /// <summary>
-    /// Throws if the companyId string is null or whitespace.
+    /// Throws if the companyCode is empty.
     /// </summary>
-    /// <param name="companyId">string</param>
+    /// <param name="companyCode">Guid</param>
     /// <exception cref="ArgumentException"></exception>
-    private static void ValidateCompany(string companyId)
+    private static void ValidateCompany(Guid companyCode)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(companyId, nameof(companyId));
+        if (companyCode == Guid.Empty)
+            throw new ArgumentException("companyCode is required and cannot be empty.", nameof(companyCode));
     }
 
     /// <summary>

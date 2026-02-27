@@ -40,37 +40,37 @@ public class FilesController(IFilesService service) : ControllerBase
         }
     }
     
-    [HttpGet("{companyId}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyCode:guid}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
-        query.CompanyId = companyId;
+        query.CompanyCode = companyCode;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyId}/images")] // Specific filter for images
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyCode:guid}/images")] // Specific filter for images
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
-        query.CompanyId = companyId;
+        query.CompanyCode = companyCode;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyId}/images/{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyCode:guid}/images/{id:int}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
         query.Id = id;
-        query.CompanyId = companyId;
+        query.CompanyCode = companyCode;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyId}/{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromRoute] string companyId, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyCode:guid}/{id:int}")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
         query.Id = id;
-        query.CompanyId = companyId;
+        query.CompanyCode = companyCode;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
@@ -126,19 +126,19 @@ public class FilesController(IFilesService service) : ControllerBase
     }
     
     [Authorize]
-    [HttpPost("{companyId}")]
+    [HttpPost("{companyCode:guid}")]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<FileAsset>> Create(
-        [FromRoute] string companyId,
+        [FromRoute] Guid companyCode,
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
     {
         try
         {
-            var createdFile = await service.CreateAsync(companyId, file, cancellationToken);
+            var createdFile = await service.CreateAsync(companyCode, file, cancellationToken);
 
             // TODO: Add binary storage URL
-            var downloadUrl = $"/api/files/{createdFile.Id}/download?companyId={companyId}";
+            var downloadUrl = $"/api/files/{createdFile.Id}/download?companyCode={companyCode}";
 
             return Ok(new
             {
@@ -152,22 +152,22 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Create failed for companyId={CompanyId}", companyId);
+            Log.Error(ex, "FilesController.Create failed for companyCode={CompanyCode}", companyCode);
             return StatusCode(500);
         }
     }
     
     [Authorize]
-    [HttpPut("{companyId}/{id:int}")]
+    [HttpPut("{companyCode:guid}/{id:int}")]
     public async Task<ActionResult<FileDto>> Update(
         [FromRoute] int id,
-        [FromRoute] string companyId,
+        [FromRoute] Guid companyCode,
         [FromBody] UpdateFileRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await service.UpdateAsync(id, companyId, request, cancellationToken);
+            var updated = await service.UpdateAsync(id, companyCode, request, cancellationToken);
             if (updated is null) return NotFound();
             return Ok(updated);
         }
@@ -177,21 +177,21 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Update failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Update failed for id={Id}, companyCode={CompanyCode}", id, companyCode);
             return StatusCode(500);
         }
     }
     
     [Authorize]
-    [HttpDelete("{companyId}/{id:int}")]
+    [HttpDelete("{companyCode:guid}/{id:int}")]
     public async Task<IActionResult> Delete(
         [FromRoute] int id,
-        [FromRoute] string companyId,
+        [FromRoute] Guid companyCode,
         CancellationToken cancellationToken)
     {
         try
         {
-            var deleted = await service.DeleteAsync(id, companyId, cancellationToken);
+            var deleted = await service.DeleteAsync(id, companyCode, cancellationToken);
             if (!deleted) return NotFound();
             return NoContent(); // 204
         }
@@ -201,20 +201,20 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Delete failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Delete failed for id={Id}, companyCode={CompanyCode}", id, companyCode);
             return StatusCode(500);
         }
     }
     
-    [HttpGet("{companyId}/{id:int}/download")]
+    [HttpGet("{companyCode:guid}/{id:int}/download")]
     public async Task<IActionResult> Download(
         [FromRoute] int id,
-        [FromRoute] string companyId,
+        [FromRoute] Guid companyCode,
         CancellationToken cancellationToken)
     {
         try
         {
-            var info = await service.GetDownloadInfoAsync(id, companyId, cancellationToken);
+            var info = await service.GetDownloadInfoAsync(id, companyCode, cancellationToken);
             if (info is null) return NotFound();
 
             // Mock file bytes for now
@@ -229,7 +229,7 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "FilesController.Download failed for id={Id}, companyId={CompanyId}", id, companyId);
+            Log.Error(ex, "FilesController.Download failed for id={Id}, companyCode={CompanyCode}", id, companyCode);
             return StatusCode(500);
         }
     }

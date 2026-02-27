@@ -7,7 +7,7 @@ namespace MapcelRepositorioArticulos.Models;
 public class Article
 {
     public string Id { get; set; }
-    public string CompanyId { get; set; }
+    public Guid CompanyCode { get; set; }
     public string Title { get; set; }
     public string Description { get; set; }
     public string ExternalLink { get; set; }
@@ -19,7 +19,7 @@ public class Article
 
     public Article(
         string id,
-        string companyId,
+        Guid companyCode,
         string title,
         string description,
         string externalLink,
@@ -31,7 +31,7 @@ public class Article
     )
     {
         Id = id;
-        CompanyId = companyId;
+        CompanyCode = companyCode;
         Title = title;
         Description = description;
         ExternalLink = externalLink;
@@ -50,7 +50,7 @@ public class Article
 public class ArticleRowDto
 {
     public required string Id { get; init; }
-    public required string CompanyId { get; init; }
+    public required Guid CompanyCode { get; init; }
     public required string Title { get; init; }
     public required string Description { get; init; }
     public required string Status { get; init; }
@@ -91,7 +91,7 @@ public class UpdateArticleRequest : CreateArticleRequest
 public sealed class ArticleDetailsDto
 {
     public required string Id { get; init; }
-    public required string CompanyId { get; init; }
+    public required Guid CompanyCode { get; init; }
     public required string CompanyName { get; init; }
     public string Title { get; init; }
     public string? Description { get; init; }
@@ -114,7 +114,7 @@ public sealed class ArticleDetailsDto
     public ArticleDetailsDto(Article article, string companyName, List<string> tagNames)
     {
         Id = article.Id;
-        CompanyId = article.CompanyId;
+        CompanyCode = article.CompanyCode;
         CompanyName = companyName;
         Title = article.Title;
         Description = article.Description;

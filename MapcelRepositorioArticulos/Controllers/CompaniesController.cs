@@ -26,14 +26,14 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         }
     }
     
-    [HttpGet("{id}")]
+    [HttpGet("{companyCode:guid}")]
     public async Task<ActionResult<Company>> GetById(
-        [FromRoute] string id,
+        [FromRoute] Guid companyCode,
         CancellationToken cancellationToken)
     {
         try
         {
-            var company = await companiesService.GetByIdAsync(id, cancellationToken);
+            var company = await companiesService.GetByIdAsync(companyCode, cancellationToken);
             if (company is null) return NotFound();
             return Ok(company);
         }
@@ -43,21 +43,21 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "CompanyController.GetById failed for id={Id}", id);
+            Log.Error(ex, "CompanyController.GetById failed for companyCode={CompanyCode}", companyCode);
             return StatusCode(500);
         }
     }
 
     [Authorize]
-    [HttpPut("{id}")]
+    [HttpPut("{companyCode:guid}")]
     public async Task<ActionResult<Company>> Update(
-        [FromRoute] string id,
+        [FromRoute] Guid companyCode,
         [FromBody] UpdateCompanyRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var updated = await companiesService.UpdateAsync(id, request, cancellationToken);
+            var updated = await companiesService.UpdateAsync(companyCode, request, cancellationToken);
             if (updated is null) return NotFound();
             return Ok(updated);
         }
@@ -67,7 +67,7 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "CompanyController.Update failed for id={Id}", id);
+            Log.Error(ex, "CompanyController.Update failed for companyCode={CompanyCode}", companyCode);
             return StatusCode(500);
         }
     }
@@ -97,7 +97,7 @@ public class CompanyController(ICompaniesService companiesService, IConfiguratio
             var decrypted = SymmetricCipher.Decrypt(data, key);
             var metadata = JsonSerializer.Deserialize<UserMetadata>(decrypted);
 
-            if (metadata is null || string.IsNullOrWhiteSpace(metadata.CompanyCode))
+            if (metadata is null || metadata.CompanyCode == Guid.Empty)
                 return StatusCode(403);
 
             var company = await companiesService.GetByIdAsync(metadata.CompanyCode, cancellationToken);

@@ -11,9 +11,9 @@ namespace MapcelRepositorioArticulos.Controllers;
 public sealed class TagsController(ITagsService tagsService) : ControllerBase
 {
 
-    [HttpGet("{companyCode}")]
+    [HttpGet("{companyCode:guid}")]
     public async Task<ActionResult<IReadOnlyList<Tag>>> GetAll(
-        [FromRoute] string companyCode,
+        [FromRoute] Guid companyCode,
         [FromQuery] string? searchString = null,
         CancellationToken cancellationToken = default
     )
@@ -56,7 +56,7 @@ public sealed class TagsController(ITagsService tagsService) : ControllerBase
 
     [Authorize]
     [HttpPost]
-    public async Task<ActionResult<Tag>> Create([FromQuery] string companyCode, [FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<Tag>> Create([FromQuery] Guid companyCode, [FromBody] CreateTagRequest request, CancellationToken cancellationToken = default)
     {
         try
         {

@@ -25,7 +25,7 @@ var NewArticlePageUI = (function() {
 
   // Page state management
   var pageState = {
-    companyId: null,
+    companyCode: null,
     companyName: '',
     layoutCell: null,
     onNavigateBack: null,
@@ -847,7 +847,7 @@ var NewArticlePageUI = (function() {
       return tag.id;
     });
 
-    TagPickerUI.openTagPicker(pageState.companyId, selectedIds, function(selectedTags) {
+    TagPickerUI.openTagPicker(pageState.companyCode, selectedIds, function(selectedTags) {
       pageState.selectedTags = selectedTags;
       updateSelectedTagsDisplay();
       markFormDirty();
@@ -928,7 +928,7 @@ var NewArticlePageUI = (function() {
       status: statusSelect ? statusSelect.value : 'Borrador',
       externalLink: externalLinkInput ? externalLinkInput.value.trim() : '',
       clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
-      companyId: pageState.companyId,
+      companyCode: pageState.companyCode,
       tags: tagIds,
       attachedImages: pageState.stagedImages.map(img => img.id),
       attachedFiles: pageState.stagedFiles.map(file => file.id),
@@ -961,7 +961,7 @@ var NewArticlePageUI = (function() {
         FileService.createFile({
           name: fileData.name,
           size: fileData.size,
-          companyId: pageState.companyId,
+          companyCode: pageState.companyCode,
           file: fileData.file
         }).then(function(response) {
           return { type: 'file', id: response.data.id };
@@ -975,7 +975,7 @@ var NewArticlePageUI = (function() {
         ImageService.createImage({
           name: imageData.name,
           size: imageData.size,
-          companyId: pageState.companyId,
+          companyCode: pageState.companyCode,
           file: imageData.file
         }).then(function(response) {
           return { type: 'image', id: response.data.id };
@@ -996,7 +996,7 @@ var NewArticlePageUI = (function() {
         });
 
         // Create the article
-        return ArticleService.createArticle(formData, pageState.companyId);
+        return ArticleService.createArticle(formData, pageState.companyCode);
       })
       .then(function(response) {
         if (response.status === 'success') {
@@ -1030,11 +1030,11 @@ var NewArticlePageUI = (function() {
   /**
    * Open the New Article page
    * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
-   * @param {string} companyId - Company ID for the new article
+   * @param {string} companyCode - Company code for the new article
    * @param {string} companyName - Company name for display
    * @param {Function} onNavigateBack - Callback when navigating back to grid
    */
-  function openPage(layoutCell, companyId, companyName, onNavigateBack) {
+  function openPage(layoutCell, companyCode, companyName, onNavigateBack) {
     // Check permissions
     if (typeof AdminNewArticlePage === 'undefined') {
       dhtmlx.alert({
@@ -1045,7 +1045,7 @@ var NewArticlePageUI = (function() {
     }
 
     // Initialize page state
-    pageState.companyId = companyId;
+    pageState.companyCode = companyCode;
     pageState.companyName = companyName || '';
     pageState.layoutCell = layoutCell;
     pageState.onNavigateBack = onNavigateBack;
@@ -1058,7 +1058,7 @@ var NewArticlePageUI = (function() {
     // Check company settings for upload permissions
     // Note: Administrators can always upload regardless of company settings
     // to ensure they maintain full control over content management
-    CompanyService.canUsersUpload(companyId)
+    CompanyService.canUsersUpload(companyCode)
       .then(function(canUpload) {
         pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
         

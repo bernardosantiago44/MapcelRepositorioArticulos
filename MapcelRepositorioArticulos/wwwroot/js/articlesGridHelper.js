@@ -112,28 +112,3 @@ function initializeArticlesGrid(gridCell, articlesData) {
   
   return articlesGrid;
 }
-
-/**
- * Load articles data from JSON file
- * Returns a Promise for modern async/await usage, but also supports callback pattern
- * for compatibility with DHTMLX 5 event-driven architecture
- * 
- * @param {string} jsonFilePath - Path to the JSON file
- * @param {Function} callback - Callback function (error, data) for compatibility
- */
-function loadArticlesDataFromJson(jsonFilePath, callback) {
-  fetch(jsonFilePath)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to load articles data: ' + response.statusText);
-      }
-      return response.json();
-    })
-    .then(data => {
-      callback(null, data);
-    })
-    .catch(error => {
-      console.error('Error loading articles data:', error);
-      callback(error, null);
-    });
-}

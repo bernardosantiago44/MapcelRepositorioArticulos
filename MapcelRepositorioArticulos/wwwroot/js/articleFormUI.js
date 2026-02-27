@@ -1305,7 +1305,7 @@ var ArticleFormUI = (function() {
       text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
       callback: function(result) {
         if (result) {
-          fetch('/api/articles/' + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
+          fetch(`${API_BASE_URL}/articles/` + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
             method: 'DELETE'
           })
             .then(function(response) {

@@ -63,7 +63,7 @@ const FileService = (function() {
       pageSize
     });
 
-    return fetch(`/api/files/${encodeURIComponent(companyId)}?${params}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}?${params}`)
       .then(response => {
         if (response.status === 404) {
           // Cache empty result to prevent future calls
@@ -86,7 +86,7 @@ const FileService = (function() {
    * @returns {Promise<Object|null>} Promise resolving to file object or null
    */
   function getFileById(fileId, companyId) {
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`)
       .then(response => {
         if (response.status === 404) {
           return null;
@@ -120,7 +120,7 @@ const FileService = (function() {
       const formData = new FormData();
       formData.append('file', file);
       
-      return fetch(`/api/files/${encodeURIComponent(companyId)}`, {
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}`, {
         method: 'POST',
         body: formData
       })
@@ -143,7 +143,7 @@ const FileService = (function() {
    * @returns {Promise<Object>} Promise resolving to updated file object
    */
   function updateFileMetadata(fileId, newDescription, companyId) {
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -166,7 +166,7 @@ const FileService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function deleteFile(fileId, companyId) {
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
       method: 'DELETE'
     })
       .then(response => {
@@ -180,10 +180,11 @@ const FileService = (function() {
   /**
    * Download a file
    * @param {string} fileId - The file ID to download
+   * @param {string} companyId 
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
   function downloadFile(fileId, companyId) {
-    return fetch(`/api/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}/download`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download file: ${response.statusText}`);
@@ -243,7 +244,7 @@ const FileService = (function() {
       return Promise.resolve(filesByArticleCache.get(key).filter(file =>  file.isImage == imagesOnly));
     }
 
-    return fetch(`/api/files/forArticleId=${encodeURIComponent(key)}`, {
+    return fetch(`${API_BASE_URL}/files/forArticleId=${encodeURIComponent(key)}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json"

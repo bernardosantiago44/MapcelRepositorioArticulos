@@ -18,7 +18,7 @@ const CompanyFormUI = (function() {
     
     // MARK - State and constants
     let formState = {
-        companyId: null,
+        companyCode: null,
         companyName: null,
         settingsWindow: null,
         currentSettings: null,
@@ -72,7 +72,7 @@ const CompanyFormUI = (function() {
      * Reset form state
      */
     function resetFormState() {
-        formState.companyId = null;
+        formState.companyCode = null;
         formState.companyName = null;
         formState.settingsWindow = null;
         formState.currentSettings = null;
@@ -270,7 +270,7 @@ const CompanyFormUI = (function() {
      * Save the settings
      */
     function saveSettings() {
-        if (!formState.companyId || !formState.currentSettings) {
+        if (!formState.companyCode || !formState.currentSettings) {
             dhtmlx.alert({
                 title: 'Error',
                 text: 'No se pudo guardar la configuración. Datos incompletos.'
@@ -295,7 +295,7 @@ const CompanyFormUI = (function() {
         });
         
         // Save via CompanyService
-        CompanyService.updateCompanySettings(formState.companyId, newSettings)
+        CompanyService.updateCompanySettings(formState.companyCode, newSettings)
             .then(function(response) {
                 if (response.status === 'success') {
                     dhtmlx.message({
@@ -351,19 +351,19 @@ const CompanyFormUI = (function() {
     
     /**
      * Open the company settings form
-     * @param {string} companyId - The company ID
+     * @param {string} companyCode - The company code
      * @param {Function} onSaveCallback - Callback function after settings are saved
      */
-    function openSettingsForm(companyId, onSaveCallback) {
+    function openSettingsForm(companyCode, onSaveCallback) {
         resetFormState();
         
-        formState.companyId = CompanyRouting.getCompanyCodeFromUrl() || companyId;
+        formState.companyCode = CompanyRouting.getCompanyCodeFromUrl() || companyCode;
         formState.onSaveCallback = onSaveCallback;
         
         // Load company data and settings
         Promise.all([
-            CompanyService.getCompanyById(formState.companyId),
-            CompanyService.getCompanySettings(formState.companyId)
+            CompanyService.getCompanyByCode(formState.companyCode),
+            CompanyService.getCompanySettings(formState.companyCode)
         ])
         .then(function(results) {
             const company = results[0];

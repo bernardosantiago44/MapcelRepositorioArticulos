@@ -25,7 +25,7 @@ var ArticleFormUI = (function() {
     currentMode: null,          // 'create' or 'edit'
     articleId: null,            // Article ID when editing
     articleWindow: null,        // DHTMLX Window instance
-    companyId: null,            // Company ID for new articles
+    companyCode: null,            // Company code for new articles
     onSaveCallback: null,       // Callback function after save
     selectedTags: [],           // Selected tags for the article
     attachedImages: [],         // Attached image IDs
@@ -635,10 +635,10 @@ var ArticleFormUI = (function() {
    * Load media data (images and files) for the company
    */
   function loadMediaData() {
-    if (!formState.companyId) return;
+    if (!formState.companyCode) return;
     
     // Load images
-    ImageService.getImages(formState.companyId)
+    ImageService.getImages(formState.companyCode)
       .then(function(images) {
         formState.allImages = images;
         resolveFileIdsFromArticleData();
@@ -655,7 +655,7 @@ var ArticleFormUI = (function() {
       });
     
     // Load files
-    FileService.getFiles(formState.companyId)
+    FileService.getFiles(formState.companyCode)
       .then(function(files) {
         formState.allFiles = files;
         resolveFileIdsFromArticleData();
@@ -994,7 +994,7 @@ var ArticleFormUI = (function() {
    * Open image upload modal
    */
   function openImageUpload() {
-    ImageUploadUI.openUploadModal(formState.companyId, function(uploadedImages) {
+    ImageUploadUI.openUploadModal(formState.companyCode, function(uploadedImages) {
       // Add uploaded images to available images and attach them
       uploadedImages.forEach(function(img) {
         formState.allImages.push(img);
@@ -1008,7 +1008,7 @@ var ArticleFormUI = (function() {
    * Open file upload modal
    */
   function openFileUpload() {
-    FileUploadUI.openUploadModal(formState.companyId, function(uploadedFiles) {
+    FileUploadUI.openUploadModal(formState.companyCode, function(uploadedFiles) {
       // Add uploaded files to available files and attach them
       uploadedFiles.forEach(function(file) {
         formState.allFiles.push(file);
@@ -1066,7 +1066,7 @@ var ArticleFormUI = (function() {
    * Open the tag picker for the form
    */
   function openTagPickerForForm() {
-    if (!formState.companyId) {
+    if (!formState.companyCode) {
       dhtmlx.alert({
         title: 'Error',
         text: 'No se pudo cargar las etiquetas'
@@ -1078,7 +1078,7 @@ var ArticleFormUI = (function() {
     var selectedTagIds = formState.selectedTags.map(function(tag) { return tag.id; });
     
     // Open the tag picker
-    TagPickerUI.openTagPicker(formState.companyId, selectedTagIds, function(selectedTags) {
+    TagPickerUI.openTagPicker(formState.companyCode, selectedTagIds, function(selectedTags) {
       formState.selectedTags = selectedTags;
       updateTagsDisplay();
     });
@@ -1193,7 +1193,7 @@ var ArticleFormUI = (function() {
       status: statusSelect ? statusSelect.value : 'Abierto',
       externalLink: externalLinkInput ? externalLinkInput.value.trim() : '',
       clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
-      companyId: formState.companyId,
+      companyCode: formState.companyCode,
       tags: tagIds,
       attachedImages: formState.attachedImages.slice(),
       attachedFiles: formState.attachedFiles.slice(),
@@ -1221,7 +1221,7 @@ var ArticleFormUI = (function() {
     
     if (formState.currentMode === 'create') {
       // Create new article
-      ArticleService.createArticle(formData, formState.companyId)
+      ArticleService.createArticle(formData, formState.companyCode)
         .then(function(response) {
           if (response.status === 'success') {
             dhtmlx.message({
@@ -1253,11 +1253,11 @@ var ArticleFormUI = (function() {
         });
     } else if (formState.currentMode === 'edit') {
       // Update article with new data
-      ArticleService.getArticleById(formState.articleId, formState.companyId)
+      ArticleService.getArticleById(formState.articleId, formState.companyCode)
         .then(function(existingArticle) {
           formData.createdAt = existingArticle ? existingArticle.createdAt : null;
           
-          return ArticleService.updateArticle(formState.articleId, formData, formState.companyId);
+          return ArticleService.updateArticle(formState.articleId, formData, formState.companyCode);
         })
         .then(function(response) {
           if (response.status === 'success') {
@@ -1295,17 +1295,17 @@ var ArticleFormUI = (function() {
    * Handle delete article action with confirmation
    */
   function handleDeleteArticle() {
-    if (!formState.articleId || !formState.companyId) return;
+    if (!formState.articleId || !formState.companyCode) return;
     
     var articleId = formState.articleId;
-    var companyId = formState.companyId;
+    var companyCode = formState.companyCode;
     
     dhtmlx.confirm({
       title: 'Confirmar eliminación',
       text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
       callback: function(result) {
         if (result) {
-          fetch(`${API_BASE_URL}/articles/` + encodeURIComponent(articleId) + '?companyId=' + encodeURIComponent(companyId), {
+          fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`, {
             method: 'DELETE'
           })
             .then(function(response) {
@@ -1348,7 +1348,7 @@ var ArticleFormUI = (function() {
     formState.currentMode = null;
     formState.articleId = null;
     formState.articleWindow = null;
-    formState.companyId = null;
+    formState.companyCode = null;
     formState.onSaveCallback = null;
     formState.selectedTags = [];
     formState.attachedImages = [];
@@ -1397,14 +1397,14 @@ var ArticleFormUI = (function() {
   
   /**
    * Open the form in Create mode
-   * @param {string} companyId - Company ID for the new article
+   * @param {string} companyCode - Company code for the new article
    * @param {Function} onSaveCallback - Callback function after successful save
    */
-  function openCreateForm(companyId, onSaveCallback) {
+  function openCreateForm(companyCode, onSaveCallback) {
     // Set state for create mode
     formState.currentMode = 'create';
     formState.articleId = null;
-    formState.companyId = companyId;
+    formState.companyCode = companyCode;
     formState.onSaveCallback = onSaveCallback;
     formState.selectedTags = [];
     formState.attachedImages = [];
@@ -1435,7 +1435,7 @@ var ArticleFormUI = (function() {
     // Set state for edit mode
     formState.currentMode = 'edit';
     formState.articleId = articleData.id;
-    formState.companyId = articleData.companyId;
+    formState.companyCode = articleData.companyCode;
     formState.onSaveCallback = onSaveCallback;
     formState.originalArticleData = articleData;
     formState.attachedImages = [];
@@ -1448,7 +1448,7 @@ var ArticleFormUI = (function() {
     formState.descriptionTab = 'write';
     
     // Load tags for the company and convert article tags to tag objects
-    ArticleService.getTags(articleData.companyId)
+    ArticleService.getTags(articleData.companyCode)
       .then(function(companyTags) {
         // Convert article's tag IDs (if they exist) to full tag objects
         formState.selectedTags = [];

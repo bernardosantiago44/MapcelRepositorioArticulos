@@ -12,7 +12,7 @@ const UserService = (function() {
    * @property {string} id - Unique user identifier
    * @property {string} name - User's display name
    * @property {('admin'|'regular')} role - User's role in the system
-   * @property {string|null} companyCode - Assigned company code (null for admins, required for regular users)
+   * @property {string|null} companyCode - Assigned company code (null for admins; for regular users, resolved from URL or backend metadata)
    */
   
   // Mock users for testing

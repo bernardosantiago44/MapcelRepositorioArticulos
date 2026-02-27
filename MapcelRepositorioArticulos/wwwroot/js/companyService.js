@@ -29,8 +29,8 @@ const CompanyService = (function() {
       .then(function(companies) {
         if (Array.isArray(companies)) {
           companies.forEach(function(company) {
-            if (company && company.id) {
-              companiesCache.set(company.id, company);
+            if (company && company.companyCode) {
+              companiesCache.set(company.companyCode, company);
             }
           });
         }
@@ -42,12 +42,14 @@ const CompanyService = (function() {
       });
   }
 
-  function getCompanyById(companyId) {
-    if (companiesCache.has(companyId)) {
-      return Promise.resolve(companiesCache.get(companyId));
+  function getCompanyByCode(companyCode) {
+    if (!Utils.isValidUUID(companyCode)) return Promise.reject(new Error('Invalid company code'));
+
+    if (companiesCache.has(companyCode)) {
+      return Promise.resolve(companiesCache.get(companyCode));
     }
 
-    return fetch(`${API_BASE_URL}/companies/${companyId}`)
+    return fetch(`${API_BASE_URL}/companies/${companyCode}`)
       .then(function(response) {
         if (response.status === 404) {
           return null; // Company not found
@@ -58,33 +60,33 @@ const CompanyService = (function() {
         return response.json();
       })
       .then(function(company) {
-        if (company && company.id) {
-          companiesCache.set(company.id, company);
+        if (company && company.companyCode) {
+          companiesCache.set(company.companyCode, company);
         }
         return company;
       })
       .catch(function(error) {
-        console.error('Error fetching company by ID:', error);
+        console.error('Error fetching company by code:', error);
         return null;
       });
   }
 
   /**
-   * Get company settings by company ID
-   * @param {string} companyId - The company ID
+   * Get company settings by company code
+   * @param {string} companyCode - The company code (UUID)
    * @returns {Promise<CompanySettings>} Promise resolving to company settings
    */
-  function getCompanySettings(companyId) {
+  function getCompanySettings(companyCode) {
     // Check cache first
-    if (companySettingsCache[companyId]) {
-      return Promise.resolve(companySettingsCache[companyId]);
+    if (companySettingsCache[companyCode]) {
+      return Promise.resolve(companySettingsCache[companyCode]);
     }
 
     // Load from CompanyService and cache the result
-    return getCompanyById(companyId)
+    return getCompanyByCode(companyCode)
       .then(function(company) {
         if (!company) {
-          throw new Error('Company not found: ' + companyId);
+          throw new Error('Company not found: ' + companyCode);
         }
 
         // Get settings or use defaults
@@ -98,7 +100,7 @@ const CompanyService = (function() {
         };
         
         // Cache the settings
-        companySettingsCache[companyId] = settings;
+        companySettingsCache[companyCode] = settings;
         
         return settings;
       });
@@ -110,14 +112,19 @@ const CompanyService = (function() {
    * 
    * Settings are persisted to the backend via a PUT request to the API.
    * 
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code (UUID)
    * @param {CompanySettings} newSettings - The new settings object
    * @returns {Promise<{status: string, data: CompanySettings}>} Promise resolving to the update result
    */
-  function updateCompanySettings(companyId, newSettings) {
+  function updateCompanySettings(companyCode, newSettings) {
     return new Promise(function(resolve, reject) {
-      if (!companyId) {
-        reject(new Error('Company ID is required'));
+      if (!companyCode) {
+        reject(new Error('Company code is required'));
+        return;
+      }
+
+      if (!Utils.isValidUUID(companyCode)) {
+        reject(new Error('Invalid company code'));
         return;
       }
 
@@ -141,7 +148,7 @@ const CompanyService = (function() {
         redirect: "follow"
       };
 
-      fetch(`${API_BASE_URL}/companies/${companyId}`, requestOptions)
+      fetch(`${API_BASE_URL}/companies/${companyCode}`, requestOptions)
         .then(function(response) {
           if (!response.ok) {
             throw new Error('Failed to update company settings: ' + response.status);
@@ -155,11 +162,11 @@ const CompanyService = (function() {
         .then(function(data) {
 
           // Clear caches to force refresh
-          delete companySettingsCache[companyId];
-          companiesCache.delete(companyId);
+          delete companySettingsCache[companyCode];
+          companiesCache.delete(companyCode);
 
           // Update cache with new settings
-          companySettingsCache[companyId] = data.settings || newSettings;
+          companySettingsCache[companyCode] = data.settings || newSettings;
 
           resolve({ 
             status: 'success', 
@@ -176,12 +183,12 @@ const CompanyService = (function() {
   /**
    * Check if a specific setting is enabled for a company
    * This is a convenience method for checking individual settings
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code (UUID)
    * @param {string} settingKey - The setting key to check
    * @returns {Promise<boolean>} Promise resolving to the setting value
    */
-  function isSettingEnabled(companyId, settingKey) {
-    return getCompanySettings(companyId)
+  function isSettingEnabled(companyCode, settingKey) {
+    return getCompanySettings(companyCode)
       .then(function(settings) {
         return settings[settingKey] === true;
       })
@@ -193,35 +200,35 @@ const CompanyService = (function() {
 
   /**
    * Check if regular users can upload files/images
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code (UUID)
    * @returns {Promise<boolean>} Promise resolving to true if uploads are allowed
    */
-  function canUsersUpload(companyId) {
-    return isSettingEnabled(companyId, 'allow_user_uploads');
+  function canUsersUpload(companyCode) {
+    return isSettingEnabled(companyCode, 'allow_user_uploads');
   }
 
   /**
    * Check if regular users can create tags
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code (UUID)
    * @returns {Promise<boolean>} Promise resolving to true if tag creation is allowed
    */
-  function canUsersCreateTags(companyId) {
-    return isSettingEnabled(companyId, 'allow_user_tag_creation');
+  function canUsersCreateTags(companyCode) {
+    return isSettingEnabled(companyCode, 'allow_user_tag_creation');
   }
 
   /**
    * Check if client comments are required when closing tickets
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code (UUID)
    * @returns {Promise<boolean>} Promise resolving to true if comments are required
    */
-  function areClientCommentsRequired(companyId) {
-    return isSettingEnabled(companyId, 'require_client_comments');
+  function areClientCommentsRequired(companyCode) {
+    return isSettingEnabled(companyCode, 'require_client_comments');
   }
 
   // Public API
   return {
     getAllCompanies: getAllCompanies,
-    getCompanyById: getCompanyById,
+    getCompanyByCode: getCompanyByCode,
     getCompanySettings: getCompanySettings,
     updateCompanySettings: updateCompanySettings,
     isSettingEnabled: isSettingEnabled,

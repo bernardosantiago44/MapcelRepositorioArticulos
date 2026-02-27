@@ -158,4 +158,4 @@ const Utils = (function() {
   };
 })();
 
-const API_BASE_URL = '/nuevos/repositorioarticulos/produccion/api/';
+const API_BASE_URL = '/nuevos/repositorioarticulos/produccion/api';

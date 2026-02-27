@@ -229,7 +229,7 @@ const ArticleService = (function() {
     qs.set("page", String(params.page ?? 1));
     qs.set("pageSize", String(params.pageSize ?? 50));
 
-    const url = `/api/articles/${encodeURIComponent(params.companyId)}?${qs.toString()}`;
+    const url = `${API_BASE_URL}/articles/${encodeURIComponent(params.companyId)}?${qs.toString()}`;
 
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }

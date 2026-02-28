@@ -936,8 +936,8 @@ function refreshAppStateForSettings(newSettings) {
   
   // Refresh upload button visibility for non-admin users
   if (typeof AdminUploadOverride === 'undefined') {
-    updateUploadButtonVisibility('files-upload-btn', newSettings.allow_user_uploads);
-    updateUploadButtonVisibility('images-upload-btn', newSettings.allow_user_uploads);
+    updateUploadButtonVisibility('files-upload-btn', newSettings.allowUserUploads);
+    updateUploadButtonVisibility('images-upload-btn', newSettings.allowUserUploads);
   }
 }
 

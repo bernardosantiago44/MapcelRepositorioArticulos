@@ -18,7 +18,7 @@ var TagPickerUI = (function() {
   
   // State management
   var tagPickerState = {
-    currentCompanyId: null,
+    currentCompanyCode: null,
     allTags: [],
     filteredTags: [],
     selectedTagIds: [],
@@ -37,19 +37,19 @@ var TagPickerUI = (function() {
   
   /**
    * Open the tag picker
-   * @param {string} companyId - The company ID to load tags for
+   * @param {string} companyCode - The company code to load tags for
    * @param {Array<string>} selectedTagIds - Currently selected tag IDs
    * @param {Function} onSelection - Callback function called with selected tags array
    */
-  function openTagPicker(companyId, selectedTagIds, onSelection) {
-    tagPickerState.currentCompanyId = companyId;
+  function openTagPicker(companyCode, selectedTagIds, onSelection) {
+    tagPickerState.currentCompanyCode = companyCode;
     tagPickerState.selectedTagIds = selectedTagIds || [];
     tagPickerState.onSelectionCallback = onSelection || null;
     tagPickerState.searchQuery = '';
     tagPickerState.currentPage = 1;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags(companyCode)
       .then(function(tags) {
         tagPickerState.allTags = tags;
         tagPickerState.filteredTags = tags;
@@ -397,7 +397,7 @@ var TagPickerUI = (function() {
     }
     
     // Clean up state
-    tagPickerState.currentCompanyId = null;
+    tagPickerState.currentCompanyCode = null;
     tagPickerState.allTags = [];
     tagPickerState.filteredTags = [];
     tagPickerState.selectedTagIds = [];

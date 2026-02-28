@@ -9,7 +9,7 @@ const ImagesTabManager = (function() {
   
   // State management
   let currentView = 'gallery'; // 'gallery' or 'list'
-  let currentCompanyId = null;
+  let currentCompanyCode = null;
   let imagesGrid = null;
   let imagesCell = null;
   let imagesLayout = null;
@@ -21,10 +21,10 @@ const ImagesTabManager = (function() {
   /**
    * Initialize the Images tab
    * @param {Object} tabCell - DHTMLX tab cell for images
-   * @param {string} companyId - Current company ID
+   * @param {string} companyCode - Current company code
    */
-  function initializeImagesTab(tabCell, companyId) {
-    currentCompanyId = companyId;
+  function initializeImagesTab(tabCell, companyCode) {
+    currentCompanyCode = companyCode;
     imagesCell = tabCell;
     
     // Create layout for images tab
@@ -72,12 +72,12 @@ const ImagesTabManager = (function() {
     }
     
     // Check if company is selected
-    if (!currentCompanyId) {
+    if (!currentCompanyCode) {
       return;
     }
     
     // For regular users, check company settings
-    CompanyService.canUsersUpload(currentCompanyId)
+    CompanyService.canUsersUpload(currentCompanyCode)
       .then(function(canUpload) {
         const uploadBtn = document.getElementById('images-upload-btn');
         if (uploadBtn) {
@@ -439,8 +439,8 @@ const ImagesTabManager = (function() {
    */
   function loadImages() {
     const dataPromise = currentSearchTerm 
-      ? ImageService.searchImages(currentCompanyId, currentSearchTerm)
-      : ImageService.getImages(currentCompanyId);
+      ? ImageService.searchImages(currentCompanyCode, currentSearchTerm)
+      : ImageService.getImages(currentCompanyCode);
     
     dataPromise.then(images => {
       currentImages = images;
@@ -483,7 +483,7 @@ const ImagesTabManager = (function() {
    */
   function loadImagesIntoGrid() {
     if (imagesGrid) {
-      ImagesGridHelper.loadImagesData(imagesGrid, currentCompanyId, currentSearchTerm);
+      ImagesGridHelper.loadImagesData(imagesGrid, currentCompanyCode, currentSearchTerm);
     }
   }
   
@@ -509,7 +509,7 @@ const ImagesTabManager = (function() {
    * @param {string} imageId - Image ID to download
    */
   function downloadImage(imageId) {
-    ImageService.downloadImage(imageId, currentCompanyId)
+    ImageService.downloadImage(imageId, currentCompanyCode)
       .then(() => {
         dhtmlx.message({
           type: 'success',
@@ -542,7 +542,7 @@ const ImagesTabManager = (function() {
    */
   function deleteSingleImage(imageId) {
     // Get image name for confirmation message
-    ImageService.getImageById(imageId, currentCompanyId)
+    ImageService.getImageById(imageId, currentCompanyCode)
       .then(image => {
         if (!image) {
           dhtmlx.message({
@@ -559,7 +559,7 @@ const ImagesTabManager = (function() {
           '¿Eliminar imagen?',
           `¿Estás seguro de que deseas eliminar "${escapedName}"?`,
           () => {
-            ImageService.deleteImage(imageId, currentCompanyId)
+            ImageService.deleteImage(imageId, currentCompanyCode)
               .then(() => {
                 
                 dhtmlx.message({
@@ -613,7 +613,7 @@ const ImagesTabManager = (function() {
    * Execute bulk delete operation
    */
   function executeBulkDelete() {
-    ImageService.bulkDeleteImages(selectedImageIds, currentCompanyId)
+    ImageService.bulkDeleteImages(selectedImageIds, currentCompanyCode)
       .then(result => {
         dhtmlx.message({
           type: 'success',
@@ -735,7 +735,7 @@ const ImagesTabManager = (function() {
    * Open image upload modal
    */
   function openUploadModal() {
-    ImageUploadUI.openUploadModal(currentCompanyId, (uploadedImages) => {
+    ImageUploadUI.openUploadModal(currentCompanyCode, (uploadedImages) => {
       // Reset selection state after upload
       selectedImageIds = [];
       
@@ -771,10 +771,10 @@ const ImagesTabManager = (function() {
   
   /**
    * Update company ID and reload images
-   * @param {string} companyId - New company ID
+   * @param {string} companyCode - New company code
    */
-  function updateCompany(companyId) {
-    currentCompanyId = companyId;
+  function updateCompany(companyCode) {
+    currentCompanyCode = companyCode;
     currentSearchTerm = '';
     selectedImageIds = [];
     

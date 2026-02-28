@@ -16,10 +16,10 @@ const FileUploadUI = (function() {
   
   /**
    * Open the file upload modal
-   * @param {string} companyId - Company ID to associate uploaded files with
+   * @param {string} companyCode - Company code to associate uploaded files with
    * @param {Function} onUploadComplete - Callback function when upload completes
    */
-  function openUploadModal(companyId, onUploadComplete) {
+  function openUploadModal(companyCode, onUploadComplete) {
     // Create DHTMLX Window - cleanup previous window if exists
     if (currentWindow) {
       try {
@@ -41,7 +41,7 @@ const FileUploadUI = (function() {
     
     // Setup event handlers after content is attached
     setTimeout(() => {
-      setupEventHandlers(companyId, uploadWindow, onUploadComplete);
+      setupEventHandlers(companyCode, uploadWindow, onUploadComplete);
     }, 100);
   }
   
@@ -131,11 +131,11 @@ const FileUploadUI = (function() {
   
   /**
    * Setup event handlers for the upload form
-   * @param {string} companyId - Company ID
+   * @param {string} companyCode - Company code
    * @param {Object} uploadWindow - DHTMLX Window instance
    * @param {Function} onUploadComplete - Callback function
    */
-  function setupEventHandlers(companyId, uploadWindow, onUploadComplete) {
+  function setupEventHandlers(companyCode, uploadWindow, onUploadComplete) {
     const dropzone = document.getElementById('file-upload-dropzone');
     const fileInput = document.getElementById('file-upload-input');
     const cancelBtn = document.getElementById('file-upload-cancel-btn');
@@ -191,7 +191,7 @@ const FileUploadUI = (function() {
       submitBtn.textContent = 'Subiendo...';
       
       // Call file service to upload
-      FileService.uploadFiles(selectedFiles, description, companyId)
+      FileService.uploadFiles(selectedFiles, description, companyCode)
         .then(uploadedFiles => {
           // Show success message
           dhtmlx.message({

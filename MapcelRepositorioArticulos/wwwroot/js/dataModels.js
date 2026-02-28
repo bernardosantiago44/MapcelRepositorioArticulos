@@ -42,7 +42,7 @@ function getDefaultCompanySettings() {
  * @property {string} externalLink - External tracker link
  * @property {string} clientComments - Comments from the client
  * @property {('Producción'|'Borrador'|'Cerrado')} status - Current status
- * @property {string} companyId - Foreign key to Company
+ * @property {string} companyCode - Foreign key to Company (UUID)
  * @property {Array<string>} tags - Array of tag IDs (company-scoped)
  * @property {Array<string>} attachedImages - Array of image IDs attached to the article
  * @property {Array<string>} attachedFiles - Array of file IDs attached to the article

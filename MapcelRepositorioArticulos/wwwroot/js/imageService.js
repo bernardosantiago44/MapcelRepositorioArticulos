@@ -10,20 +10,20 @@ const ImageService = (function() {
   
   /**
    * Get images for a specific company
-   * @param {string} companyId - The company ID to filter images by
+   * @param {string} companyCode - The company code to filter images by
    * @returns {Promise<Array<Object>>} Promise resolving to array of image objects
    */
-  function getImages(companyId, page = 1, pageSize = 10) {
+  function getImages(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({
       page,
       pageSize
     });
 
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/images?${params}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/images?${params}`)
       .then(response => {
         if (response.status === 404) {
           // remove that id from cache if not found
-          imagesCache.delete(companyId);
+          imagesCache.delete(companyCode);
           return {data:[]};
         }
         if (!response.ok) throw new Error("API Error");
@@ -44,14 +44,14 @@ const ImageService = (function() {
    * @param {string} imageId - The image ID
    * @returns {Promise<Object|null>} Promise resolving to image object or null
    */
-  function getImageById(imageId, companyId) {
+  function getImageById(imageId, companyCode) {
     // Check cache first
     if (imagesCache.has(imageId)) {
       return Promise.resolve(imagesCache.get(imageId));
     }
 
     // We call the specific endpoint for an image by ID
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/images/${encodeURIComponent(imageId)}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/images/${encodeURIComponent(imageId)}`)
       .then(response => {
         // If the server returns 404, we return null to match your original logic
         if (response.status === 404) {
@@ -127,13 +127,13 @@ const ImageService = (function() {
    * @param {string} imageId - The image ID to delete
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function deleteImage(imageId, companyId) {
+  function deleteImage(imageId, companyCode) {
     const requestOptions = {
       method: "DELETE",
       redirect: "follow"
     };
 
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(imageId)}`, requestOptions)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to delete image: ${response.statusText}`);
@@ -174,7 +174,7 @@ const ImageService = (function() {
    * @param {Array<string>} imageIds - Array of image IDs to delete
    * @returns {Promise<Object>} Promise resolving to result object with deleted count
    */
-  function bulkDeleteImages(imageIds, companyId) {
+  function bulkDeleteImages(imageIds, companyCode) {
     if (!imageIds || imageIds.length === 0) {
       return Promise.reject(new Error('No images specified for deletion'));
     }
@@ -184,7 +184,7 @@ const ImageService = (function() {
         method: "DELETE",
         redirect: "follow"
       };
-      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}`, requestOptions)
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(imageId)}`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to delete image ${imageId}: ${response.statusText}`);
@@ -212,8 +212,8 @@ const ImageService = (function() {
    * @param {string} imageId - The image ID to download
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function downloadImage(imageId, companyId) {
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(imageId)}/download`)
+  function downloadImage(imageId, companyCode) {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(imageId)}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download image: ${response.statusText}`);
@@ -222,7 +222,7 @@ const ImageService = (function() {
       })
       .then(blob => {
         // Get filename from image data or use a default
-        return getImageById(imageId, companyId).then(image => {
+        return getImageById(imageId, companyCode).then(image => {
           const filename = image ? image.name : `image-${imageId}`;
           
           // Create blob URL and trigger download
@@ -248,12 +248,12 @@ const ImageService = (function() {
   
   /**
    * Search images by name, description, or dimensions
-   * @param {string} companyId - Company ID to filter images by
+   * @param {string} companyCode - Company code to filter images by
    * @param {string} searchTerm - Search term to filter by
    * @returns {Promise<Array<Object>>} Promise resolving to array of filtered image objects
    */
-  function searchImages(companyId, searchTerm) {
-    return getImages(companyId).then(images => {
+  function searchImages(companyCode, searchTerm) {
+    return getImages(companyCode).then(images => {
       if (!searchTerm || searchTerm.trim() === '') {
         return images;
       }
@@ -273,10 +273,10 @@ const ImageService = (function() {
    * @param {FileList|Array<File>} imageFiles - Image files to upload
    * @param {Array<Object>} imageDimensions - Array of {width, height} objects for each file (kept for backwards compatibility)
    * @param {string} description - Optional description for the images (batch) (kept for backwards compatibility)
-   * @param {string} companyId - Company ID to associate images with
+   * @param {string} companyCode - Company code to associate images with
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded image objects
    */
-  function uploadImages(imageFiles, imageDimensions, description, companyId) {
+  function uploadImages(imageFiles, imageDimensions, description, companyCode) {
     // Convert FileList to Array if needed
     const filesArray = Array.from(imageFiles);
     
@@ -290,7 +290,7 @@ const ImageService = (function() {
         redirect: "follow"
       };
       
-      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}`, requestOptions)
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}`, requestOptions)
         .then(response => {
           if (!response.ok) {
             throw new Error(`Failed to upload ${file.name}: ${response.statusText}`);

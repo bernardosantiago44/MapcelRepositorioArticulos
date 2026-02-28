@@ -306,7 +306,7 @@ const ArticleDetailUI = (function() {
    */
   function handleFileClick(fileId) {
     if (fileId && typeof FileService !== 'undefined') {
-      FileService.downloadFile(fileId, CompanyRouting.getCompanyIdFromUrl())
+      FileService.downloadFile(fileId, CompanyRouting.getCompanyCodeFromUrl())
         .then(function() {
           if (typeof dhtmlx !== 'undefined') {
             dhtmlx.message({ type: 'success', text: 'Descargando archivo...' });

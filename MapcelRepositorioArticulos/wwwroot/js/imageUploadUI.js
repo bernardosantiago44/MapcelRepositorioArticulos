@@ -20,10 +20,10 @@ const ImageUploadUI = (function() {
   
   /**
    * Open the image upload modal
-   * @param {string} companyId - Company ID to associate uploaded images with
+   * @param {string} companyCode - Company code to associate uploaded images with
    * @param {Function} onUploadComplete - Callback function when upload completes (targetGallery)
    */
-  function openUploadModal(companyId, onUploadComplete) {
+  function openUploadModal(companyCode, onUploadComplete) {
     // Create DHTMLX Window - cleanup previous window if exists
     if (currentWindow) {
       try {
@@ -48,7 +48,7 @@ const ImageUploadUI = (function() {
     
     // Setup event handlers after content is attached
     setTimeout(() => {
-      setupEventHandlers(companyId, uploadWindow, onUploadComplete);
+      setupEventHandlers(companyCode, uploadWindow, onUploadComplete);
     }, 100);
   }
   
@@ -141,11 +141,11 @@ const ImageUploadUI = (function() {
   
   /**
    * Setup event handlers for the upload form
-   * @param {string} companyId - Company ID
+   * @param {string} companyCode - Company code
    * @param {Object} uploadWindow - DHTMLX Window instance
    * @param {Function} onUploadComplete - Callback function (targetGallery)
    */
-  function setupEventHandlers(companyId, uploadWindow, onUploadComplete) {
+  function setupEventHandlers(companyCode, uploadWindow, onUploadComplete) {
     const dropzone = document.getElementById('image-upload-dropzone');
     const fileInput = document.getElementById('image-upload-input');
     const cancelBtn = document.getElementById('image-upload-cancel-btn');
@@ -207,7 +207,7 @@ const ImageUploadUI = (function() {
       const imageDimensions = selectedImages.map(img => img.dimensions);
       
       // Call image service to upload
-      ImageService.uploadImages(imageFiles, imageDimensions, description, companyId)
+      ImageService.uploadImages(imageFiles, imageDimensions, description, companyCode)
         .then(uploadedImages => {
           // Show success message
           dhtmlx.message({

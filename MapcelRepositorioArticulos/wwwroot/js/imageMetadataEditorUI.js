@@ -180,7 +180,7 @@ const ImageMetadataEditorUI = (function() {
       saveBtn.textContent = 'Guardando...';
       
       // Call image service to update metadata
-      ImageService.updateImageMetadata(image.id, newDescription, CompanyRouting.getCompanyIdFromUrl())
+      ImageService.updateImageMetadata(image.id, newDescription, CompanyRouting.getCompanyCodeFromUrl())
         .then(updatedImage => {
           // Show success message
           dhtmlx.message({

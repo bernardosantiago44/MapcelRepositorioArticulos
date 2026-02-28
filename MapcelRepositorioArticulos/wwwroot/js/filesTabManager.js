@@ -9,7 +9,7 @@ const FilesTabManager = (function() {
   
   // State management
   let currentView = 'list'; // 'list' or 'card'
-  let currentCompanyId = null;
+  let currentCompanyCode = null;
   let filesGrid = null;
   let filesCell = null;
   let filesLayout = null;
@@ -20,10 +20,10 @@ const FilesTabManager = (function() {
   /**
    * Initialize the Files tab
    * @param {Object} tabCell - DHTMLX tab cell for files
-   * @param {string} companyId - Current company ID
+   * @param {string} companyCode - Current company code
    */
-  function initializeFilesTab(tabCell, companyId) {
-    currentCompanyId = companyId;
+  function initializeFilesTab(tabCell, companyCode) {
+    currentCompanyCode = companyCode;
     filesCell = tabCell;
     
     // Create layout for files tab
@@ -72,12 +72,12 @@ const FilesTabManager = (function() {
     }
     
     // Check if company is selected
-    if (!currentCompanyId) {
+    if (!currentCompanyCode) {
       return;
     }
     
     // For regular users, check company settings
-    CompanyService.canUsersUpload(currentCompanyId)
+    CompanyService.canUsersUpload(currentCompanyCode)
       .then(function(canUpload) {
         const uploadBtn = document.getElementById('files-upload-btn');
         if (uploadBtn) {
@@ -225,8 +225,8 @@ const FilesTabManager = (function() {
       
       // Load files and render card view
       const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyId, currentSearchTerm)
-        : FileService.getFiles(currentCompanyId);
+        ? FileService.searchFiles(currentCompanyCode, currentSearchTerm)
+        : FileService.getFiles(currentCompanyCode);
       
       dataPromise.then(files => {
         contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));
@@ -270,11 +270,11 @@ const FilesTabManager = (function() {
    */
   function loadFiles() {
     if (currentView === 'list' && filesGrid) {
-      FilesGridHelper.loadFilesData(filesGrid, currentCompanyId, currentSearchTerm);
+      FilesGridHelper.loadFilesData(filesGrid, currentCompanyCode, currentSearchTerm);
     } else if (currentView === 'card' && contentSection) {
       const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyId, currentSearchTerm)
-        : FileService.getFiles(currentCompanyId);
+        ? FileService.searchFiles(currentCompanyCode, currentSearchTerm)
+        : FileService.getFiles(currentCompanyCode);
       
       dataPromise.then(files => {
         contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));
@@ -307,7 +307,7 @@ const FilesTabManager = (function() {
    * Open upload modal
    */
   function openUploadModal() {
-    FileUploadUI.openUploadModal(currentCompanyId, (uploadedFiles) => {
+    FileUploadUI.openUploadModal(currentCompanyCode, (uploadedFiles) => {
       // Refresh files list after upload
       refreshFilesList();
     });
@@ -332,11 +332,11 @@ const FilesTabManager = (function() {
   }
   
   /**
-   * Update company ID and reload files
-   * @param {string} companyId - New company ID
+   * Update company code and reload files
+   * @param {string} companyCode - New company code
    */
-  function updateCompany(companyId) {
-    currentCompanyId = companyId;
+  function updateCompany(companyCode) {
+    currentCompanyCode = companyCode;
     currentSearchTerm = '';
     
     // Clear search input

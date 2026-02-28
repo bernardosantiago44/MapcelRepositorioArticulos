@@ -19,7 +19,7 @@ var BulkTagEditorUI = (function() {
   
   // State management
   var bulkTagEditorState = {
-    currentCompanyId: null,
+    currentCompanyCode: null,
     selectedArticles: [],        // Array of article objects with resolved tags
     allTags: [],                 // All tags for the company
     tagPresenceMap: {},          // Map of tagId -> { presentCount, missingCount, action }
@@ -29,11 +29,11 @@ var BulkTagEditorUI = (function() {
   
   /**
    * Open the bulk tag editor for selected articles
-   * @param {string} companyId - The company ID
+   * @param {string} companyCode - The company code
    * @param {Array<Object>} selectedArticles - Array of selected article objects (with resolved tags)
    * @param {Function} onUpdate - Callback function called after any update
    */
-  function openBulkTagEditor(companyId, selectedArticles, onUpdate) {
+  function openBulkTagEditor(companyCode, selectedArticles, onUpdate) {
     // Check admin access
     if (typeof AdminBulkTagEditor === 'undefined') {
       dhtmlx.alert({
@@ -51,12 +51,12 @@ var BulkTagEditorUI = (function() {
       return;
     }
     
-    bulkTagEditorState.currentCompanyId = companyId;
+    bulkTagEditorState.currentCompanyCode = companyCode;
     bulkTagEditorState.selectedArticles = selectedArticles;
     bulkTagEditorState.onUpdateCallback = onUpdate || null;
     
     // Load tags for the company
-    ArticleService.getTags(companyId)
+    ArticleService.getTags(companyCode)
       .then(function(tags) {
         bulkTagEditorState.allTags = tags;
         calculateTagPresence();
@@ -315,7 +315,7 @@ var BulkTagEditorUI = (function() {
       '</div>';
     }
     
-    ArticleService.bulkUpdateTags(articleIds, tagId, action, bulkTagEditorState.currentCompanyId)
+    ArticleService.bulkUpdateTags(articleIds, tagId, action, bulkTagEditorState.currentCompanyCode)
       .then(function(response) {
         if (response.status === 'success') {
           var actionVerb = action === 'add' ? 'añadida' : 'eliminada';
@@ -370,7 +370,7 @@ var BulkTagEditorUI = (function() {
     ArticleService.clearCache()
     
     // Fetch updated articles using bulk method
-    return ArticleService.getArticlesByIds(articleIds, bulkTagEditorState.currentCompanyId)
+    return ArticleService.getArticlesByIds(articleIds, bulkTagEditorState.currentCompanyCode)
       .then(function(updatedArticles) {
         // Filter out any null results
         bulkTagEditorState.selectedArticles = updatedArticles.filter(function(article) {
@@ -389,7 +389,7 @@ var BulkTagEditorUI = (function() {
     }
     
     // Clean up state
-    bulkTagEditorState.currentCompanyId = null;
+    bulkTagEditorState.currentCompanyCode = null;
     bulkTagEditorState.selectedArticles = [];
     bulkTagEditorState.allTags = [];
     bulkTagEditorState.tagPresenceMap = {};

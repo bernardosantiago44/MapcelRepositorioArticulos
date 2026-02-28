@@ -54,16 +54,16 @@ const FileService = (function() {
   
   /**
    * Get files for a specific company
-   * @param {string} companyId - The company ID to filter files by
+   * @param {string} companyCode - The company code to filter files by
    * @returns {Promise<Array<Object>>} Promise resolving to array of file objects
    */
-  function getFiles(companyId, page = 1, pageSize = 10) {
+  function getFiles(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({
       page,
       pageSize
     });
 
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}?${params}`)
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}?${params}`)
       .then(response => {
         if (response.status === 404) {
           // Cache empty result to prevent future calls
@@ -85,8 +85,8 @@ const FileService = (function() {
    * @param {string} fileId - The file ID
    * @returns {Promise<Object|null>} Promise resolving to file object or null
    */
-  function getFileById(fileId, companyId) {
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`)
+  function getFileById(fileId, companyCode) {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(fileId)}`)
       .then(response => {
         if (response.status === 404) {
           return null;
@@ -108,10 +108,10 @@ const FileService = (function() {
    * Upload one or more files with optional description
    * @param {FileList|Array<File>} files - Files to upload
    * @param {string} description - Optional description for the files
-   * @param {string} companyId - Company ID to associate files with
+   * @param {string} companyCode - Company code to associate files with
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded file objects
    */
-  function uploadFiles(files, description, companyId) {
+  function uploadFiles(files, description, companyCode) {
     // Convert FileList to Array if needed
     const filesArray = Array.from(files);
     
@@ -120,7 +120,7 @@ const FileService = (function() {
       const formData = new FormData();
       formData.append('file', file);
       
-      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}`, {
+      return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}`, {
         method: 'POST',
         body: formData
       })
@@ -142,8 +142,8 @@ const FileService = (function() {
    * @param {string} newDescription - New description text
    * @returns {Promise<Object>} Promise resolving to updated file object
    */
-  function updateFileMetadata(fileId, newDescription, companyId) {
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
+  function updateFileMetadata(fileId, newDescription, companyCode) {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(fileId)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -165,8 +165,8 @@ const FileService = (function() {
    * @param {string} fileId - The file ID to delete
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function deleteFile(fileId, companyId) {
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}`, {
+  function deleteFile(fileId, companyCode) {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(fileId)}`, {
       method: 'DELETE'
     })
       .then(response => {
@@ -180,11 +180,11 @@ const FileService = (function() {
   /**
    * Download a file
    * @param {string} fileId - The file ID to download
-   * @param {string} companyId 
+   * @param {string} companyCode 
    * @returns {Promise<boolean>} Promise resolving to true if successful
    */
-  function downloadFile(fileId, companyId) {
-    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyId)}/${encodeURIComponent(fileId)}/download`)
+  function downloadFile(fileId, companyCode) {
+    return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}/${encodeURIComponent(fileId)}/download`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Failed to download file: ${response.statusText}`);
@@ -208,12 +208,12 @@ const FileService = (function() {
   
   /**
    * Search files by name or description
-   * @param {string} companyId - Company ID to filter files by
+   * @param {string} companyCode - Company code to filter files by
    * @param {string} searchTerm - Search term to filter by
    * @returns {Promise<Array<Object>>} Promise resolving to array of filtered file objects
    */
-  function searchFiles(companyId, searchTerm) {
-    return getFiles(companyId).then(files => {
+  function searchFiles(companyCode, searchTerm) {
+    return getFiles(companyCode).then(files => {
       if (!searchTerm || searchTerm.trim() === '') {
         return files;
       }

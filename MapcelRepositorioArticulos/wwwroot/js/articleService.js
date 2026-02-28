@@ -41,16 +41,16 @@ const ArticleService = (function() {
   
   /**
    * Get tags specific to a company from the new centralized tags array
-   * @param {string} companyId - The company ID to filter tags by
-   * @returns {Promise<Array<{id: string, name: string, color: string, description: string, companyId: string}>>} Promise resolving to array of tags
+   * @param {string} companyCode - The company code to filter tags by
+   * @returns {Promise<Array<{id: string, name: string, color: string, description: string, companyCode: string}>>} Promise resolving to array of tags
    */
-  function getTags(companyId) {
+  function getTags(companyCode) {
     // Check cache first
-    if (tagCache && tagCache.has(companyId)) {
-      return Promise.resolve(tagCache.get(companyId));
+    if (tagCache && tagCache.has(companyCode)) {
+      return Promise.resolve(tagCache.get(companyCode));
     }
 
-    return fetch(`${API_BASE_URL}/tags/${encodeURIComponent(companyId)}`, {
+    return fetch(`${API_BASE_URL}/tags/${encodeURIComponent(companyCode)}`, {
       headers: { "Accept": "application/json" }
     })
     .then(function (res) {
@@ -63,7 +63,7 @@ const ArticleService = (function() {
     })
     .then(function (companyTags) {
       // Cache the tags for this company
-      tagCache.set(companyId, companyTags);
+      tagCache.set(companyCode, companyTags);
       return companyTags;
     });
   }
@@ -76,8 +76,8 @@ const ArticleService = (function() {
   function getTagById(tagId) {
     // Check if tag is in cache
     if (tagCache) {
-      for (const companyId of tagCache.keys()) {
-        const tags = tagCache.get(companyId);
+      for (const companyCode of tagCache.keys()) {
+        const tags = tagCache.get(companyCode);
         const tag = tags.find(t => t.id === tagId);
         if (tag) {
           return Promise.resolve(tag);
@@ -102,7 +102,7 @@ const ArticleService = (function() {
   
   /**
    * Create a new tag (POST equivalent)
-   * @param {Object} tagData - Tag data object {name, color, description, companyId}
+   * @param {Object} tagData - Tag data object {name, color, description, companyCode}
    * @returns {Promise<{status: string, data: Object}>} Promise resolving to the created tag
    */
   function createTag(tagData) {
@@ -118,7 +118,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`${API_BASE_URL}/tags?companyCode=${encodeURIComponent(tagData.companyId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/tags?companyCode=${encodeURIComponent(tagData.companyCode)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create tag: " + response.status);
@@ -200,7 +200,7 @@ const ArticleService = (function() {
   }
   
   /**
-   * Get articles filtered by company ID
+   * Get articles filtered by company code
    * Articles will have their tag IDs resolved to full tag objects
    * @param {object} params - Parameters for filtering articles
    * @returns {Promise<Array<Article>>} Promise resolving to array of filtered articles
@@ -229,7 +229,7 @@ const ArticleService = (function() {
     qs.set("page", String(params.page ?? 1));
     qs.set("pageSize", String(params.pageSize ?? 50));
 
-    const url = `${API_BASE_URL}/articles/${encodeURIComponent(params.companyId)}?${qs.toString()}`;
+    const url = `${API_BASE_URL}/articles/${encodeURIComponent(params.companyCode)}?${qs.toString()}`;
 
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }
@@ -240,7 +240,7 @@ const ArticleService = (function() {
     const response = await res.json();
     const allArticles = response.data || [];
 
-    const tags = await getTags(params.companyId);
+    const tags = await getTags(params.companyCode);
 
     // Resolve tag IDs to full tag objects
     const articlesWithResolvedTags = allArticles.map(article => {
@@ -272,13 +272,13 @@ const ArticleService = (function() {
  * Get a single article from backend
  * Server already resolves tag names (no client mapping)
  * @param {string} articleId
- * @param {string} companyId
+ * @param {string} companyCode
  * @returns {Promise<Object|null>}
  */
-  async function getArticleById(articleId, companyId) {
+  async function getArticleById(articleId, companyCode) {
     if (!articleId) return null;
 
-    const url = `/api/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(articleId)}`;
+    const url = `/api/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`;
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }
     });
@@ -287,7 +287,7 @@ const ArticleService = (function() {
     if (!res.ok) throw new Error(`getArticleById failed: ${res.status}`);
 
     const article = await res.json();
-    const tags = await getTags(article.companyId);  // Get tags for the company to resolve tag IDs
+    const tags = await getTags(article.companyCode);  // Get tags for the company to resolve tag IDs
 
     if (article.tags && Array.isArray(article.tags)) {
       const resolvedTags = article.tags.map(tagId => {
@@ -311,7 +311,7 @@ const ArticleService = (function() {
    * @param {Array<string>} articleIds - Array of article IDs
    * @returns {Promise<Array<Article>>} Promise resolving to array of articles (with resolved tags)
    */
-    function getArticlesByIds(articleIds, companyId) {
+    function getArticlesByIds(articleIds, companyCode) {
       const resultsMap = new Map();
       const idsToFetch = [];
 
@@ -333,7 +333,7 @@ const ArticleService = (function() {
 
       // 3. Create an array of Promises for the missing articles
       const fetchPromises = idsToFetch.map(id => {
-        return getArticleById(id, companyId)
+        return getArticleById(id, companyCode)
           .then(article => {
             if (article) {
               articlesCache.set(id, article); // Hydrate cache for future use
@@ -362,7 +362,7 @@ const ArticleService = (function() {
    * @param {Object} data - Article data object
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the created article
    */
-  function createArticle(data, companyId) {
+  function createArticle(data, companyCode) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -383,7 +383,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to create article: " + response.status);
@@ -406,7 +406,7 @@ const ArticleService = (function() {
    * @param {Object} data - Updated article data
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the updated article
    */
-  function updateArticle(id, data, companyId) {
+  function updateArticle(id, data, companyCode) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -427,7 +427,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}/${encodeURIComponent(id)}`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(id)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
         throw new Error("Failed to update article: " + response.status);
@@ -453,7 +453,7 @@ const ArticleService = (function() {
    * @param {('add'|'remove')} action - Whether to 'add' or 'remove' the tag
    * @returns {Promise<{status: string, updatedCount: number}>} Promise resolving to the result
    */
-  function bulkUpdateTags(articleIds, tagId, action, companyId) {
+  function bulkUpdateTags(articleIds, tagId, action, companyCode) {
     const headers = new Headers();
     headers.append("Content-Type", "application/json");
 
@@ -470,7 +470,7 @@ const ArticleService = (function() {
       redirect: "follow"
     };
 
-    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyId)}/bulk-tags`, requestOptions)
+    return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/bulk-tags`, requestOptions)
       .then(function (response) {
         if (!response.ok) {
           throw new Error("Failed to bulk update tags: " + response.status);

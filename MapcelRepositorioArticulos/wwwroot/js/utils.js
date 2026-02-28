@@ -147,6 +147,16 @@ const Utils = (function() {
     }
   }
   
+  /**
+   * Validate that a string is a valid UUID format
+   * @param {string} value - String to validate
+   * @returns {boolean} True if the string is a valid UUID
+   */
+  function isValidUUID(value) {
+    if (!value || typeof value !== 'string') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+
   // Public API
   return {
     escapeHtml,
@@ -154,7 +164,8 @@ const Utils = (function() {
     getFileExtension,
     debounce,
     applyMarkdownActionToTextArea,
-    renderMarkdown
+    renderMarkdown,
+    isValidUUID
   };
 })();
 

@@ -341,7 +341,7 @@ function createCompanyComboOptions(companies) {
   var companyPickerHtml = '';
 if (companies && companies.length > 0) {
     var optionsHtml = companies.map(function(company, index) {
-      return '<option value="' + company.id + '"' + (index === 0 ? ' selected' : '') + '>' + company.name + '</option>';
+      return '<option value="' + company.companyCode + '"' + (index === 0 ? ' selected' : '') + '>' + company.name + '</option>';
     }).join('');
     
     companyPickerHtml = '<div class="p-4 space-y-3">' +

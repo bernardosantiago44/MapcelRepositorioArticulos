@@ -29,8 +29,8 @@ const CompanyService = (function() {
       .then(function(companies) {
         if (Array.isArray(companies)) {
           companies.forEach(function(company) {
-            if (company && company.id) {
-              companiesCache.set(company.id, company);
+            if (company && company.companyCode) {
+              companiesCache.set(company.companyCode, company);
             }
           });
         }
@@ -58,8 +58,8 @@ const CompanyService = (function() {
         return response.json();
       })
       .then(function(company) {
-        if (company && company.id) {
-          companiesCache.set(company.id, company);
+        if (company && company.companyCode) {
+          companiesCache.set(company.companyCode, company);
         }
         return company;
       })

@@ -79,7 +79,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                       )
                   AND (
                         @tagIds IS NULL OR EXISTS (
-                            SELECT 1 FROM article_tags filter_at
+                            SELECT 1 FROM [RepositorioArticulos].[dbo].[article_tags] filter_at
                             WHERE filter_at.article_id = a.article_id
                             AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
                         )
@@ -102,13 +102,13 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             JOIN [RepositorioArticulos].[dbo].[articles] a ON b.article_id = a.article_id
             OUTER APPLY (
                 SELECT STRING_AGG(t.tag_id, ',') AS tags
-                FROM article_tags at
-                JOIN tags t ON at.tag_id = t.tag_id
+                FROM [RepositorioArticulos].[dbo].[article_tags] at
+                JOIN [RepositorioArticulos].[dbo].[tags] t ON at.tag_id = t.tag_id
                 WHERE at.article_id = a.article_id
             ) AS tag_data
             OUTER APPLY (
                 SELECT STRING_AGG(fa.file_id, ',') AS files
-                FROM file_articles fa
+                FROM [RepositorioArticulos].[dbo].[file_articles] fa
                 WHERE fa.article_id = a.article_id
             ) as file_data
             ORDER BY a.created_at DESC;
@@ -126,7 +126,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                   )
               AND (
                     @tagIds IS NULL OR EXISTS (
-                        SELECT 1 FROM article_tags filter_at
+                        SELECT 1 FROM [RepositorioArticulos].[dbo].[article_tags] filter_at
                         WHERE filter_at.article_id = a.article_id
                         AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
                     )
@@ -167,30 +167,30 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     ";
     private const string SqlDeleteArticleTags = @"
         DELETE at
-        FROM [dbo].[article_tags] at
-        INNER JOIN dbo.articles a ON a.article_id = at.article_id
+        FROM [RepositorioArticulos].[dbo].[article_tags] at
+        INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = at.article_id
         WHERE at.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
     private const string SqlInsertArticleTagsFromCsv = @"
-        INSERT INTO dbo.article_tags (article_id, tag_id)
+        INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (article_id, tag_id)
         SELECT
             @ArticleId,
             t.tag_id
         FROM string_split(@TagIdsCsv, ',') s
-        INNER JOIN dbo.tags t
+        INNER JOIN [RepositorioArticulos].[dbo].[tags] t
             ON t.tag_id = TRY_CAST(s.value AS int)
            AND t.company_code = @CompanyCode;
     ";
     private const string SqlDeleteFileArticles = @"
         DELETE fa
-        FROM dbo.file_articles fa
-        INNER JOIN dbo.articles a ON a.article_id = fa.article_id
+        FROM [RepositorioArticulos].[dbo].[file_articles] fa
+        INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = fa.article_id
         WHERE fa.article_id = @ArticleId
           AND a.company_code = @CompanyCode;";
     private const string SqlDeleteArticle = @"
         DELETE a
-        FROM dbo.articles a
+        FROM [RepositorioArticulos].[dbo].[articles] a
         WHERE a.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
@@ -201,13 +201,13 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         t.name,
         t.color,
         t.description
-    FROM dbo.tags AS t
+    FROM [RepositorioArticulos].[dbo].[tags] AS t
         INNER JOIN @TagIds AS ids ON t.tag_id = ids.Id
     WHERE t.company_code = @CompanyCode
     ORDER BY t.tag_id;
     ";
     private const string SqlBulkAddTagToArticles = @"
-        IF NOT EXISTS (SELECT 1 FROM dbo.tags WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        IF NOT EXISTS (SELECT 1 FROM [RepositorioArticulos].[dbo].[tags] WHERE tag_id = @TagId AND company_code = @CompanyCode)
         BEGIN
             SELECT CAST(-1 AS int);
             RETURN;
@@ -219,15 +219,15 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             FROM string_split(@ArticleIdsCsv, ',')
             WHERE TRY_CAST(value AS int) IS NOT NULL
         )
-        INSERT INTO dbo.article_tags (article_id, tag_id)
+        INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (article_id, tag_id)
         SELECT a.article_id, @TagId
-        FROM dbo.articles a
+        FROM [RepositorioArticulos].[dbo].[articles] a
         INNER JOIN ids i ON i.article_id = a.article_id
         WHERE a.company_code = @CompanyCode
           AND NOT EXISTS
           (
               SELECT 1
-              FROM dbo.article_tags at
+              FROM [RepositorioArticulos].[dbo].[article_tags] at
               WHERE at.article_id = a.article_id
                 AND at.tag_id = @TagId
           );
@@ -235,7 +235,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         SELECT @@ROWCOUNT;
     ";
     private const string SqlBulkRemoveTagFromArticles = @"
-        IF NOT EXISTS (SELECT 1 FROM dbo.tags WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        IF NOT EXISTS (SELECT 1 FROM [RepositorioArticulos].[dbo].[tags] WHERE tag_id = @TagId AND company_code = @CompanyCode)
         BEGIN
             SELECT CAST(-1 AS int);
             RETURN;
@@ -248,8 +248,8 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             WHERE TRY_CAST(value AS int) IS NOT NULL
         )
         DELETE at
-        FROM dbo.article_tags at
-        INNER JOIN dbo.articles a ON a.article_id = at.article_id
+        FROM [RepositorioArticulos].[dbo].[article_tags] at
+        INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = at.article_id
         INNER JOIN ids i ON i.article_id = a.article_id
         WHERE a.company_code = @CompanyCode
           AND at.tag_id = @TagId;
@@ -257,12 +257,12 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         SELECT @@ROWCOUNT;
     ";
     private const string SqlInsertFileArticlesFromCsv = @"
-        INSERT INTO [dbo].[file_articles] (file_id, article_id)
+        INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (file_id, article_id)
         SELECT
             f.file_id,
             @ArticleId
         FROM string_split(@FileIdsCsv, ',') s
-        INNER JOIN dbo.files f
+        INNER JOIN [RepositorioArticulos].[dbo].[files] f
             ON f.file_id = TRY_CAST(s.value AS int)
            AND f.company_code = @CompanyCode;
     ";

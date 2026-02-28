@@ -72,9 +72,9 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
     /// Checks whether an enterprise exists in the master table and returns its name.
     /// </summary>
     private const string SqlSelectEnterpriseById = @"
-        SELECT ENT_CodigRND, ENTERPRISE_NAME
+        SELECT ENT_CodigoRND, ENTERPRISE_NAME
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES]
-        WHERE ENT_CodigRND = @EnterpriseCode;
+        WHERE ENT_CodigoRND = @EnterpriseCode;
     ";
 
     /// <summary>

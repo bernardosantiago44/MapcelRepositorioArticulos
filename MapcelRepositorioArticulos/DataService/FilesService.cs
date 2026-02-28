@@ -225,7 +225,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
         const string sql = @"
             WITH FileBase AS (
                 SELECT f.file_id
-                FROM [dbo].[files] f
+                FROM [RepositorioArticulos].[dbo].[files] f
                 WHERE 
                   (@companyCode IS NULL OR f.company_code = @companyCode)
                   -- Filter Id search
@@ -258,13 +258,13 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
                 f.is_image,
                 f.extension
             FROM FileBase b
-            JOIN [dbo].[files] f ON b.file_id = f.file_id
+            JOIN [RepositorioArticulos].[dbo].[files] f ON b.file_id = f.file_id
             ORDER BY f.upload_date DESC
             OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 
             -- Total count (Synchronized filters)
             SELECT COUNT(1)
-            FROM [dbo].[files] f
+            FROM [RepositorioArticulos].[dbo].[files] f
             WHERE 
               (@companyCode IS NULL OR f.company_code = @companyCode)
               AND (@fileId IS NULL OR f.file_id = @fileId)

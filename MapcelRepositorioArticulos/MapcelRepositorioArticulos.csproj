@@ -18,4 +18,9 @@
       <Folder Include="Logs\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="wwwroot\data\articles-mock-data.json" />
+      <_ContentIncludedByDefault Remove="wwwroot\data\grid.xml" />
+    </ItemGroup>
+
 </Project>

@@ -96,7 +96,7 @@ public class FilesService(IConfiguration configuration) : BaseService(configurat
             f.extension,
             f.is_image
         FROM [RepositorioArticulos].[dbo].[files] f
-        INNER JOIN [dbo].[file_articles] fa ON f.file_id = fa.file_id
+        INNER JOIN [RepositorioArticulos].[dbo].[file_articles] fa ON f.file_id = fa.file_id
         WHERE fa.article_id = @articleId
         ORDER BY f.is_image DESC, f.upload_date DESC;
     ";

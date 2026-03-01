@@ -24,6 +24,7 @@ const CompanyService = (function() {
         if (!response.ok) {
           throw new Error('Failed to fetch companies');
         }
+        console.log(response);
         return response.json();
       })
       .then(function(companies) {

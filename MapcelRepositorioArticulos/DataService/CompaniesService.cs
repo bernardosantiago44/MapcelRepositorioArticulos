@@ -50,7 +50,7 @@ public sealed class CompaniesService(IConfiguration configuration) : BaseService
             ISNULL(c.require_client_comments, 0)    AS require_client_comments
         FROM [MapaLocalizadorVisor].[dbo].[MNG_ENTERPRISES] m
         LEFT JOIN [RepositorioArticulos].[dbo].[companies] c
-            ON company_code = c.company_code
+            ON m.ENT_CodigoRND = c.company_code
         ORDER BY m.ENTERPRISE_NAME;
     ";
 

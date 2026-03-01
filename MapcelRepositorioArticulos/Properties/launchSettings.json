@@ -14,7 +14,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
-      "launchUrl": "co-01",
+      "launchUrl": "nuevos/repositorioarticulos/produccion/co-01",
       "applicationUrl": "https://localhost:7033;http://localhost:5200",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"

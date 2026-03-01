@@ -262,6 +262,9 @@ function initializeAppForCompany(companyCode) {
     grid_toolbar.hideItem('sep_bulk');
   }
   
+  // Fetch company to sync internal table
+  CompanyService.getCompanyByCode(companyCode);
+  
   // Build filter + header UI
   if (typeof AdminCompanyPicker !== 'undefined') {
     CompanyService.getAllCompanies()

@@ -24,6 +24,7 @@ const CompanyService = (function() {
         if (!response.ok) {
           throw new Error('Failed to fetch companies');
         }
+        console.log(response);
         return response.json();
       })
       .then(function(companies) {
@@ -89,15 +90,8 @@ const CompanyService = (function() {
           throw new Error('Company not found: ' + companyCode);
         }
 
-        // Get settings or use defaults
-        var raw = company.settings || getDefaultCompanySettings();
-        
-        // Normalize camelCase API keys to snake_case used by the frontend
-        var settings = {
-          allow_user_uploads: raw.allow_user_uploads !== undefined ? raw.allow_user_uploads : raw.allowUserUploads,
-          allow_user_tag_creation: raw.allow_user_tag_creation !== undefined ? raw.allow_user_tag_creation : raw.allowUserTagCreation,
-          require_client_comments: raw.require_client_comments !== undefined ? raw.require_client_comments : raw.requireClientComments
-        };
+        // Get settings or use defaults (API returns camelCase keys)
+        var settings = company.settings || getDefaultCompanySettings();
         
         // Cache the settings
         companySettingsCache[companyCode] = settings;
@@ -137,9 +131,9 @@ const CompanyService = (function() {
       headers.append("Content-Type", "application/json");
 
       const rawSettings = JSON.stringify({
-        allowUserUploads: newSettings.allow_user_uploads,
-        allowUserTagCreation: newSettings.allow_user_tag_creation,
-        requireClientComments: newSettings.require_client_comments
+        allowUserUploads: newSettings.allowUserUploads,
+        allowUserTagCreation: newSettings.allowUserTagCreation,
+        requireClientComments: newSettings.requireClientComments
       });
       const requestOptions = {
         method: "PUT",
@@ -204,7 +198,7 @@ const CompanyService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if uploads are allowed
    */
   function canUsersUpload(companyCode) {
-    return isSettingEnabled(companyCode, 'allow_user_uploads');
+    return isSettingEnabled(companyCode, 'allowUserUploads');
   }
 
   /**
@@ -213,7 +207,7 @@ const CompanyService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if tag creation is allowed
    */
   function canUsersCreateTags(companyCode) {
-    return isSettingEnabled(companyCode, 'allow_user_tag_creation');
+    return isSettingEnabled(companyCode, 'allowUserTagCreation');
   }
 
   /**
@@ -222,7 +216,7 @@ const CompanyService = (function() {
    * @returns {Promise<boolean>} Promise resolving to true if comments are required
    */
   function areClientCommentsRequired(companyCode) {
-    return isSettingEnabled(companyCode, 'require_client_comments');
+    return isSettingEnabled(companyCode, 'requireClientComments');
   }
 
   // Public API

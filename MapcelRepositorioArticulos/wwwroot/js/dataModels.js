@@ -7,15 +7,15 @@
  * Company Settings Data Model
  * Defines toggleable settings for company-level feature control
  * @typedef {Object} CompanySettings
- * @property {boolean} allow_user_uploads - If true, regular users can upload images and files
- * @property {boolean} allow_user_tag_creation - If true, regular users can create new tags
- * @property {boolean} require_client_comments - If true, client comments are required when closing tickets
+ * @property {boolean} allowUserUploads - If true, regular users can upload images and files
+ * @property {boolean} allowUserTagCreation - If true, regular users can create new tags
+ * @property {boolean} requireClientComments - If true, client comments are required when closing tickets
  */
 
 /**
  * Company Data Model
  * @typedef {Object} Company
- * @property {string} id - Unique identifier for the company
+ * @property {string} companyCode - Unique identifier for the company (UUID)
  * @property {string} name - Company name
  * @property {CompanySettings} settings - Company-level settings for feature control
  */
@@ -27,9 +27,9 @@
  */
 function getDefaultCompanySettings() {
   return {
-    allow_user_uploads: true,
-    allow_user_tag_creation: true,
-    require_client_comments: false
+    allowUserUploads: true,
+    allowUserTagCreation: true,
+    requireClientComments: false
   };
 }
 

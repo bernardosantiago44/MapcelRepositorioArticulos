@@ -63,7 +63,7 @@ app.MapControllers();
 
 app.MapControllerRoute(
     name: "all_companies",
-    pattern: "/Companies/{controller=Companies}/{action=Index}");
+    pattern: "Companies/{controller=Companies}/{action=Index}");
 
 app.MapControllerRoute(
     name: "company_route",

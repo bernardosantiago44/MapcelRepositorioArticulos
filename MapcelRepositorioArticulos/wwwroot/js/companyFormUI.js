@@ -39,13 +39,13 @@ const CompanyFormUI = (function() {
             categoryDescription: 'Controla qué acciones pueden realizar los usuarios no-administradores',
             settings: [
                 {
-                    key: 'allow_user_uploads',
+                    key: 'allowUserUploads',
                     label: 'Permitir a usuarios no-admin subir imágenes y archivos',
                     description: 'Cuando está activo, los usuarios regulares pueden subir nuevos archivos e imágenes a la biblioteca.',
                     defaultValue: true
                 },
                 {
-                    key: 'allow_user_tag_creation',
+                    key: 'allowUserTagCreation',
                     label: 'Permitir a usuarios no-admin crear nuevas etiquetas',
                     description: 'Cuando está activo, los usuarios regulares pueden crear nuevas etiquetas en el sistema.',
                     defaultValue: true
@@ -57,7 +57,7 @@ const CompanyFormUI = (function() {
             categoryDescription: 'Configura las reglas de validación para los flujos de trabajo',
             settings: [
                 {
-                    key: 'require_client_comments',
+                    key: 'requireClientComments',
                     label: 'Hacer obligatorios los comentarios del cliente al cerrar el ticket',
                     description: 'Cuando está activo, se requerirá que el campo de comentarios del cliente tenga contenido antes de poder cerrar un ticket.',
                     defaultValue: false

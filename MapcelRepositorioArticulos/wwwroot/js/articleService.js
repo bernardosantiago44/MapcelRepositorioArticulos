@@ -278,7 +278,7 @@ const ArticleService = (function() {
   async function getArticleById(articleId, companyCode) {
     if (!articleId) return null;
 
-    const url = `/api/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`;
+    const url = `${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`;
     const res = await fetch(url, {
       headers: { "Accept": "application/json" }
     });

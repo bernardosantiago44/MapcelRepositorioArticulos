@@ -262,6 +262,9 @@ function initializeAppForCompany(companyCode) {
     grid_toolbar.hideItem('sep_bulk');
   }
   
+  // Fetch company to sync internal table
+  CompanyService.getCompanyByCode(companyCode);
+  
   // Build filter + header UI
   if (typeof AdminCompanyPicker !== 'undefined') {
     CompanyService.getAllCompanies()
@@ -936,8 +939,8 @@ function refreshAppStateForSettings(newSettings) {
   
   // Refresh upload button visibility for non-admin users
   if (typeof AdminUploadOverride === 'undefined') {
-    updateUploadButtonVisibility('files-upload-btn', newSettings.allow_user_uploads);
-    updateUploadButtonVisibility('images-upload-btn', newSettings.allow_user_uploads);
+    updateUploadButtonVisibility('files-upload-btn', newSettings.allowUserUploads);
+    updateUploadButtonVisibility('images-upload-btn', newSettings.allowUserUploads);
   }
 }
 

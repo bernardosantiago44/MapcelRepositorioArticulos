@@ -3,16 +3,20 @@ using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using System.Text;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Authorization;
 
 namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("api/files")]
-public class FilesController(IFilesService service) : ControllerBase
+public class FilesController(IFilesService service, IWebHostEnvironment env) : ControllerBase
 {
-    private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAllAsync(FileQuery query, CancellationToken cancellationToken = default)
+    private readonly FileExtensionContentTypeProvider _contentTypeProvider = new();
+
+    private async Task<ActionResult<PagedResult<FileDto>>> ExecuteGetAllAsync(
+        FileQuery query,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -35,21 +39,27 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.ExecuteGetAllAsync failed");
             return StatusCode(500, exception.Message);
         }
     }
-    
+
     [HttpGet("{companyCode:guid}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles([FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFiles(
+        [FromRoute] Guid companyCode,
+        [FromQuery] FileQuery query,
+        CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
         query.CompanyCode = companyCode;
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyCode:guid}/images")] // Specific filter for images
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImages([FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    [HttpGet("{companyCode:guid}/images")]
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImages(
+        [FromRoute] Guid companyCode,
+        [FromQuery] FileQuery query,
+        CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
         query.CompanyCode = companyCode;
@@ -57,7 +67,11 @@ public class FilesController(IFilesService service) : ControllerBase
     }
 
     [HttpGet("{companyCode:guid}/images/{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(int id, [FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(
+        [FromRoute] int id,
+        [FromRoute] Guid companyCode,
+        [FromQuery] FileQuery query,
+        CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = true;
         query.Id = id;
@@ -66,7 +80,11 @@ public class FilesController(IFilesService service) : ControllerBase
     }
 
     [HttpGet("{companyCode:guid}/{id:int}")]
-    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(int id, [FromRoute] Guid companyCode, [FromQuery] FileQuery query, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(
+        [FromRoute] int id,
+        [FromRoute] Guid companyCode,
+        [FromQuery] FileQuery query,
+        CancellationToken cancellationToken = default)
     {
         query.ImagesOnly = false;
         query.Id = id;
@@ -75,7 +93,9 @@ public class FilesController(IFilesService service) : ControllerBase
     }
 
     [HttpGet("forArticleId={articleId:int}")]
-    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetForArticleId(int articleId, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetForArticleId(
+        [FromRoute] int articleId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -94,13 +114,14 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.GetForArticleId failed");
             return StatusCode(500, exception.Message);
         }
     }
 
     [HttpGet("ids={filesIds}")]
-    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetFilesByIds(int[] filesIds,
+    public async Task<ActionResult<IReadOnlyList<FileDto>>> GetFilesByIds(
+        [FromRoute] int[] filesIds,
         CancellationToken cancellationToken = default)
     {
         try
@@ -109,10 +130,6 @@ public class FilesController(IFilesService service) : ControllerBase
             if (result.IsNullOrEmpty()) return NotFound();
             return Ok(result);
         }
-        catch (ArgumentOutOfRangeException)
-        {
-            return BadRequest("Please provide a positive integer `articleId` using `/api/files/forArticleId={articleId}`");
-        }
         catch (OperationCanceledException)
         {
             Log.Information("The operation was canceled.");
@@ -120,15 +137,16 @@ public class FilesController(IFilesService service) : ControllerBase
         }
         catch (Exception exception)
         {
-            Log.Error($"FilesController.ExecuteGetAsync(query:): ${typeof(Exception)}: ${exception.Message}");
+            Log.Error(exception, "FilesController.GetFilesByIds failed");
             return StatusCode(500, exception.Message);
         }
     }
-    
+
     [Authorize]
     [HttpPost("{companyCode:guid}")]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<FileAsset>> Create(
+    [RequestSizeLimit(50L * 1024 * 1024)]
+    public async Task<ActionResult<object>> Create(
         [FromRoute] Guid companyCode,
         [FromForm] IFormFile file,
         CancellationToken cancellationToken)
@@ -136,9 +154,12 @@ public class FilesController(IFilesService service) : ControllerBase
         try
         {
             var createdFile = await service.CreateAsync(companyCode, file, cancellationToken);
-
-            // TODO: Add binary storage URL
-            var downloadUrl = $"/api/files/{createdFile.Id}/download?companyCode={companyCode}";
+            
+            var downloadUrl = Url.Action(
+                action: nameof(Download),
+                controller: "Files",
+                values: new { companyCode, id = int.Parse(createdFile.Id) }
+            );
 
             return Ok(new
             {
@@ -156,7 +177,7 @@ public class FilesController(IFilesService service) : ControllerBase
             return StatusCode(500);
         }
     }
-    
+
     [Authorize]
     [HttpPut("{companyCode:guid}/{id:int}")]
     public async Task<ActionResult<FileDto>> Update(
@@ -181,7 +202,7 @@ public class FilesController(IFilesService service) : ControllerBase
             return StatusCode(500);
         }
     }
-    
+
     [Authorize]
     [HttpDelete("{companyCode:guid}/{id:int}")]
     public async Task<IActionResult> Delete(
@@ -193,7 +214,7 @@ public class FilesController(IFilesService service) : ControllerBase
         {
             var deleted = await service.DeleteAsync(id, companyCode, cancellationToken);
             if (!deleted) return NotFound();
-            return NoContent(); // 204
+            return NoContent();
         }
         catch (ArgumentException ex)
         {
@@ -205,7 +226,7 @@ public class FilesController(IFilesService service) : ControllerBase
             return StatusCode(500);
         }
     }
-    
+
     [HttpGet("{companyCode:guid}/{id:int}/download")]
     public async Task<IActionResult> Download(
         [FromRoute] int id,
@@ -217,11 +238,32 @@ public class FilesController(IFilesService service) : ControllerBase
             var info = await service.GetDownloadInfoAsync(id, companyCode, cancellationToken);
             if (info is null) return NotFound();
 
-            // Mock file bytes for now
             var filename = $"{info.Value.Name}{info.Value.Extension}";
-            var bytes = Encoding.UTF8.GetBytes($"Mock download payload for fileId={id}.");
 
-            return File(bytes, "application/octet-stream", filename);
+            // Resolve disk path consistent with FilesService:
+            // ../Archivos/<companyUuid>/<fileId><ext>
+            var extension = string.IsNullOrWhiteSpace(info.Value.Extension) ? "" : info.Value.Extension;
+            if (!string.IsNullOrWhiteSpace(extension) && !extension.StartsWith('.'))
+                extension = "." + extension;
+
+            var physicalPath = BuildPhysicalFilePath(companyCode, id, extension);
+
+            if (!System.IO.File.Exists(physicalPath))
+                return NotFound("File bytes not found on disk.");
+
+            // Content-Type (best-effort)
+            if (!_contentTypeProvider.TryGetContentType(filename, out var contentType))
+                contentType = "application/octet-stream";
+
+            var stream = new FileStream(
+                physicalPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 1024 * 1024,
+                useAsync: true);
+
+            return File(stream, contentType, filename);
         }
         catch (ArgumentException ex)
         {
@@ -232,5 +274,34 @@ public class FilesController(IFilesService service) : ControllerBase
             Log.Error(ex, "FilesController.Download failed for id={Id}, companyCode={CompanyCode}", id, companyCode);
             return StatusCode(500);
         }
+    }
+
+    // Keep controller in sync with FilesService path logic.
+    private string BuildPhysicalFilePath(Guid companyCode, int fileId, string extension)
+    {
+        var archivosRoot = GetArchivosRootPath();
+        var companyDir = Path.Combine(archivosRoot, companyCode.ToString("D"));
+        Directory.CreateDirectory(companyDir);
+
+        // extension already normalized by caller
+        return Path.Combine(companyDir, $"{fileId}{extension}");
+    }
+
+    private string GetArchivosRootPath()
+    {
+        // Optional override from config is better; if you want it here too,
+        // add IConfiguration injection and read "Files:ArchivosRootPath".
+        var contentRoot = env.ContentRootPath;
+        var dir = new DirectoryInfo(contentRoot);
+
+        while (dir != null && !dir.Name.Equals("Produccion", StringComparison.OrdinalIgnoreCase))
+            dir = dir.Parent;
+
+        var repoRoot =
+            dir?.Parent?.FullName
+            ?? Directory.GetParent(contentRoot)?.FullName
+            ?? contentRoot;
+
+        return Path.Combine(repoRoot, "Archivos");
     }
 }

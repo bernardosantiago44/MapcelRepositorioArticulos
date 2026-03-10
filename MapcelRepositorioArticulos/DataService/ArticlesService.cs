@@ -257,7 +257,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         SELECT @@ROWCOUNT;
     ";
     private const string SqlInsertFileArticlesFromCsv = @"
-        INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (file_id, article_id)
+        INSERT INTO [RepositorioArticulos].[dbo].[file_articles] (file_id, article_id)
         SELECT
             f.file_id,
             @ArticleId

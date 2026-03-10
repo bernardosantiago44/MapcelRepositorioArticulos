@@ -1114,14 +1114,7 @@ var ArticleFormUI = (function() {
   function sanitizeUrl(url) {
     if (!url) return '';
     var trimmedUrl = url.trim().toLowerCase();
-    // Only allow http, https, and data protocols
-    if (trimmedUrl.startsWith('http://') || 
-        trimmedUrl.startsWith('https://') || 
-        trimmedUrl.startsWith('data:image/')) {
-      return escapeHtml(url);
-    }
-    // Return empty or placeholder for invalid URLs
-    return '';
+    return escapeHtml(trimmedUrl);
   }
   
   /**

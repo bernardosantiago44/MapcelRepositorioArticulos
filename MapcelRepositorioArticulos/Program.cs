@@ -33,7 +33,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     .AddCookie(options =>
     {
         options.Cookie.HttpOnly = true;
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(1440);
+        options.Cookie.Path="/nuevos/repositorioarticulos/produccion";
         options.LoginPath = "/Account/Login";
     });
 
@@ -45,7 +46,12 @@ builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+    app.UsePathBase("/nuevos/repositorioarticulos/produccion");
+}
+else
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
@@ -60,6 +66,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapControllerRoute(
+    name: "account",
+    pattern: "Account/{action=Login}/{id?}",
+    defaults: new { controller = "Account" });
 
 app.MapControllerRoute(
     name: "all_companies",

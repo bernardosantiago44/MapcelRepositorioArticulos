@@ -251,7 +251,7 @@ var NewArticlePageUI = (function() {
         <!-- External Link Field -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-            Enlace Externo
+            Enlace Externo al Ticket Completo →
           </label>
           <input 
             type="url" 

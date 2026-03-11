@@ -20,7 +20,7 @@ const GRID_SIDEBAR_ASPECT_WIDTH = 0.45;
 const window_width = window.innerWidth;
 
 var LAYOUT_CONFIG = {
-  HEADER_HEIGHT: '80',
+  HEADER_HEIGHT: '110',
   FILTERS_SECTION_HEIGHT: '120',
   SIDEBAR_WIDTH: `${GRID_SIDEBAR_ASPECT_WIDTH * window_width}`,
 };

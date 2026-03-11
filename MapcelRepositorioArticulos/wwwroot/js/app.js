@@ -396,14 +396,6 @@ function createFilterContainerHtml(companies) {
         '</select>' +
       '</div>' +
       '<div class="flex items-center gap-2">' +
-        '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Fecha inicio:</label>' +
-        '<input type="date" id="filter-date-start" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />' +
-      '</div>' +
-      '<div class="flex items-center gap-2">' +
-        '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Fecha fin:</label>' +
-        '<input type="date" id="filter-date-end" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />' +
-      '</div>' +
-      '<div class="flex items-center gap-2">' +
         '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Etiquetas:</label>' +
         '<button id="filter-tags-btn" class="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm flex items-center gap-2">' +
           '<span id="filter-tags-count">Todas</span>' +

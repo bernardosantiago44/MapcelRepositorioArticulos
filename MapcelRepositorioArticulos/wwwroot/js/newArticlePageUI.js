@@ -521,7 +521,9 @@ var NewArticlePageUI = (function() {
           }
         },
         list: {
-          class: NestedList || EditorjsList || List,
+          class: typeof EditorjsList !== 'undefined' ? EditorjsList
+               : typeof NestedList !== 'undefined' ? NestedList
+               : List,
           inlineToolbar: true
         },
         table: {

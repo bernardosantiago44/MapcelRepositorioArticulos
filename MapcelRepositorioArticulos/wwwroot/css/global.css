@@ -201,6 +201,17 @@ tr.odd_material td {
     height: 35px;
 }
 
+.dhx_toolbar_btn {
+    background-color: #0EA5E9 !important; /* A standard blue */
+    color: white !important;              /* Ensures text is readable */
+    border-radius: 4px;                   /* Optional: gives a modern look */
+}
+
+.dhx_toolbar_btn:hover {
+    background-color: #0284C7 !important;
+    cursor: pointer;
+}
+
 /*Padding en el header del grid*/
 div.gridbox_material.gridbox table.hdr td div.hdrcell {
     padding-left: 0px;

@@ -521,6 +521,7 @@ var NewArticlePageUI = (function() {
           }
         },
         list: {
+          // @editorjs/list@2 CDN exports as 'EditorjsList' (UMD global)
           class: typeof EditorjsList !== 'undefined' ? EditorjsList
                : typeof NestedList !== 'undefined' ? NestedList
                : List,
@@ -699,7 +700,7 @@ var NewArticlePageUI = (function() {
   function hydrateEditorFromHtml(editor, htmlString) {
     var sanitizedHtml = typeof DOMPurify !== 'undefined'
       ? DOMPurify.sanitize(htmlString, { USE_PROFILES: { html: true } })
-      : htmlString;
+      : (console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration'), htmlString);
 
     editor.isReady.then(function() {
       if (typeof editor.blocks.renderFromHTML === 'function') {
@@ -713,8 +714,6 @@ var NewArticlePageUI = (function() {
       }
     }).catch(function(error) {
       console.error('Error hydrating editor from HTML:', error);
-      // Last-resort fallback: insert as paragraph
-      editor.blocks.insert('paragraph', { text: sanitizedHtml });
     });
   }
 
@@ -1138,6 +1137,8 @@ var NewArticlePageUI = (function() {
         // Sanitize the output HTML
         if (typeof DOMPurify !== 'undefined') {
           descriptionHtml = DOMPurify.sanitize(descriptionHtml, { USE_PROFILES: { html: true } });
+        } else {
+          console.warn('DOMPurify not loaded: HTML output will not be sanitized');
         }
 
         if (!validateForm(descriptionHtml)) {

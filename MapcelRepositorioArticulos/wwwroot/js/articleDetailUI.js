@@ -111,9 +111,13 @@ const ArticleDetailUI = (function() {
   function renderContentSection(sectionTitle, content) {
     var displayContent;
     if (content && content.trim() !== '') {
-      var sanitizedHtml = typeof DOMPurify !== 'undefined'
-        ? DOMPurify.sanitize(content, { USE_PROFILES: { html: true } })
-        : Utils.escapeHtml(content);
+      var sanitizedHtml;
+      if (typeof DOMPurify !== 'undefined') {
+        sanitizedHtml = DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+      } else {
+        console.warn('DOMPurify not loaded: article HTML content will be escaped as plain text');
+        sanitizedHtml = Utils.escapeHtml(content);
+      }
       displayContent = '<div class="article-html-content">' + sanitizedHtml + '</div>';
     } else {
       displayContent = '<em style="color: #8c8c8c;">No hay información disponible</em>';

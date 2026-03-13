@@ -472,7 +472,6 @@ const ArticleDetailUI = (function() {
         <!-- Header: Status and ID -->
         <div style="margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
           ${renderStatusBadge(article.status, statusConfig)}
-          <span style="font-size: 12px; color: #8c8c8c; font-weight: 500;">${article.id}</span>
         </div>
         
         <!-- Metadata: Created and Updated dates -->

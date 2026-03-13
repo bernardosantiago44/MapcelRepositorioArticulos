@@ -78,7 +78,7 @@ var ArticleFormUI = (function() {
     var dhxWins = new dhtmlXWindows();
     
     // Window title based on mode - escape articleId to prevent XSS
-    var windowTitle = mode === 'create' ? 'Nuevo Artículo' : 'Editando: ' + escapeHtml(articleId || '');
+    var windowTitle = mode === 'create' ? 'Nuevo Artículo' : 'Editar artículo';
     
     // Create and configure window
     var formWindow = dhxWins.createWindow('article_form_window', 0, 0, FORM_WINDOW_WIDTH, FORM_WINDOW_HEIGHT);

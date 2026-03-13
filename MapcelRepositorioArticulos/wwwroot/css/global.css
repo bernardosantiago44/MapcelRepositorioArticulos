@@ -29,6 +29,17 @@ html, body {
     border-collapse: collapse;
     border: 0.5px solid #D9D9D9;
 }
+
+tr.ev_material td {
+    height: 50px !important;
+    vertical-align: middle;
+}
+
+tr.odd_material td {
+    height: 50px !important;
+    vertical-align: middle;
+}
+
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 

@@ -133,23 +133,19 @@ grid_sidebar_layout.hideHeader();
 // Grid Toolbar Area (various actions)
 var grid_toolbar = grid_sidebar_layout.attachToolbar();
 grid_toolbar.setIconsPath('/Dhtmlx/codebase/imgs/');
-grid_toolbar.addButton('clear_filters', 1, 'Limpiar Filtros');
-grid_toolbar.addSeparator('sep_bulk', 2);
-grid_toolbar.addButton('bulk_edit_tags', 3, 'Editar Etiquetas (Selección)');
-grid_toolbar.addSeparator('sep_clear', 4);
-grid_toolbar.addButton('manage_tags', 5, 'Administrar Etiquetas');
+grid_toolbar.addSeparator('sep_bulk', 1);
+grid_toolbar.addButton('bulk_edit_tags', 2, 'Editar Etiquetas (Selección)');
+grid_toolbar.addSeparator('sep_clear', 3);
+grid_toolbar.addButton('manage_tags', 4, 'Administrar Etiquetas');
 
 grid_toolbar.setItemToolTip('manage_tags', 'Administrar las etiquetas de la empresa');
 grid_toolbar.setItemToolTip('bulk_edit_tags', 'Editar etiquetas de los artículos seleccionados');
-grid_toolbar.setItemToolTip('clear_filters', 'Limpiar todos los filtros');
 
 grid_toolbar.attachEvent('onClick', function(id) {
   if (id === 'manage_tags') {
     openTagManager();
   } else if (id === 'bulk_edit_tags') {
     openBulkTagEditor();
-  } else if (id === 'clear_filters') {
-    clearAllFilters();
   }
 });
 
@@ -403,6 +399,9 @@ function createFilterContainerHtml(companies) {
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
           '</svg>' +
         '</button>' +
+      '</div>' +
+      '<div class="flex items-center gap-2">' +
+      '<button id="clear_filters" class="inline-block rounded bg-sky-500 text-neutral-50 shadow-blue-950 hover:bg-sky-600 hover:shadow-blue-950 focus:bg-sky-800 focus:shadow-blue-950 active:bg-sky-700 active:shadow-sky-950 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal transition duration-150 ease-in-out focus:outline-none focus:ring-0" onclick="clearAllFilters()">Limpiar filtros</button>' +
       '</div>' +
       '<div id="filter-active-indicator" style="display: none;" class="text-sm text-blue-600 font-medium">' +
         '● Filtros activos' +
@@ -1058,23 +1057,19 @@ function rebuildArticlesTabLayout() {
   // Grid Toolbar Area (various actions)
   grid_toolbar = grid_sidebar_layout.attachToolbar();
   grid_toolbar.setIconsPath('./Dhtmlx/codebase/imgs/');
-  grid_toolbar.addButton('clear_filters', 1, 'Limpiar Filtros');
-  grid_toolbar.addSeparator('sep_bulk', 2);
-  grid_toolbar.addButton('bulk_edit_tags', 3, 'Editar Etiquetas (Selección)');
-  grid_toolbar.addSeparator('sep_clear', 4);
-  grid_toolbar.addButton('manage_tags', 5, 'Administrar Etiquetas');
+  grid_toolbar.addSeparator('sep_bulk', 1);
+  grid_toolbar.addButton('bulk_edit_tags', 2, 'Editar Etiquetas (Selección)');
+  grid_toolbar.addSeparator('sep_clear', 3);
+  grid_toolbar.addButton('manage_tags', 4, 'Administrar Etiquetas');
   
   grid_toolbar.setItemToolTip('manage_tags', 'Administrar las etiquetas de la empresa');
   grid_toolbar.setItemToolTip('bulk_edit_tags', 'Editar etiquetas de los artículos seleccionados');
-  grid_toolbar.setItemToolTip('clear_filters', 'Limpiar todos los filtros');
   
   grid_toolbar.attachEvent('onClick', function(id) {
     if (id === 'manage_tags') {
       openTagManager();
     } else if (id === 'bulk_edit_tags') {
       openBulkTagEditor();
-    } else if (id === 'clear_filters') {
-      clearAllFilters();
     }
   });
   

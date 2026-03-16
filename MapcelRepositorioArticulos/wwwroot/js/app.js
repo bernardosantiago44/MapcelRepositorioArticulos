@@ -1109,6 +1109,7 @@ function rebuildArticlesTabLayout() {
 
 /**
  * Open the form for editing an existing article
+ * Redirects to NewArticlePageUI in edit mode (replaces the old floating ArticleFormUI window)
  * @param {string} articleId - ID of the article to edit
  * @param {string} companyCode - Code of the company the article belongs to
  */
@@ -1123,7 +1124,7 @@ function openEditArticleForm(articleId, companyCode) {
         return;
       }
       
-      ArticleFormUI.openEditForm(article, onArticleFormSaved);
+      showEditArticlePage(article);
     })
     .catch(function(error) {
       console.error('Error loading article for edit:', error);
@@ -1131,6 +1132,37 @@ function openEditArticleForm(articleId, companyCode) {
         title: 'Error',
         text: 'Error al cargar el artículo: ' + error.message
       });
+    });
+}
+
+/**
+ * Show the Edit Article page in the articles tab
+ * @param {Object} articleData - Full article object to edit
+ */
+function showEditArticlePage(articleData) {
+  appState.currentArticlesView = 'new-article';
+  
+  // Hide header toolbar items
+  header_toolbar.hideItem('new_article');
+  header_toolbar.hideItem('edit_company');
+  
+  CompanyService.getCompanyByCode(articleData.companyCode)
+    .then(function(company) {
+      var companyName = company ? company.name : '';
+      NewArticlePageUI.openEditPage(
+        articles,
+        articleData,
+        companyName,
+        onNavigateBackFromNewArticle
+      );
+    })
+    .catch(function() {
+      NewArticlePageUI.openEditPage(
+        articles,
+        articleData,
+        '',
+        onNavigateBackFromNewArticle
+      );
     });
 }
 

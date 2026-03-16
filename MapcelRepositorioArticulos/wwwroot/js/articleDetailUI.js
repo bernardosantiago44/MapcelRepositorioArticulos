@@ -103,14 +103,25 @@ const ArticleDetailUI = (function() {
   
   /**
    * Render a content section with title and body
+   * Treats content as raw HTML (sanitized with DOMPurify) rather than Markdown
    * @param {string} sectionTitle - Section title
-   * @param {string} content - Section content
+   * @param {string} content - Section content (HTML string)
    * @returns {string} HTML for content section
    */
   function renderContentSection(sectionTitle, content) {
-    const displayContent = content && content.trim() !== '' 
-      ? '<div class="markdown-body">' + Utils.renderMarkdown(content) + '</div>'
-      : '<em style="color: #8c8c8c;">No hay información disponible</em>';
+    var displayContent;
+    if (content && content.trim() !== '') {
+      var sanitizedHtml;
+      if (typeof DOMPurify !== 'undefined') {
+        sanitizedHtml = DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+      } else {
+        console.warn('DOMPurify not loaded: article HTML content will be escaped as plain text');
+        sanitizedHtml = Utils.escapeHtml(content);
+      }
+      displayContent = '<div class="article-html-content">' + sanitizedHtml + '</div>';
+    } else {
+      displayContent = '<em style="color: #8c8c8c;">No hay información disponible</em>';
+    }
     
     return `
       <div style="margin-bottom: 20px;">

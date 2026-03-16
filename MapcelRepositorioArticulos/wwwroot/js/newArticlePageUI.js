@@ -41,6 +41,7 @@ var NewArticlePageUI = (function() {
     allTags: [],
     canUserUpload: true,     // Determined by CompanySettings
     editorInstance: null,    // Editor.js instance
+    imagePasteHandler: null, // Paste handler reference for cleanup
     editMode: false,         // true when editing an existing article
     articleId: null,         // Article ID when in edit mode
     originalArticleData: null // Original article data for edit mode
@@ -395,22 +396,37 @@ var NewArticlePageUI = (function() {
    */
   function renderActionBar() {
     var submitLabel = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+    var deleteButtonHtml = pageState.editMode ? `
+        <button 
+          id="new-article-delete-btn"
+          type="button"
+          class="px-6 py-2.5 text-sm font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+        >
+          Eliminar
+        </button>
+    ` : '';
+
     return `
-      <div class="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3 shadow-lg">
-        <button 
-          id="new-article-cancel-btn"
-          type="button"
-          class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button 
-          id="new-article-submit-btn"
-          type="button"
-          class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
-          ${submitLabel}
-        </button>
+      <div class="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between shadow-lg">
+        <div class="flex items-center">
+          ${deleteButtonHtml}
+        </div>
+        <div class="flex items-center gap-3">
+          <button 
+            id="new-article-cancel-btn"
+            type="button"
+            class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button 
+            id="new-article-submit-btn"
+            type="button"
+            class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            ${submitLabel}
+          </button>
+        </div>
       </div>
     `;
   }
@@ -472,6 +488,12 @@ var NewArticlePageUI = (function() {
       submitBtn.addEventListener('click', handleSubmit);
     }
 
+    // Delete button (edit mode only)
+    var deleteBtn = document.getElementById('new-article-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', handleDeleteArticle);
+    }
+
     // Tags container click
     var tagsContainer = document.getElementById('new-article-tags-container');
     if (tagsContainer) {
@@ -509,6 +531,23 @@ var NewArticlePageUI = (function() {
       return;
     }
 
+    var hasSimpleImage = typeof SimpleImage !== 'undefined';
+    var hasImageTool = typeof ImageTool !== 'undefined';
+    var imageToolConfig = null;
+
+    if (hasSimpleImage) {
+      imageToolConfig = {
+        class: SimpleImage
+      };
+    } else if (hasImageTool) {
+      imageToolConfig = {
+        class: ImageTool
+      };
+      console.warn('Using ImageTool. Pasting image URLs requires config.endpoints.byUrl on the backend.');
+    } else {
+      console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
+    }
+
     pageState.editorInstance = new EditorJS({
       holder: 'new-article-editorjs',
       placeholder: 'Describe el artículo en detalle...',
@@ -521,7 +560,6 @@ var NewArticlePageUI = (function() {
           }
         },
         list: {
-          // @editorjs/list@2 CDN exports as 'EditorjsList' (UMD global)
           class: typeof EditorjsList !== 'undefined' ? EditorjsList
                : typeof NestedList !== 'undefined' ? NestedList
                : List,
@@ -530,12 +568,73 @@ var NewArticlePageUI = (function() {
         table: {
           class: Table,
           inlineToolbar: true
-        }
+        },
+        code: {
+          class: CodeTool
+        },
+
+        delimiter: {
+          class: Delimiter
+        },
+
+        image: SimpleImage
+      },
+      onReady: function() {
+        attachImageUrlPasteHandler();
       },
       onChange: function() {
         markFormDirty();
       }
     });
+  }
+
+  /**
+   * Detect image URLs and insert a SimpleImage block on paste.
+   */
+  function attachImageUrlPasteHandler() {
+    var editorHolder = document.getElementById('new-article-editorjs');
+    if (!editorHolder || !pageState.editorInstance) return;
+
+    if (typeof SimpleImage === 'undefined') return;
+
+    if (pageState.imagePasteHandler) {
+      document.removeEventListener('paste', pageState.imagePasteHandler);
+    }
+
+    pageState.imagePasteHandler = function(event) {
+      var target = event.target;
+      if (!editorHolder.contains(target)) return;
+
+      var clipboard = event.clipboardData || window.clipboardData;
+      if (!clipboard) return;
+
+      var text = (clipboard.getData && clipboard.getData('text/plain')) || '';
+      var url = (text || '').trim();
+      if (!isLikelyImageUrl(url)) return;
+
+      event.preventDefault();
+
+      try {
+        var index = pageState.editorInstance.blocks.getCurrentBlockIndex();
+        pageState.editorInstance.blocks.insert('image', { url: url }, {}, index + 1, true);
+        markFormDirty();
+      } catch (error) {
+        console.warn('Failed to insert image block from pasted URL:', error);
+      }
+    };
+
+    document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+
+  /**
+   * Check if the pasted URL is likely an image URL.
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isLikelyImageUrl(url) {
+    if (!url) return false;
+    if (!/^https?:\/\//i.test(url)) return false;
+    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
   }
 
   /**
@@ -545,6 +644,10 @@ var NewArticlePageUI = (function() {
     if (pageState.editorInstance) {
       pageState.editorInstance.destroy();
       pageState.editorInstance = null;
+    }
+    if (pageState.imagePasteHandler) {
+      document.removeEventListener('paste', pageState.imagePasteHandler);
+      pageState.imagePasteHandler = null;
     }
   }
 
@@ -602,7 +705,7 @@ var NewArticlePageUI = (function() {
 
     var parser = edjsHTML(customParsers);
     var htmlArray = parser.parse(editorData);
-    return htmlArray.join('');
+    return htmlArray;
   }
 
   /**
@@ -1235,6 +1338,67 @@ var NewArticlePageUI = (function() {
           text: 'Error al obtener el contenido del editor.'
         });
       });
+  }
+
+  /**
+   * Handle delete article action with confirmation
+   */
+  function handleDeleteArticle() {
+    if (!pageState.editMode || !pageState.articleId || !pageState.companyCode) return;
+
+    var deleteBtn = document.getElementById('new-article-delete-btn');
+    var articleId = pageState.articleId;
+    var companyCode = pageState.companyCode;
+
+    dhtmlx.confirm({
+      title: 'Confirmar eliminación',
+      text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+      callback: function(result) {
+        if (!result) return;
+
+        if (deleteBtn) {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = 'Eliminando...';
+        }
+
+        fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`, {
+          method: 'DELETE'
+        })
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error('Failed to delete article: ' + response.status);
+            }
+
+            if (typeof ArticleService !== 'undefined' && ArticleService.clearCache) {
+              ArticleService.clearCache();
+            }
+
+            dhtmlx.message({
+              type: 'success',
+              text: 'Artículo eliminado exitosamente',
+              expire: 3000
+            });
+
+            var navigateBackCallback = pageState.onNavigateBack;
+            resetPageState();
+            if (navigateBackCallback) {
+              navigateBackCallback();
+            }
+          })
+          .catch(function(error) {
+            console.error('Error deleting article:', error);
+            dhtmlx.alert({
+              title: 'Error',
+              text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+            });
+
+            if (deleteBtn) {
+              deleteBtn.disabled = false;
+              deleteBtn.textContent = 'Eliminar';
+            }
+          });
+      }
+    });
   }
 
   /**

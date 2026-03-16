@@ -38,6 +38,17 @@ function renderTitleCellTemplate(title, description) {
   `;
 }
 
+function htmlToPreviewText(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+
+  // Remove elements you definitely don't want in the preview
+  div.querySelectorAll('table, img, video, iframe, script, style').forEach(el => el.remove());
+
+  // Get only readable text
+  return (div.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Initialize and configure the articles grid
  * @param {Object} gridCell - DHTMLX layout cell where grid will be attached
@@ -99,12 +110,14 @@ function initializeArticlesGrid(gridCell, articlesData) {
     const statusConfig = getStatusConfiguration(article.status);
     const rowId = article.id;
     
+    const previewableDescription = htmlToPreviewText(htmlToPreviewText(article.description));
+    
     // Add row with initial data (necessary for DHTMLX grid structure)
     articlesGrid.addRow(rowId, ['', '', '', '', '', '']);
     
     // Set custom HTML content for each cell
     articlesGrid.cells(rowId, 1).setValue(renderStatusCellTemplate(article.status, statusConfig));
-    articlesGrid.cells(rowId, 2).setValue(renderTitleCellTemplate(article.title, article.description));
+    articlesGrid.cells(rowId, 2).setValue(renderTitleCellTemplate(article.title, previewableDescription));
     articlesGrid.cells(rowId, 3).setValue(renderTagBadges(article.tags));
     articlesGrid.cells(rowId, 4).setValue(article.updatedAt);
     articlesGrid.cells(rowId, 5).setValue(article.createdAt);

@@ -1,14 +1,16 @@
 /**
  * New Article Page UI Module
- * Provides a dedicated page for creating new articles with a two-column layout
+ * Provides a dedicated page for creating and editing articles with a two-column layout
  * Uses HTML + Tailwind CSS within the main DHTMLX Layout Cell
  * 
  * Features:
  * - Breadcrumb navigation with dirty form confirmation
  * - Two-column layout (Core Data | Categorization & Assets)
+ * - Editor.js rich text editor for article descriptions (outputs HTML)
  * - Tag selection via TagPickerUI
  * - File and image upload with staged file management
  * - Role-based permission checks
+ * - Edit mode support: hydrates Editor.js from existing HTML content
  * 
  * Dependencies:
  * - dataModels.js (for status configuration)
@@ -18,6 +20,9 @@
  * - TagPickerUI.js (for tag selection)
  * - CompanyService.js (for role checks)
  * - UserService.js (for user permissions)
+ * - Editor.js (CDN: @editorjs/editorjs, @editorjs/header, @editorjs/list, @editorjs/table)
+ * - editorjs-html (CDN: editorjs-html@4.0.0 for JSON-to-HTML conversion)
+ * - DOMPurify (for HTML sanitization)
  */
 
 var NewArticlePageUI = (function() {
@@ -34,7 +39,13 @@ var NewArticlePageUI = (function() {
     stagedImages: [],        // Images selected for upload (not yet saved)
     isFormDirty: false,
     allTags: [],
-    canUserUpload: true      // Determined by CompanySettings
+    canUserUpload: true,     // Determined by CompanySettings
+    editorInstance: null,    // Editor.js instance
+    editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
+    imagePasteHandler: null, // Paste handler reference for cleanup
+    editMode: false,         // true when editing an existing article
+    articleId: null,         // Article ID when in edit mode
+    originalArticleData: null // Original article data for edit mode
   };
 
   // Constants
@@ -45,6 +56,7 @@ var NewArticlePageUI = (function() {
     externalLink: '',
     clientComments: ''
   };
+  var MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 
   /**
    * Get status options from articleStatusConfiguration
@@ -102,19 +114,17 @@ var NewArticlePageUI = (function() {
    */
   function isFormDirty() {
     var titleInput = document.getElementById('new-article-title');
-    var descriptionInput = document.getElementById('new-article-description');
     var externalLinkInput = document.getElementById('new-article-external-link');
     var clientCommentsInput = document.getElementById('new-article-client-comments');
 
     var hasTextChanges = (titleInput && titleInput.value.trim() !== '') ||
-                         (descriptionInput && descriptionInput.value.trim() !== '') ||
                          (externalLinkInput && externalLinkInput.value.trim() !== '') ||
                          (clientCommentsInput && clientCommentsInput.value.trim() !== '');
 
     var hasTagChanges = pageState.selectedTags.length > 0;
     var hasFileChanges = pageState.stagedFiles.length > 0 || pageState.stagedImages.length > 0;
 
-    return hasTextChanges || hasTagChanges || hasFileChanges;
+    return pageState.isFormDirty || hasTextChanges || hasTagChanges || hasFileChanges;
   }
 
   /**
@@ -159,6 +169,9 @@ var NewArticlePageUI = (function() {
     pageState.stagedFiles = [];
     pageState.stagedImages = [];
     pageState.isFormDirty = false;
+    pageState.editMode = false;
+    pageState.articleId = null;
+    pageState.originalArticleData = null;
   }
 
   /**
@@ -166,6 +179,7 @@ var NewArticlePageUI = (function() {
    * @returns {string} HTML string for breadcrumb
    */
   function renderBreadcrumb() {
+    var breadcrumbLabel = pageState.editMode ? 'Editando Artículo' : 'Nuevo Artículo';
     return `
       <nav class="flex items-center space-x-2 text-sm mb-6">
         <button 
@@ -180,7 +194,7 @@ var NewArticlePageUI = (function() {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
           </svg>
         </span>
-        <span class="text-gray-600 font-medium">Nuevo Artículo</span>
+        <span class="text-gray-600 font-medium">${breadcrumbLabel}</span>
       </nav>
     `;
   }
@@ -251,7 +265,7 @@ var NewArticlePageUI = (function() {
         <!-- External Link Field -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
-            Enlace Externo
+            Enlace Externo al Ticket Completo →
           </label>
           <input 
             type="url" 
@@ -261,39 +275,16 @@ var NewArticlePageUI = (function() {
           />
         </div>
 
-        <!-- Description Field -->
+        <!-- Description Field (Editor.js) -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
             Descripción <span class="text-red-500">*</span>
           </label>
-          <div class="border border-gray-300 rounded-lg overflow-hidden bg-white">
-            <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-3 py-2">
-              <div class="flex gap-1">
-                <button type="button" id="new-article-desc-tab-write" class="px-3 py-1 text-sm font-semibold text-gray-900 border-b-2 border-blue-500 bg-white rounded-t">Escribir</button>
-                <button type="button" id="new-article-desc-tab-preview" class="px-3 py-1 text-sm font-semibold text-gray-500 hover:text-gray-700">Vista previa</button>
-              </div>
-              <div class="flex items-center gap-1">
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="heading" title="Encabezado">H</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="bold" title="Negrita">B</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="italic" title="Cursiva">I</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="list" title="Lista">List</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="link" title="Enlace">Link</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="code" title="Código">Code</button>
-                <button type="button" class="px-2 py-1 text-xs font-semibold text-gray-600 hover:text-gray-900" data-md-action="image" title="Imagen">Image</button>
-              </div>
-            </div>
-            <div class="p-3">
-              <textarea 
-                id="new-article-description"
-                rows="6"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y text-base"
-                placeholder="Describe el artículo en detalle (soporta Markdown)"
-              ></textarea>
-              <div id="new-article-description-preview" class="hidden w-full min-h-[160px] rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 leading-relaxed"></div>
-            </div>
+          <div id="new-article-editor-container" class="border border-gray-300 rounded-lg overflow-hidden bg-white">
+            <div id="new-article-editorjs" class="min-h-[200px] px-4 py-2"></div>
           </div>
           <div class="mt-2 text-xs text-gray-500">
-            Soporta Markdown: **negrita**, _cursiva_, listas, enlaces.
+            Editor de texto enriquecido: encabezados, listas, tablas.
           </div>
         </div>
 
@@ -406,22 +397,38 @@ var NewArticlePageUI = (function() {
    * @returns {string} HTML string for action bar
    */
   function renderActionBar() {
+    var submitLabel = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+    var deleteButtonHtml = pageState.editMode ? `
+        <button 
+          id="new-article-delete-btn"
+          type="button"
+          class="px-6 py-2.5 text-sm font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+        >
+          Eliminar
+        </button>
+    ` : '';
+
     return `
-      <div class="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3 shadow-lg">
-        <button 
-          id="new-article-cancel-btn"
-          type="button"
-          class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-        >
-          Cancelar
-        </button>
-        <button 
-          id="new-article-submit-btn"
-          type="button"
-          class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
-          Crear Artículo
-        </button>
+      <div class="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between shadow-lg">
+        <div class="flex items-center">
+          ${deleteButtonHtml}
+        </div>
+        <div class="flex items-center gap-3">
+          <button 
+            id="new-article-cancel-btn"
+            type="button"
+            class="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button 
+            id="new-article-submit-btn"
+            type="button"
+            class="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            ${submitLabel}
+          </button>
+        </div>
       </div>
     `;
   }
@@ -483,40 +490,22 @@ var NewArticlePageUI = (function() {
       submitBtn.addEventListener('click', handleSubmit);
     }
 
+    // Delete button (edit mode only)
+    var deleteBtn = document.getElementById('new-article-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', handleDeleteArticle);
+    }
+
     // Tags container click
     var tagsContainer = document.getElementById('new-article-tags-container');
     if (tagsContainer) {
       tagsContainer.addEventListener('click', openTagPicker);
     }
 
-    // Form input change detection
-    var inputs = document.querySelectorAll('#new-article-title, #new-article-description, #new-article-external-link, #new-article-client-comments');
+    // Form input change detection (non-editor fields)
+    var inputs = document.querySelectorAll('#new-article-title, #new-article-external-link, #new-article-client-comments');
     inputs.forEach(function(input) {
       input.addEventListener('input', markFormDirty);
-    });
-
-    // Description markdown tabs
-    var writeTab = document.getElementById('new-article-desc-tab-write');
-    var previewTab = document.getElementById('new-article-desc-tab-preview');
-    if (writeTab) {
-      writeTab.addEventListener('click', function() {
-        setDescriptionTab('write');
-      });
-    }
-    if (previewTab) {
-      previewTab.addEventListener('click', function() {
-        setDescriptionTab('preview');
-      });
-    }
-
-    // Markdown toolbar buttons
-    var mdButtons = document.querySelectorAll('[data-md-action]');
-    mdButtons.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        const action = btn.getAttribute('data-md-action');
-        Utils.applyMarkdownActionToTextArea('new-article-description', action);
-        markFormDirty();
-      });
     });
 
     // File upload handlers
@@ -524,48 +513,503 @@ var NewArticlePageUI = (function() {
     setupImageUploadHandlers();
   }
 
+  // =========================================================================
+  // Editor.js Integration
+  // =========================================================================
+
   /**
-   * Set description tab (write/preview)
-   * @param {string} tab - 'write' or 'preview'
+   * Initialize the Editor.js instance
+   * Must be called after the DOM container #new-article-editorjs is rendered
    */
-  function setDescriptionTab(tab) {
-    var writeTab = document.getElementById('new-article-desc-tab-write');
-    var previewTab = document.getElementById('new-article-desc-tab-preview');
-    var textarea = document.getElementById('new-article-description');
-    var preview = document.getElementById('new-article-description-preview');
+  function initializeEditor() {
+    if (pageState.editorInstance) {
+      pageState.editorInstance.destroy();
+      pageState.editorInstance = null;
+    }
 
-    if (!writeTab || !previewTab || !textarea || !preview) return;
+    var editorHolder = document.getElementById('new-article-editorjs');
+    if (!editorHolder) {
+      console.error('Editor.js holder element not found');
+      return;
+    }
 
-    if (tab === 'preview') {
-      writeTab.className = 'px-3 py-1 text-sm font-semibold text-gray-500 hover:text-gray-700';
-      previewTab.className = 'px-3 py-1 text-sm font-semibold text-gray-900 border-b-2 border-blue-500 bg-white rounded-t';
-      textarea.classList.add('hidden');
-      preview.classList.remove('hidden');
-      updateDescriptionPreview();
+    var hasImageTool = typeof ImageTool !== 'undefined';
+    var hasSimpleImage = typeof SimpleImage !== 'undefined';
+    var imageToolConfig = null;
+
+    if (hasImageTool) {
+      imageToolConfig = {
+        class: ImageTool,
+        config: {
+          uploader: {
+            uploadByFile: uploadEditorImageByFile,
+            uploadByUrl: uploadEditorImageByUrl
+          }
+        }
+      };
+      pageState.editorUsesSimpleImage = false;
+    } else if (hasSimpleImage) {
+      imageToolConfig = {
+        class: SimpleImage
+      };
+      pageState.editorUsesSimpleImage = true;
     } else {
-      writeTab.className = 'px-3 py-1 text-sm font-semibold text-gray-900 border-b-2 border-blue-500 bg-white rounded-t';
-      previewTab.className = 'px-3 py-1 text-sm font-semibold text-gray-500 hover:text-gray-700';
-      preview.classList.add('hidden');
-      textarea.classList.remove('hidden');
-      textarea.focus();
+      console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
+      pageState.editorUsesSimpleImage = false;
+    }
+
+    pageState.editorInstance = new EditorJS({
+      holder: 'new-article-editorjs',
+      placeholder: 'Describe el artículo en detalle...',
+      tools: {
+        header: {
+          class: Header,
+          config: {
+            levels: [1, 2, 3, 4, 5, 6],
+            defaultLevel: 2
+          }
+        },
+        list: {
+          class: typeof EditorjsList !== 'undefined' ? EditorjsList
+               : typeof NestedList !== 'undefined' ? NestedList
+               : List,
+          inlineToolbar: true
+        },
+        table: {
+          class: Table,
+          inlineToolbar: true
+        },
+        code: {
+          class: CodeTool
+        },
+
+        delimiter: {
+          class: Delimiter
+        },
+
+        image: imageToolConfig
+      },
+      onReady: function() {
+        attachImageUrlPasteHandler();
+      },
+      onChange: function() {
+        markFormDirty();
+      }
+    });
+  }
+
+  /**
+   * Detect image URLs and insert a SimpleImage block on paste.
+   */
+  function attachImageUrlPasteHandler() {
+    var editorHolder = document.getElementById('new-article-editorjs');
+    if (!editorHolder || !pageState.editorInstance) return;
+
+    if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
+
+    if (pageState.imagePasteHandler) {
+      document.removeEventListener('paste', pageState.imagePasteHandler);
+    }
+
+    pageState.imagePasteHandler = function(event) {
+      var target = event.target;
+      if (!editorHolder.contains(target)) return;
+
+      var clipboard = event.clipboardData || window.clipboardData;
+      if (!clipboard) return;
+
+      var text = (clipboard.getData && clipboard.getData('text/plain')) || '';
+      var url = (text || '').trim();
+      if (!isLikelyImageUrl(url)) return;
+
+      event.preventDefault();
+
+      try {
+        var index = pageState.editorInstance.blocks.getCurrentBlockIndex();
+        pageState.editorInstance.blocks.insert('image', { url: url }, {}, index + 1, true);
+        markFormDirty();
+      } catch (error) {
+        console.warn('Failed to insert image block from pasted URL:', error);
+      }
+    };
+
+    document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+
+  /**
+   * Build the public file URL used by Editor.js image blocks
+   * @param {string} companyCode - Company identifier
+   * @param {string|number} fileId - Uploaded file identifier
+   * @returns {string} Image retrieval URL
+   */
+  function buildEditorImageUrl(companyCode, fileId) {
+    return API_BASE_URL + '/files/' + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId) + '/download';
+  }
+
+  /**
+   * Convert API errors to a readable string
+   * @param {Response} response - Fetch response object
+   * @returns {Promise<string>} Error message
+   */
+  function parseUploadErrorMessage(response) {
+    return response.text()
+      .then(function(responseText) {
+        if (!responseText) {
+          return 'Error al subir la imagen (' + response.status + ')';
+        }
+        return responseText;
+      })
+      .catch(function() {
+        return 'Error al subir la imagen (' + response.status + ')';
+      });
+  }
+
+  /**
+   * Upload an image file to FilesController for Editor.js Image Tool
+   * @param {File} file - Local file selected in Editor.js
+   * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
+   */
+  function uploadEditorImageByFile(file) {
+    if (!file) {
+      var emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
+      dhtmlx.message({ type: 'error', text: emptyFileError.message });
+      return Promise.reject(emptyFileError);
+    }
+
+    if (!pageState.canUserUpload) {
+      var permissionError = new Error('No tienes permisos para subir imágenes.');
+      dhtmlx.message({ type: 'error', text: permissionError.message });
+      return Promise.reject(permissionError);
+    }
+
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      var typeError = new Error('El archivo "' + file.name + '" no es una imagen válida.');
+      dhtmlx.message({ type: 'error', text: typeError.message });
+      return Promise.reject(typeError);
+    }
+
+    if (file.size > MAX_EDITOR_IMAGE_UPLOAD_SIZE) {
+      var sizeError = new Error('La imagen "' + file.name + '" excede el límite de 10MB.');
+      dhtmlx.message({ type: 'error', text: sizeError.message });
+      return Promise.reject(sizeError);
+    }
+
+    var formData = new FormData();
+    formData.append('file', file);
+
+    return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
+      method: 'POST',
+      body: formData
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          return parseUploadErrorMessage(response).then(function(errorText) {
+            throw new Error(errorText);
+          });
+        }
+        return response.json();
+      })
+      .then(function(uploadResult) {
+        var uploadedFile = uploadResult && uploadResult.file ? uploadResult.file : uploadResult;
+        if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
+          throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
+        }
+
+        markFormDirty();
+
+        return {
+          success: 1,
+          file: {
+            id: uploadedFile.id,
+            url: buildEditorImageUrl(pageState.companyCode, uploadedFile.id)
+          }
+        };
+      })
+      .catch(function(error) {
+        dhtmlx.message({
+          type: 'error',
+          text: error && error.message ? error.message : 'No se pudo subir la imagen.'
+        });
+        throw error;
+      });
+  }
+
+  /**
+   * Keep URL-based image insertion available in Image Tool.
+   * @param {string} imageUrl - URL entered in Editor.js
+   * @returns {Promise<{success: number, file: {url: string}}>}
+   */
+  function uploadEditorImageByUrl(imageUrl) {
+    if (!imageUrl || !imageUrl.trim()) {
+      var urlError = new Error('Debes indicar una URL de imagen válida.');
+      dhtmlx.message({ type: 'error', text: urlError.message });
+      return Promise.reject(urlError);
+    }
+
+    return Promise.resolve({
+      success: 1,
+      file: {
+        url: imageUrl.trim()
+      }
+    });
+  }
+
+  /**
+   * Check if the pasted URL is likely an image URL.
+   * @param {string} url
+   * @returns {boolean}
+   */
+  function isLikelyImageUrl(url) {
+    if (!url) return false;
+    if (!/^https?:\/\//i.test(url)) return false;
+    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
+  }
+
+  /**
+   * Destroy the Editor.js instance and clean up
+   */
+  function destroyEditor() {
+    if (pageState.editorInstance) {
+      pageState.editorInstance.destroy();
+      pageState.editorInstance = null;
+    }
+    if (pageState.imagePasteHandler) {
+      document.removeEventListener('paste', pageState.imagePasteHandler);
+      pageState.imagePasteHandler = null;
     }
   }
 
   /**
-   * Update description preview with rendered markdown
+   * Render list items recursively for editorjs-html custom parser
+   * Handles both simple string items and nested object-based items (list v2.0+)
+   * @param {Array} items - List items from Editor.js block data
+   * @param {string} listTag - 'ol' or 'ul'
+   * @returns {string} HTML string of list items
    */
-  function updateDescriptionPreview() {
-    var textarea = document.getElementById('new-article-description');
-    var preview = document.getElementById('new-article-description-preview');
-    if (!textarea || !preview) return;
+  function renderListItemsToHtml(items, listTag) {
+    return items.map(function(item) {
+      var content = typeof item === 'string' ? item : (item.content || '');
+      var nestedHtml = '';
+      if (item.items && item.items.length > 0) {
+        nestedHtml = '<' + listTag + '>' + renderListItemsToHtml(item.items, listTag) + '</' + listTag + '>';
+      }
+      return '<li>' + content + nestedHtml + '</li>';
+    }).join('');
+  }
 
-    var value = textarea.value || '';
-    if (!value.trim()) {
-      preview.innerHTML = '<em class="text-gray-400">Sin descripción</em>';
-      return;
+  /**
+   * Convert Editor.js saved data (JSON) to a standard HTML string
+   * Uses editorjs-html with custom parsers for list and table blocks
+   * @param {Object} editorData - The saved data from editor.save()
+   * @returns {string} HTML string
+   */
+  function convertEditorDataToHtml(editorData) {
+    if (!editorData || !editorData.blocks || editorData.blocks.length === 0) {
+      return '';
     }
 
-    preview.innerHTML = '<div class="markdown-body">' + Utils.renderMarkdown(value) + '</div>';
+    var customParsers = {
+      list: function(block) {
+        var listTag = block.data.style === 'ordered' ? 'ol' : 'ul';
+        var itemsHtml = renderListItemsToHtml(block.data.items, listTag);
+        return '<' + listTag + '>' + itemsHtml + '</' + listTag + '>';
+      },
+      table: function(block) {
+        var rows = block.data.content || [];
+        var withHeadings = block.data.withHeadings;
+        var tableHtml = '<table>';
+        rows.forEach(function(row, rowIndex) {
+          tableHtml += '<tr>';
+          row.forEach(function(cell) {
+            var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
+            tableHtml += '<' + cellTag + '>' + cell + '</' + cellTag + '>';
+          });
+          tableHtml += '</tr>';
+        });
+        tableHtml += '</table>';
+        return tableHtml;
+      },
+      image: function(block) {
+        var imageUrl = '';
+        var caption = '';
+        var isStretched = false;
+
+        if (block && block.data) {
+          imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
+          caption = block.data.caption || '';
+          isStretched = !!block.data.stretched;
+        }
+
+        if (!imageUrl) return '';
+
+        var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
+        var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
+        return '<figure class="' + figureClass + '"><img src="' + escapeHtml(imageUrl) + '" alt=""/>' + captionHtml + '</figure>';
+      }
+    };
+
+    var parser = edjsHTML(customParsers);
+    var htmlArray = parser.parse(editorData);
+    return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
+  }
+
+  /**
+   * Convert an HTML string into Editor.js block data for hydration in edit mode
+   * Parses HTML elements into block objects compatible with Editor.js blocks.render()
+   * @param {string} htmlString - The HTML string to convert
+   * @returns {Object} Editor.js data object with blocks array
+   */
+  function htmlToEditorJsBlocks(htmlString) {
+    var tempParser = new DOMParser();
+    var doc = tempParser.parseFromString(htmlString, 'text/html');
+    var blocks = [];
+
+    /**
+     * Parse <li> children of a list element into Editor.js list items
+     * @param {HTMLElement} listElement - The <ul> or <ol> element
+     * @returns {Array} Array of list item objects
+     */
+    function parseListChildren(listElement) {
+      var listItems = [];
+      var children = listElement.querySelectorAll(':scope > li');
+      children.forEach(function(li) {
+        var itemContent = '';
+        var nestedItems = [];
+        li.childNodes.forEach(function(child) {
+          if (child.nodeType === Node.ELEMENT_NODE &&
+              (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
+            nestedItems = parseListChildren(child);
+          } else if (child.nodeType === Node.ELEMENT_NODE) {
+            itemContent += child.outerHTML;
+          } else if (child.nodeType === Node.TEXT_NODE) {
+            itemContent += child.textContent;
+          }
+        });
+        listItems.push({ content: itemContent.trim(), items: nestedItems });
+      });
+      return listItems;
+    }
+
+    doc.body.childNodes.forEach(function(node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        var tag = node.tagName.toLowerCase();
+
+        if (/^h[1-6]$/.test(tag)) {
+          blocks.push({
+            type: 'header',
+            data: { text: node.innerHTML, level: parseInt(tag[1], 10) }
+          });
+        } else if (tag === 'p') {
+          if (node.innerHTML.trim()) {
+            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
+          }
+        } else if (tag === 'ul' || tag === 'ol') {
+          blocks.push({
+            type: 'list',
+            data: {
+              style: tag === 'ol' ? 'ordered' : 'unordered',
+              items: parseListChildren(node)
+            }
+          });
+        } else if (tag === 'table') {
+          var tableContent = [];
+          var hasHeadings = node.querySelector('th') !== null;
+          node.querySelectorAll('tr').forEach(function(tr) {
+            var row = [];
+            tr.querySelectorAll('td, th').forEach(function(cell) {
+              row.push(cell.innerHTML);
+            });
+            if (row.length > 0) tableContent.push(row);
+          });
+          blocks.push({
+            type: 'table',
+            data: { withHeadings: hasHeadings, content: tableContent }
+          });
+        } else if (tag === 'figure' && node.querySelector('img')) {
+          var figureImage = node.querySelector('img');
+          var figureCaption = node.querySelector('figcaption');
+          blocks.push({
+            type: 'image',
+            data: {
+              file: { url: figureImage.getAttribute('src') || '' },
+              caption: figureCaption ? figureCaption.textContent : '',
+              stretched: node.classList.contains('cdx-image--stretched')
+            }
+          });
+        } else if (tag === 'img') {
+          blocks.push({
+            type: 'image',
+            data: {
+              file: { url: node.getAttribute('src') || '' },
+              caption: ''
+            }
+          });
+        } else {
+          // Treat unknown block-level elements as paragraphs
+          if (node.textContent.trim()) {
+            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
+          }
+        }
+      } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        blocks.push({ type: 'paragraph', data: { text: node.textContent } });
+      }
+    });
+
+    return { blocks: blocks };
+  }
+
+  /**
+   * Hydrate the Editor.js instance with existing HTML content (for edit mode)
+   * Tries editor.blocks.renderFromHTML first, falls back to manual block parsing
+   * @param {Object} editor - The Editor.js instance
+   * @param {string} htmlString - The HTML content to load
+   */
+  function hydrateEditorFromHtml(editor, htmlString) {
+    var sanitizedHtml = typeof DOMPurify !== 'undefined'
+      ? DOMPurify.sanitize(htmlString, { USE_PROFILES: { html: true } })
+      : (console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration'), htmlString);
+
+    editor.isReady.then(function() {
+      if (typeof editor.blocks.renderFromHTML === 'function') {
+        editor.blocks.renderFromHTML(sanitizedHtml);
+      } else {
+        // Fallback: parse HTML to Editor.js blocks manually
+        var blocksData = htmlToEditorJsBlocks(sanitizedHtml);
+        if (blocksData.blocks.length > 0) {
+          editor.blocks.render(blocksData);
+        }
+      }
+    }).catch(function(error) {
+      console.error('Error hydrating editor from HTML:', error);
+    });
+  }
+
+  /**
+   * Populate form fields with existing article data (edit mode)
+   */
+  function populateFormForEditMode() {
+    var article = pageState.originalArticleData;
+    if (!article) return;
+
+    var titleInput = document.getElementById('new-article-title');
+    if (titleInput) titleInput.value = article.title || '';
+
+    var statusSelect = document.getElementById('new-article-status');
+    if (statusSelect && article.status) statusSelect.value = article.status;
+
+    var externalLinkInput = document.getElementById('new-article-external-link');
+    if (externalLinkInput) externalLinkInput.value = article.externalLink || '';
+
+    var clientCommentsInput = document.getElementById('new-article-client-comments');
+    if (clientCommentsInput) clientCommentsInput.value = article.clientComments || '';
+
+    // Update tags display
+    updateSelectedTagsDisplay();
+
+    // Hydrate editor with article description HTML
+    if (article.description && pageState.editorInstance) {
+      hydrateEditorFromHtml(pageState.editorInstance, article.description);
+    }
   }
 
   /**
@@ -880,11 +1324,11 @@ var NewArticlePageUI = (function() {
 
   /**
    * Validate form data
+   * @param {string} descriptionHtml - HTML content from the editor
    * @returns {boolean} True if valid
    */
-  function validateForm() {
+  function validateForm(descriptionHtml) {
     var titleInput = document.getElementById('new-article-title');
-    var descriptionInput = document.getElementById('new-article-description');
 
     var errors = [];
 
@@ -892,7 +1336,7 @@ var NewArticlePageUI = (function() {
       errors.push('El título es obligatorio');
     }
 
-    if (!descriptionInput || !descriptionInput.value.trim()) {
+    if (!descriptionHtml || !descriptionHtml.trim()) {
       errors.push('La descripción es obligatoria');
     }
 
@@ -908,13 +1352,13 @@ var NewArticlePageUI = (function() {
   }
 
   /**
-   * Get form data
-   * @returns {Object} Form data object
+   * Get form data including the editor HTML content
+   * @param {string} descriptionHtml - HTML string from the editor
+   * @returns {Object} Form data object ready for API submission
    */
-  function getFormData() {
+  function getFormData(descriptionHtml) {
     var titleInput = document.getElementById('new-article-title');
     var statusSelect = document.getElementById('new-article-status');
-    var descriptionInput = document.getElementById('new-article-description');
     var externalLinkInput = document.getElementById('new-article-external-link');
     var clientCommentsInput = document.getElementById('new-article-client-comments');
 
@@ -924,111 +1368,242 @@ var NewArticlePageUI = (function() {
 
     return {
       title: titleInput ? titleInput.value.trim() : '',
-      description: descriptionInput ? descriptionInput.value.trim() : '',
+      description: descriptionHtml,
       status: statusSelect ? statusSelect.value : 'Borrador',
       externalLink: externalLinkInput ? externalLinkInput.value.trim() : '',
       clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
       companyCode: pageState.companyCode,
       tags: tagIds,
-      attachedImages: pageState.stagedImages.map(img => img.id),
-      attachedFiles: pageState.stagedFiles.map(file => file.id),
-      fileIds: [...pageState.stagedImages.map(img => img.id), ...pageState.stagedFiles.map(file => file.id)] // For backward compatibility if needed by API
+      attachedImages: pageState.stagedImages.map(function(img) { return img.id; }),
+      attachedFiles: pageState.stagedFiles.map(function(file) { return file.id; }),
+      fileIds: [
+        ...pageState.stagedImages.map(function(img) { return img.id; }),
+        ...pageState.stagedFiles.map(function(file) { return file.id; })
+      ]
     };
   }
 
   /**
-   * Handle form submission
+   * Handle form submission (create or edit)
+   * Saves editor content as HTML and sends to the backend API
    */
   function handleSubmit() {
-    if (!validateForm()) {
+    var submitBtn = document.getElementById('new-article-submit-btn');
+
+    if (!pageState.editorInstance) {
+      console.error('Editor not initialized');
       return;
     }
 
-    var submitBtn = document.getElementById('new-article-submit-btn');
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creando...';
-    }
+    // Save editor content (returns a Promise with JSON block data)
+    pageState.editorInstance.save()
+      .then(function(editorData) {
+        // Convert Editor.js JSON blocks to standard HTML
+        var descriptionHtml = convertEditorDataToHtml(editorData);
 
-    var formData = getFormData();
-
-    // First, upload any staged files and images
-    var uploadPromises = [];
-
-    // Upload staged files
-    pageState.stagedFiles.forEach(function(fileData) {
-      uploadPromises.push(
-        FileService.createFile({
-          name: fileData.name,
-          size: fileData.size,
-          companyCode: pageState.companyCode,
-          file: fileData.file
-        }).then(function(response) {
-          return { type: 'file', id: response.data.id };
-        })
-      );
-    });
-
-    // Upload staged images
-    pageState.stagedImages.forEach(function(imageData) {
-      uploadPromises.push(
-        ImageService.createImage({
-          name: imageData.name,
-          size: imageData.size,
-          companyCode: pageState.companyCode,
-          file: imageData.file
-        }).then(function(response) {
-          return { type: 'image', id: response.data.id };
-        })
-      );
-    });
-
-    // Wait for all uploads to complete
-    Promise.all(uploadPromises)
-      .then(function(uploadResults) {
-        // Add uploaded IDs to form data
-        uploadResults.forEach(function(result) {
-          if (result.type === 'file') {
-            formData.attachedFiles.push(result.id);
-          } else if (result.type === 'image') {
-            formData.attachedImages.push(result.id);
-          }
-        });
-
-        // Create the article
-        return ArticleService.createArticle(formData, pageState.companyCode);
-      })
-      .then(function(response) {
-        if (response.status === 'success') {
-          dhtmlx.message({
-            text: 'Artículo creado exitosamente',
-            type: 'success',
-            expire: 3000
-          });
-
-          // Reset state and navigate back
-          resetPageState();
-          if (pageState.onNavigateBack) {
-            pageState.onNavigateBack(response.data);
-          }
+        // Sanitize the output HTML
+        if (typeof DOMPurify !== 'undefined') {
+          descriptionHtml = DOMPurify.sanitize(descriptionHtml, { USE_PROFILES: { html: true } });
+        } else {
+          console.warn('DOMPurify not loaded: HTML output will not be sanitized');
         }
-      })
-      .catch(function(error) {
-        console.error('Error creating article:', error);
-        dhtmlx.alert({
-          title: 'Error',
-          text: 'Error al crear el artículo: ' + error.message
-        });
+
+        if (!validateForm(descriptionHtml)) {
+          return;
+        }
 
         if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Crear Artículo';
+          submitBtn.disabled = true;
+          submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
         }
+
+        var formData = getFormData(descriptionHtml);
+
+        // Upload any staged files and images
+        var uploadPromises = [];
+
+        pageState.stagedFiles.forEach(function(fileData) {
+          uploadPromises.push(
+            FileService.createFile({
+              name: fileData.name,
+              size: fileData.size,
+              companyCode: pageState.companyCode,
+              file: fileData.file
+            }).then(function(response) {
+              return { type: 'file', id: response.data.id };
+            })
+          );
+        });
+
+        pageState.stagedImages.forEach(function(imageData) {
+          uploadPromises.push(
+            ImageService.createImage({
+              name: imageData.name,
+              size: imageData.size,
+              companyCode: pageState.companyCode,
+              file: imageData.file
+            }).then(function(response) {
+              return { type: 'image', id: response.data.id };
+            })
+          );
+        });
+
+        // Wait for all uploads to complete, then save the article
+        Promise.all(uploadPromises)
+          .then(function(uploadResults) {
+            uploadResults.forEach(function(result) {
+              if (result.type === 'file') {
+                formData.attachedFiles.push(result.id);
+              } else if (result.type === 'image') {
+                formData.attachedImages.push(result.id);
+              }
+            });
+
+            if (pageState.editMode) {
+              return ArticleService.updateArticle(pageState.articleId, formData, pageState.companyCode);
+            } else {
+              return ArticleService.createArticle(formData, pageState.companyCode);
+            }
+          })
+          .then(function(response) {
+            if (response.status === 'success') {
+              var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
+              dhtmlx.message({
+                text: 'Artículo ' + actionLabel + ' exitosamente',
+                type: 'success',
+                expire: 3000
+              });
+
+              var savedData = response.data;
+              var navigateBackCallback = pageState.onNavigateBack;
+              resetPageState();
+              if (navigateBackCallback) {
+                navigateBackCallback(savedData);
+              }
+            }
+          })
+          .catch(function(error) {
+            console.error('Error saving article:', error);
+            dhtmlx.alert({
+              title: 'Error',
+              text: 'Error al guardar el artículo: ' + error.message
+            });
+
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+            }
+          });
+      })
+      .catch(function(error) {
+        console.error('Error saving editor content:', error);
+        dhtmlx.alert({
+          title: 'Error',
+          text: 'Error al obtener el contenido del editor.'
+        });
       });
   }
 
   /**
-   * Open the New Article page
+   * Handle delete article action with confirmation
+   */
+  function handleDeleteArticle() {
+    if (!pageState.editMode || !pageState.articleId || !pageState.companyCode) return;
+
+    var deleteBtn = document.getElementById('new-article-delete-btn');
+    var articleId = pageState.articleId;
+    var companyCode = pageState.companyCode;
+
+    dhtmlx.confirm({
+      title: 'Confirmar eliminación',
+      text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+      callback: function(result) {
+        if (!result) return;
+
+        if (deleteBtn) {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = 'Eliminando...';
+        }
+
+        fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`, {
+          method: 'DELETE'
+        })
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error('Failed to delete article: ' + response.status);
+            }
+
+            if (typeof ArticleService !== 'undefined' && ArticleService.clearCache) {
+              ArticleService.clearCache();
+            }
+
+            dhtmlx.message({
+              type: 'success',
+              text: 'Artículo eliminado exitosamente',
+              expire: 3000
+            });
+
+            var navigateBackCallback = pageState.onNavigateBack;
+            resetPageState();
+            if (navigateBackCallback) {
+              navigateBackCallback();
+            }
+          })
+          .catch(function(error) {
+            console.error('Error deleting article:', error);
+            dhtmlx.alert({
+              title: 'Error',
+              text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+            });
+
+            if (deleteBtn) {
+              deleteBtn.disabled = false;
+              deleteBtn.textContent = 'Eliminar';
+            }
+          });
+      }
+    });
+  }
+
+  /**
+   * Shared initialization logic for both create and edit modes
+   * Sets up the page layout, renders HTML, attaches events, and initializes the editor
+   * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
+   * @param {string} companyCode - Company code
+   * @param {string} companyName - Company name for display
+   * @param {Function} onNavigateBack - Callback when navigating back
+   */
+  function initializePage(layoutCell, companyCode, companyName, onNavigateBack) {
+    pageState.companyCode = companyCode;
+    pageState.companyName = companyName || '';
+    pageState.layoutCell = layoutCell;
+    pageState.onNavigateBack = onNavigateBack;
+    pageState.canUserUpload = true;
+
+    CompanyService.canUsersUpload(companyCode)
+      .then(function(canUpload) {
+        pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
+        renderAndAttach();
+      })
+      .catch(function(error) {
+        console.error('Error checking upload permissions:', error);
+        renderAndAttach();
+      });
+
+    function renderAndAttach() {
+      layoutCell.attachHTMLString(renderPageHtml());
+      setTimeout(function() {
+        attachEventHandlers();
+        initializeEditor();
+        if (pageState.editMode) {
+          populateFormForEditMode();
+        }
+      }, 100);
+    }
+  }
+
+  /**
+   * Open the New Article page (Create Mode)
    * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
    * @param {string} companyCode - Company code for the new article
    * @param {string} companyName - Company name for display
@@ -1044,46 +1619,70 @@ var NewArticlePageUI = (function() {
       return;
     }
 
-    // Initialize page state
-    pageState.companyCode = companyCode;
-    pageState.companyName = companyName || '';
-    pageState.layoutCell = layoutCell;
-    pageState.onNavigateBack = onNavigateBack;
+    // Reset state for create mode
+    pageState.editMode = false;
+    pageState.articleId = null;
+    pageState.originalArticleData = null;
     pageState.selectedTags = [];
     pageState.stagedFiles = [];
     pageState.stagedImages = [];
     pageState.isFormDirty = false;
-    pageState.canUserUpload = true;
 
-    // Check company settings for upload permissions
-    // Note: Administrators can always upload regardless of company settings
-    // to ensure they maintain full control over content management
-    CompanyService.canUsersUpload(companyCode)
-      .then(function(canUpload) {
-        pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
-        
-        // Render the page
-        layoutCell.attachHTMLString(renderPageHtml());
+    initializePage(layoutCell, companyCode, companyName, onNavigateBack);
+  }
 
-        // Attach event handlers after DOM is ready
-        setTimeout(function() {
-          attachEventHandlers();
-        }, 100);
-      })
-      .catch(function(error) {
-        console.error('Error checking upload permissions:', error);
-        // Default to allowing uploads
-        layoutCell.attachHTMLString(renderPageHtml());
-        setTimeout(function() {
-          attachEventHandlers();
-        }, 100);
+  /**
+   * Open the Article page in Edit Mode
+   * Loads existing article data into the form and editor
+   * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
+   * @param {Object} articleData - The full article object to edit
+   * @param {string} companyName - Company name for display
+   * @param {Function} onNavigateBack - Callback when navigating back to grid
+   */
+  function openEditPage(layoutCell, articleData, companyName, onNavigateBack) {
+    // Check permissions
+    if (typeof AdminEditArticleButton === 'undefined') {
+      dhtmlx.alert({
+        title: 'Acceso denegado',
+        text: 'No tienes permiso para editar artículos.'
       });
+      return;
+    }
+
+    if (!articleData || !articleData.id) {
+      console.error('Invalid article data for edit mode');
+      return;
+    }
+
+    // Set state for edit mode
+    pageState.editMode = true;
+    pageState.articleId = articleData.id;
+    pageState.originalArticleData = articleData;
+    pageState.stagedFiles = [];
+    pageState.stagedImages = [];
+    pageState.isFormDirty = false;
+
+    // Pre-populate tags from article data
+    pageState.selectedTags = [];
+    if (articleData.tags && Array.isArray(articleData.tags)) {
+      pageState.selectedTags = articleData.tags.map(function(tag) {
+        if (typeof tag === 'string') {
+          return { id: tag, name: tag, color: '#666' };
+        }
+        return tag;
+      });
+    }
+
+    initializePage(layoutCell, articleData.companyCode, companyName, onNavigateBack);
   }
 
   /**
    * Close the page and clean up resources
    */
   function closePage() {
+    // Destroy Editor.js instance
+    destroyEditor();
+
     // Revoke any object URLs
     pageState.stagedImages.forEach(function(img) {
       if (img.previewUrl) {
@@ -1105,6 +1704,7 @@ var NewArticlePageUI = (function() {
   // Public API
   return {
     openPage: openPage,
+    openEditPage: openEditPage,
     closePage: closePage,
     isPageOpen: isPageOpen,
     navigateToGrid: navigateToGrid

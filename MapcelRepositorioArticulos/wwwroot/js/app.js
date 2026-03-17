@@ -20,7 +20,7 @@ const GRID_SIDEBAR_ASPECT_WIDTH = 0.45;
 const window_width = window.innerWidth;
 
 var LAYOUT_CONFIG = {
-  HEADER_HEIGHT: '80',
+  HEADER_HEIGHT: '110',
   FILTERS_SECTION_HEIGHT: '120',
   SIDEBAR_WIDTH: `${GRID_SIDEBAR_ASPECT_WIDTH * window_width}`,
 };
@@ -133,23 +133,19 @@ grid_sidebar_layout.hideHeader();
 // Grid Toolbar Area (various actions)
 var grid_toolbar = grid_sidebar_layout.attachToolbar();
 grid_toolbar.setIconsPath('/Dhtmlx/codebase/imgs/');
-grid_toolbar.addButton('clear_filters', 1, 'Limpiar Filtros');
-grid_toolbar.addSeparator('sep_bulk', 2);
-grid_toolbar.addButton('bulk_edit_tags', 3, 'Editar Etiquetas (Selección)');
-grid_toolbar.addSeparator('sep_clear', 4);
-grid_toolbar.addButton('manage_tags', 5, 'Administrar Etiquetas');
+grid_toolbar.addSeparator('sep_bulk', 1);
+grid_toolbar.addButton('bulk_edit_tags', 2, 'Editar Etiquetas (Selección)');
+grid_toolbar.addSeparator('sep_clear', 3);
+grid_toolbar.addButton('manage_tags', 4, 'Administrar Etiquetas');
 
 grid_toolbar.setItemToolTip('manage_tags', 'Administrar las etiquetas de la empresa');
 grid_toolbar.setItemToolTip('bulk_edit_tags', 'Editar etiquetas de los artículos seleccionados');
-grid_toolbar.setItemToolTip('clear_filters', 'Limpiar todos los filtros');
 
 grid_toolbar.attachEvent('onClick', function(id) {
   if (id === 'manage_tags') {
     openTagManager();
   } else if (id === 'bulk_edit_tags') {
     openBulkTagEditor();
-  } else if (id === 'clear_filters') {
-    clearAllFilters();
   }
 });
 
@@ -396,14 +392,6 @@ function createFilterContainerHtml(companies) {
         '</select>' +
       '</div>' +
       '<div class="flex items-center gap-2">' +
-        '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Fecha inicio:</label>' +
-        '<input type="date" id="filter-date-start" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />' +
-      '</div>' +
-      '<div class="flex items-center gap-2">' +
-        '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Fecha fin:</label>' +
-        '<input type="date" id="filter-date-end" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />' +
-      '</div>' +
-      '<div class="flex items-center gap-2">' +
         '<label class="text-sm font-medium text-gray-700 whitespace-nowrap">Etiquetas:</label>' +
         '<button id="filter-tags-btn" class="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-sm flex items-center gap-2">' +
           '<span id="filter-tags-count">Todas</span>' +
@@ -411,6 +399,9 @@ function createFilterContainerHtml(companies) {
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
           '</svg>' +
         '</button>' +
+      '</div>' +
+      '<div class="flex items-center gap-2">' +
+      '<button id="clear_filters" class="inline-block rounded bg-sky-500 text-neutral-50 shadow-blue-950 hover:bg-sky-600 hover:shadow-blue-950 focus:bg-sky-800 focus:shadow-blue-950 active:bg-sky-700 active:shadow-sky-950 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal transition duration-150 ease-in-out focus:outline-none focus:ring-0" onclick="clearAllFilters()">Limpiar filtros</button>' +
       '</div>' +
       '<div id="filter-active-indicator" style="display: none;" class="text-sm text-blue-600 font-medium">' +
         '● Filtros activos' +
@@ -1066,23 +1057,19 @@ function rebuildArticlesTabLayout() {
   // Grid Toolbar Area (various actions)
   grid_toolbar = grid_sidebar_layout.attachToolbar();
   grid_toolbar.setIconsPath('./Dhtmlx/codebase/imgs/');
-  grid_toolbar.addButton('clear_filters', 1, 'Limpiar Filtros');
-  grid_toolbar.addSeparator('sep_bulk', 2);
-  grid_toolbar.addButton('bulk_edit_tags', 3, 'Editar Etiquetas (Selección)');
-  grid_toolbar.addSeparator('sep_clear', 4);
-  grid_toolbar.addButton('manage_tags', 5, 'Administrar Etiquetas');
+  grid_toolbar.addSeparator('sep_bulk', 1);
+  grid_toolbar.addButton('bulk_edit_tags', 2, 'Editar Etiquetas (Selección)');
+  grid_toolbar.addSeparator('sep_clear', 3);
+  grid_toolbar.addButton('manage_tags', 4, 'Administrar Etiquetas');
   
   grid_toolbar.setItemToolTip('manage_tags', 'Administrar las etiquetas de la empresa');
   grid_toolbar.setItemToolTip('bulk_edit_tags', 'Editar etiquetas de los artículos seleccionados');
-  grid_toolbar.setItemToolTip('clear_filters', 'Limpiar todos los filtros');
   
   grid_toolbar.attachEvent('onClick', function(id) {
     if (id === 'manage_tags') {
       openTagManager();
     } else if (id === 'bulk_edit_tags') {
       openBulkTagEditor();
-    } else if (id === 'clear_filters') {
-      clearAllFilters();
     }
   });
   
@@ -1122,6 +1109,7 @@ function rebuildArticlesTabLayout() {
 
 /**
  * Open the form for editing an existing article
+ * Redirects to NewArticlePageUI in edit mode (replaces the old floating ArticleFormUI window)
  * @param {string} articleId - ID of the article to edit
  * @param {string} companyCode - Code of the company the article belongs to
  */
@@ -1136,7 +1124,7 @@ function openEditArticleForm(articleId, companyCode) {
         return;
       }
       
-      ArticleFormUI.openEditForm(article, onArticleFormSaved);
+      showEditArticlePage(article);
     })
     .catch(function(error) {
       console.error('Error loading article for edit:', error);
@@ -1144,6 +1132,37 @@ function openEditArticleForm(articleId, companyCode) {
         title: 'Error',
         text: 'Error al cargar el artículo: ' + error.message
       });
+    });
+}
+
+/**
+ * Show the Edit Article page in the articles tab
+ * @param {Object} articleData - Full article object to edit
+ */
+function showEditArticlePage(articleData) {
+  appState.currentArticlesView = 'new-article';
+  
+  // Hide header toolbar items
+  header_toolbar.hideItem('new_article');
+  header_toolbar.hideItem('edit_company');
+  
+  CompanyService.getCompanyByCode(articleData.companyCode)
+    .then(function(company) {
+      var companyName = company ? company.name : '';
+      NewArticlePageUI.openEditPage(
+        articles,
+        articleData,
+        companyName,
+        onNavigateBackFromNewArticle
+      );
+    })
+    .catch(function() {
+      NewArticlePageUI.openEditPage(
+        articles,
+        articleData,
+        '',
+        onNavigateBackFromNewArticle
+      );
     });
 }
 

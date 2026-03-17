@@ -29,6 +29,17 @@ html, body {
     border-collapse: collapse;
     border: 0.5px solid #D9D9D9;
 }
+
+tr.ev_material td {
+    height: 50px !important;
+    vertical-align: middle;
+}
+
+tr.odd_material td {
+    height: 50px !important;
+    vertical-align: middle;
+}
+
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 
@@ -188,6 +199,17 @@ html, body {
 /*HEADER COLLAPSED*/
 .dhxlayout_base_material div.dhx_cell_layout.dhxlayout_collapsed_h div.dhx_cell_hdr {
     height: 35px;
+}
+
+.dhx_toolbar_btn {
+    background-color: #0EA5E9 !important; /* A standard blue */
+    color: white !important;              /* Ensures text is readable */
+    border-radius: 4px;                   /* Optional: gives a modern look */
+}
+
+.dhx_toolbar_btn:hover {
+    background-color: #0284C7 !important;
+    cursor: pointer;
 }
 
 /*Padding en el header del grid*/

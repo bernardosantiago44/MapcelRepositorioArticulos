@@ -843,7 +843,7 @@ var NewArticlePageUI = (function() {
         if (!imageUrl) return '';
 
         var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
-        var captionHtml = caption ? '<figcaption>' + caption + '</figcaption>' : '';
+        var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
         return '<figure class="' + figureClass + '"><img src="' + escapeHtml(imageUrl) + '" alt=""/>' + captionHtml + '</figure>';
       }
     };
@@ -932,7 +932,7 @@ var NewArticlePageUI = (function() {
             type: 'image',
             data: {
               file: { url: figureImage.getAttribute('src') || '' },
-              caption: figureCaption ? figureCaption.innerHTML : '',
+              caption: figureCaption ? figureCaption.textContent : '',
               stretched: node.classList.contains('cdx-image--stretched')
             }
           });

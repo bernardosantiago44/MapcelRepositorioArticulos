@@ -1,0 +1,134 @@
+/* Container & Base Typography */
+.article-html-content {
+    --primary-text: #2c3e50;
+    --secondary-text: #546e7a;
+    --border-color: #e0e0e0;
+    --code-bg: #f4f7f6;
+
+    max-width: 800px; /* Optional: Best for readability */
+    margin: 0 auto;
+    line-height: 1.6;
+    color: var(--primary-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Headings - Using margins to create clear visual hierarchy */
+.article-html-content h1,
+.article-html-content h2,
+.article-html-content h3,
+.article-html-content h4,
+.article-html-content h5,
+.article-html-content h6 {
+    margin-top: 2em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.article-html-content h1 { font-size: 2.5rem; }
+.article-html-content h2 { font-size: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+.article-html-content h3 { font-size: 1.75rem; }
+.article-html-content h4 { font-size: 1.5rem; }
+
+/* Paragraphs and Spacing */
+.article-html-content p {
+    margin: 1.2em 0;
+}
+
+/* Lists */
+.article-html-content ul,
+.article-html-content ol {
+    padding-left: 2em;
+    margin: 1.2em 0;
+}
+
+.article-html-content li {
+    margin-bottom: 0.5em;
+}
+
+/* Table - Page-wide and balanced */
+.article-html-content table {
+    width: 100%;             /* Force the table to take the full width of the div */
+    table-layout: fixed;     /* Optional: Forces cells to be equal width regardless of content */
+    border-collapse: collapse;
+    margin: 2.5em 0;
+    overflow: hidden;        /* Keeps corners clean if you use border-radius */
+    border-radius: 4px;
+}
+
+.article-html-content th,
+.article-html-content td {
+    padding: 14px 18px;      /* Slightly more breathing room */
+    border: 1px solid var(--border-color);
+    text-align: left;
+    word-break: break-word;  /* Prevents long text from breaking the layout */
+}
+
+/* Subtle zebra striping for better readability on wide tables */
+.article-html-content tr:nth-child(even) {
+    background-color: #fcfcfc;
+}
+
+/* Make sure the container doesn't cut off the table on mobile */
+@media (max-width: 600px) {
+    .article-html-content {
+        overflow-x: auto;
+    }
+    .article-html-content table {
+        table-layout: auto; /* Let it scroll horizontally on small screens */
+    }
+}
+
+/* Blockquotes */
+.article-html-content blockquote {
+    margin: 2em 0;
+    padding: 1em 1.5em;
+    border-left: 4px solid #3498db;
+    background: #f9f9f9;
+    font-style: italic;
+    color: var(--secondary-text);
+}
+
+/* Images & Captions */
+.article-html-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto;
+}
+
+.article-html-content .cdx-block {
+    margin-top: 1.5em;
+}
+
+.article-html-content figcaption {
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--secondary-text);
+    margin-top: 8px;
+}
+
+/* Code Blocks */
+.article-html-content pre {
+    background: var(--code-bg);
+    padding: 1.5em;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.95em;
+}
+
+.article-html-content code {
+    background: var(--code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Horizontal Rule */
+.article-html-content hr {
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    margin: 3em 0;
+}

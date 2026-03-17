@@ -41,6 +41,7 @@ var NewArticlePageUI = (function() {
     allTags: [],
     canUserUpload: true,     // Determined by CompanySettings
     editorInstance: null,    // Editor.js instance
+    editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
     imagePasteHandler: null, // Paste handler reference for cleanup
     editMode: false,         // true when editing an existing article
     articleId: null,         // Article ID when in edit mode
@@ -55,6 +56,7 @@ var NewArticlePageUI = (function() {
     externalLink: '',
     clientComments: ''
   };
+  var MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 
   /**
    * Get status options from articleStatusConfiguration
@@ -531,21 +533,29 @@ var NewArticlePageUI = (function() {
       return;
     }
 
-    var hasSimpleImage = typeof SimpleImage !== 'undefined';
     var hasImageTool = typeof ImageTool !== 'undefined';
+    var hasSimpleImage = typeof SimpleImage !== 'undefined';
     var imageToolConfig = null;
 
-    if (hasSimpleImage) {
+    if (hasImageTool) {
+      imageToolConfig = {
+        class: ImageTool,
+        config: {
+          uploader: {
+            uploadByFile: uploadEditorImageByFile,
+            uploadByUrl: uploadEditorImageByUrl
+          }
+        }
+      };
+      pageState.editorUsesSimpleImage = false;
+    } else if (hasSimpleImage) {
       imageToolConfig = {
         class: SimpleImage
       };
-    } else if (hasImageTool) {
-      imageToolConfig = {
-        class: ImageTool
-      };
-      console.warn('Using ImageTool. Pasting image URLs requires config.endpoints.byUrl on the backend.');
+      pageState.editorUsesSimpleImage = true;
     } else {
       console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
+      pageState.editorUsesSimpleImage = false;
     }
 
     pageState.editorInstance = new EditorJS({
@@ -577,7 +587,7 @@ var NewArticlePageUI = (function() {
           class: Delimiter
         },
 
-        image: SimpleImage
+        image: imageToolConfig
       },
       onReady: function() {
         attachImageUrlPasteHandler();
@@ -595,7 +605,7 @@ var NewArticlePageUI = (function() {
     var editorHolder = document.getElementById('new-article-editorjs');
     if (!editorHolder || !pageState.editorInstance) return;
 
-    if (typeof SimpleImage === 'undefined') return;
+    if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
 
     if (pageState.imagePasteHandler) {
       document.removeEventListener('paste', pageState.imagePasteHandler);
@@ -624,6 +634,124 @@ var NewArticlePageUI = (function() {
     };
 
     document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+
+  /**
+   * Build the public file URL used by Editor.js image blocks
+   * @param {string} companyCode - Company identifier
+   * @param {string|number} fileId - Uploaded file identifier
+   * @returns {string} Image retrieval URL
+   */
+  function buildEditorImageUrl(companyCode, fileId) {
+    return API_BASE_URL + '/files/' + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId) + '/download';
+  }
+
+  /**
+   * Convert API errors to a readable string
+   * @param {Response} response - Fetch response object
+   * @returns {Promise<string>} Error message
+   */
+  function parseUploadErrorMessage(response) {
+    return response.text()
+      .then(function(responseText) {
+        if (!responseText) {
+          return 'Error al subir la imagen (' + response.status + ')';
+        }
+        return responseText;
+      })
+      .catch(function() {
+        return 'Error al subir la imagen (' + response.status + ')';
+      });
+  }
+
+  /**
+   * Upload an image file to FilesController for Editor.js Image Tool
+   * @param {File} file - Local file selected in Editor.js
+   * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
+   */
+  function uploadEditorImageByFile(file) {
+    if (!file) {
+      var emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
+      dhtmlx.message({ type: 'error', text: emptyFileError.message });
+      return Promise.reject(emptyFileError);
+    }
+
+    if (!pageState.canUserUpload) {
+      var permissionError = new Error('No tienes permisos para subir imágenes.');
+      dhtmlx.message({ type: 'error', text: permissionError.message });
+      return Promise.reject(permissionError);
+    }
+
+    if (!file.type || file.type.indexOf('image/') !== 0) {
+      var typeError = new Error('El archivo "' + file.name + '" no es una imagen válida.');
+      dhtmlx.message({ type: 'error', text: typeError.message });
+      return Promise.reject(typeError);
+    }
+
+    if (file.size > MAX_EDITOR_IMAGE_UPLOAD_SIZE) {
+      var sizeError = new Error('La imagen "' + file.name + '" excede el límite de 10MB.');
+      dhtmlx.message({ type: 'error', text: sizeError.message });
+      return Promise.reject(sizeError);
+    }
+
+    var formData = new FormData();
+    formData.append('file', file);
+
+    return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
+      method: 'POST',
+      body: formData
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          return parseUploadErrorMessage(response).then(function(errorText) {
+            throw new Error(errorText);
+          });
+        }
+        return response.json();
+      })
+      .then(function(uploadResult) {
+        var uploadedFile = uploadResult && uploadResult.file ? uploadResult.file : uploadResult;
+        if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
+          throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
+        }
+
+        markFormDirty();
+
+        return {
+          success: 1,
+          file: {
+            id: uploadedFile.id,
+            url: buildEditorImageUrl(pageState.companyCode, uploadedFile.id)
+          }
+        };
+      })
+      .catch(function(error) {
+        dhtmlx.message({
+          type: 'error',
+          text: error && error.message ? error.message : 'No se pudo subir la imagen.'
+        });
+        throw error;
+      });
+  }
+
+  /**
+   * Keep URL-based image insertion available in Image Tool.
+   * @param {string} imageUrl - URL entered in Editor.js
+   * @returns {Promise<{success: number, file: {url: string}}>}
+   */
+  function uploadEditorImageByUrl(imageUrl) {
+    if (!imageUrl || !imageUrl.trim()) {
+      var urlError = new Error('Debes indicar una URL de imagen válida.');
+      dhtmlx.message({ type: 'error', text: urlError.message });
+      return Promise.reject(urlError);
+    }
+
+    return Promise.resolve({
+      success: 1,
+      file: {
+        url: imageUrl.trim()
+      }
+    });
   }
 
   /**
@@ -700,12 +828,29 @@ var NewArticlePageUI = (function() {
         });
         tableHtml += '</table>';
         return tableHtml;
+      },
+      image: function(block) {
+        var imageUrl = '';
+        var caption = '';
+        var isStretched = false;
+
+        if (block && block.data) {
+          imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
+          caption = block.data.caption || '';
+          isStretched = !!block.data.stretched;
+        }
+
+        if (!imageUrl) return '';
+
+        var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
+        var captionHtml = caption ? '<figcaption>' + caption + '</figcaption>' : '';
+        return '<figure class="' + figureClass + '"><img src="' + escapeHtml(imageUrl) + '" alt=""/>' + captionHtml + '</figure>';
       }
     };
 
     var parser = edjsHTML(customParsers);
     var htmlArray = parser.parse(editorData);
-    return htmlArray;
+    return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
   }
 
   /**
@@ -779,6 +924,25 @@ var NewArticlePageUI = (function() {
           blocks.push({
             type: 'table',
             data: { withHeadings: hasHeadings, content: tableContent }
+          });
+        } else if (tag === 'figure' && node.querySelector('img')) {
+          var figureImage = node.querySelector('img');
+          var figureCaption = node.querySelector('figcaption');
+          blocks.push({
+            type: 'image',
+            data: {
+              file: { url: figureImage.getAttribute('src') || '' },
+              caption: figureCaption ? figureCaption.innerHTML : '',
+              stretched: node.classList.contains('cdx-image--stretched')
+            }
+          });
+        } else if (tag === 'img') {
+          blocks.push({
+            type: 'image',
+            data: {
+              file: { url: node.getAttribute('src') || '' },
+              caption: ''
+            }
           });
         } else {
           // Treat unknown block-level elements as paragraphs

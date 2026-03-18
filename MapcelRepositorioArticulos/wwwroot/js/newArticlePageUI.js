@@ -35,6 +35,12 @@ var NewArticlePageUI = (function() {
     layoutCell: null,
     onNavigateBack: null,
     selectedTags: [],
+    allImages: [],             // All available images for the company
+    allFiles: [],              // All available files for the company
+    attachedImages: [],        // Already attached image IDs
+    attachedFiles: [],         // Already attached file IDs
+    imageSearchQuery: '',      // Search query for image library
+    fileSearchQuery: '',       // Search query for file library
     stagedFiles: [],         // Files selected for upload (not yet saved)
     stagedImages: [],        // Images selected for upload (not yet saved)
     isFormDirty: false,
@@ -166,6 +172,12 @@ var NewArticlePageUI = (function() {
    */
   function resetPageState() {
     pageState.selectedTags = [];
+    pageState.allImages = [];
+    pageState.allFiles = [];
+    pageState.attachedImages = [];
+    pageState.attachedFiles = [];
+    pageState.imageSearchQuery = '';
+    pageState.fileSearchQuery = '';
     pageState.stagedFiles = [];
     pageState.stagedImages = [];
     pageState.isFormDirty = false;
@@ -359,6 +371,32 @@ var NewArticlePageUI = (function() {
           <div id="new-article-staged-files" class="mt-3 space-y-2">
             <!-- Files will be listed here -->
           </div>
+
+          <!-- Attached Files -->
+          <div class="mt-4">
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              Ya cargados
+            </div>
+            <div id="new-article-attached-files" class="space-y-2">
+              <!-- Attached files will be listed here -->
+            </div>
+          </div>
+
+          <!-- Company File Library -->
+          <div class="mt-4">
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              Biblioteca de la empresa
+            </div>
+            <input
+              type="text"
+              id="new-article-file-search"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Buscar archivos"
+            />
+            <div id="new-article-available-files" class="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
+              <!-- Available files will be listed here -->
+            </div>
+          </div>
         </div>
 
         <!-- Image Upload Section -->
@@ -386,6 +424,32 @@ var NewArticlePageUI = (function() {
           <!-- Staged Images Grid -->
           <div id="new-article-staged-images" class="mt-3 grid grid-cols-3 gap-2">
             <!-- Images will be listed here -->
+          </div>
+
+          <!-- Attached Images -->
+          <div class="mt-4">
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              Ya cargados
+            </div>
+            <div id="new-article-attached-images" class="space-y-2">
+              <!-- Attached images will be listed here -->
+            </div>
+          </div>
+
+          <!-- Company Image Library -->
+          <div class="mt-4">
+            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+              Biblioteca de la empresa
+            </div>
+            <input
+              type="text"
+              id="new-article-image-search"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Buscar imágenes"
+            />
+            <div id="new-article-available-images" class="mt-2 max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
+              <!-- Available images will be listed here -->
+            </div>
           </div>
         </div>
       </div>
@@ -511,6 +575,7 @@ var NewArticlePageUI = (function() {
     // File upload handlers
     setupFileUploadHandlers();
     setupImageUploadHandlers();
+    setupMediaLibraryHandlers();
   }
 
   // =========================================================================
@@ -1081,13 +1146,10 @@ var NewArticlePageUI = (function() {
    */
   function updateStagedFilesDisplay() {
     var container = document.getElementById('new-article-staged-files');
-    var countSpan = document.getElementById('new-article-files-count');
     
     if (!container) return;
 
-    if (countSpan) {
-      countSpan.textContent = pageState.stagedFiles.length + ' archivo' + (pageState.stagedFiles.length !== 1 ? 's' : '');
-    }
+    updateMediaCounts();
 
     if (pageState.stagedFiles.length === 0) {
       container.innerHTML = '';
@@ -1175,6 +1237,29 @@ var NewArticlePageUI = (function() {
   }
 
   /**
+   * Setup handlers for the media library search inputs
+   */
+  function setupMediaLibraryHandlers() {
+    var fileSearchInput = document.getElementById('new-article-file-search');
+    if (fileSearchInput) {
+      fileSearchInput.value = pageState.fileSearchQuery || '';
+      fileSearchInput.addEventListener('input', function(e) {
+        pageState.fileSearchQuery = e.target.value || '';
+        updateAvailableFilesDisplay();
+      });
+    }
+
+    var imageSearchInput = document.getElementById('new-article-image-search');
+    if (imageSearchInput) {
+      imageSearchInput.value = pageState.imageSearchQuery || '';
+      imageSearchInput.addEventListener('input', function(e) {
+        pageState.imageSearchQuery = e.target.value || '';
+        updateAvailableImagesDisplay();
+      });
+    }
+  }
+
+  /**
    * Handle image selection
    * @param {FileList} files - Selected files
    */
@@ -1221,13 +1306,10 @@ var NewArticlePageUI = (function() {
    */
   function updateStagedImagesDisplay() {
     var container = document.getElementById('new-article-staged-images');
-    var countSpan = document.getElementById('new-article-images-count');
     
     if (!container) return;
 
-    if (countSpan) {
-      countSpan.textContent = pageState.stagedImages.length + ' imagen' + (pageState.stagedImages.length !== 1 ? 'es' : '');
-    }
+    updateMediaCounts();
 
     if (pageState.stagedImages.length === 0) {
       container.innerHTML = '';
@@ -1281,6 +1363,560 @@ var NewArticlePageUI = (function() {
       return img.id !== imageId;
     });
     updateStagedImagesDisplay();
+  }
+
+  // =========================================================================
+  // Media Library + Attachments
+  // =========================================================================
+
+  /**
+   * Format counts for display in header badges
+   * @param {number} count - Item count
+   * @param {string} singularLabel - Singular label
+   * @param {string} pluralLabel - Plural label
+   * @returns {string} Formatted label
+   */
+  function formatCountLabel(count, singularLabel, pluralLabel) {
+    return count + ' ' + (count === 1 ? singularLabel : pluralLabel);
+  }
+
+  /**
+   * Find index of an ID in a list using string matching
+   * @param {Array} list - Array of IDs
+   * @param {string|number} id - ID to find
+   * @returns {number} Index or -1
+   */
+  function findIdIndex(list, id) {
+    var targetId = String(id);
+    return list.findIndex(function(item) {
+      return String(item) === targetId;
+    });
+  }
+
+  /**
+   * Update media counts in section headers
+   */
+  function updateMediaCounts() {
+    var imagesCount = document.getElementById('new-article-images-count');
+    var filesCount = document.getElementById('new-article-files-count');
+
+    var totalImages = pageState.attachedImages.length + pageState.stagedImages.length;
+    var totalFiles = pageState.attachedFiles.length + pageState.stagedFiles.length;
+
+    if (imagesCount) {
+      imagesCount.textContent = formatCountLabel(totalImages, 'imagen', 'imágenes');
+    }
+    if (filesCount) {
+      filesCount.textContent = formatCountLabel(totalFiles, 'archivo', 'archivos');
+    }
+  }
+
+  /**
+   * Format file sizes for display
+   * @param {number|string} sizeValue - File size in bytes or formatted string
+   * @returns {string} Human-readable size
+   */
+  function formatFileSize(sizeValue) {
+    if (sizeValue === null || sizeValue === undefined) return '—';
+    if (typeof sizeValue === 'string') return sizeValue;
+    if (typeof sizeValue !== 'number' || isNaN(sizeValue)) return '—';
+    var KB_IN_BYTES = 1024;
+    var MB_IN_BYTES = KB_IN_BYTES * 1024;
+    var GB_IN_BYTES = MB_IN_BYTES * 1024;
+
+    if (sizeValue < KB_IN_BYTES) return sizeValue + ' B';
+    if (sizeValue < MB_IN_BYTES) return Math.round(sizeValue / KB_IN_BYTES) + ' KB';
+    if (sizeValue < GB_IN_BYTES) return (sizeValue / MB_IN_BYTES).toFixed(1) + ' MB';
+    return (sizeValue / GB_IN_BYTES).toFixed(1) + ' GB';
+  }
+
+  /**
+   * Escape string for safe HTML attribute usage
+   * @param {string} value - Raw attribute value
+   * @returns {string} Escaped attribute string
+   */
+  function escapeHtmlAttribute(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * Validate that a URL is safe (no javascript: protocol)
+   * @param {string} url - URL to validate
+   * @returns {string} Safe URL or empty string
+   */
+  function sanitizeUrl(url) {
+    if (!url) return '';
+    var trimmedUrl = url.trim();
+    var normalizedUrl = trimmedUrl.toLowerCase();
+    var urlWithoutWhitespace = trimmedUrl.replace(/\s+/g, '').toLowerCase();
+    if (urlWithoutWhitespace.indexOf('javascript:') === 0 ||
+        urlWithoutWhitespace.indexOf('data:') === 0 ||
+        urlWithoutWhitespace.indexOf('vbscript:') === 0 ||
+        urlWithoutWhitespace.indexOf('file:') === 0) {
+      return '';
+    }
+
+    var hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmedUrl);
+    if (hasProtocol && normalizedUrl.indexOf('http://') !== 0 && normalizedUrl.indexOf('https://') !== 0) {
+      return '';
+    }
+    if (!hasProtocol && normalizedUrl.indexOf('/') !== 0) {
+      return '';
+    }
+
+    return escapeHtmlAttribute(trimmedUrl);
+  }
+
+  /**
+   * Resolve fileIds from original article data into attached media lists
+   */
+  function resolveFileIdsFromArticleData() {
+    if (!pageState.originalArticleData || !pageState.originalArticleData.fileIds) return;
+
+    var fileIds = pageState.originalArticleData.fileIds;
+    if (!Array.isArray(fileIds) || fileIds.length === 0) return;
+
+    var imageIdSet = new Set(pageState.allImages.map(function(img) { return String(img.id); }));
+    var fileIdSet = new Set(pageState.allFiles.map(function(file) { return String(file.id); }));
+
+    fileIds.forEach(function(id) {
+      var normalizedId = String(id);
+      if (imageIdSet.has(normalizedId) && findIdIndex(pageState.attachedImages, normalizedId) === -1) {
+        pageState.attachedImages.push(id);
+      } else if (fileIdSet.has(normalizedId) && findIdIndex(pageState.attachedFiles, normalizedId) === -1) {
+        pageState.attachedFiles.push(id);
+      }
+    });
+  }
+
+  /**
+   * Load media library data for the company
+   */
+  function loadMediaData() {
+    if (!pageState.companyCode) return;
+
+    ImageService.getImages(pageState.companyCode)
+      .then(function(images) {
+        pageState.allImages = images || [];
+        resolveFileIdsFromArticleData();
+        updateAvailableImagesDisplay();
+        updateAttachedImagesDisplay();
+        updateMediaCounts();
+      })
+      .catch(function(error) {
+        console.error('Error loading images:', error);
+        dhtmlx.message({
+          type: 'error',
+          text: 'No se pudieron cargar las imágenes disponibles'
+        });
+      });
+
+    FileService.getFiles(pageState.companyCode)
+      .then(function(files) {
+        pageState.allFiles = files || [];
+        resolveFileIdsFromArticleData();
+        updateAvailableFilesDisplay();
+        updateAttachedFilesDisplay();
+        updateMediaCounts();
+      })
+      .catch(function(error) {
+        console.error('Error loading files:', error);
+        dhtmlx.message({
+          type: 'error',
+          text: 'No se pudieron cargar los archivos disponibles'
+        });
+      });
+  }
+
+  /**
+   * Update the available images list (company library)
+   */
+  function updateAvailableImagesDisplay() {
+    var container = document.getElementById('new-article-available-images');
+    if (!container) return;
+
+    var filteredImages = pageState.allImages.slice();
+
+    if (pageState.imageSearchQuery) {
+      var query = pageState.imageSearchQuery.toLowerCase();
+      filteredImages = filteredImages.filter(function(img) {
+        return (img.name && img.name.toLowerCase().includes(query)) ||
+          (img.description && img.description.toLowerCase().includes(query));
+      });
+    }
+
+    filteredImages = filteredImages.filter(function(img) {
+      return findIdIndex(pageState.attachedImages, img.id) === -1;
+    });
+
+    if (filteredImages.length === 0) {
+      container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay imágenes disponibles</div>';
+      return;
+    }
+
+    container.innerHTML = filteredImages.map(function(img) {
+      return renderAvailableImageItem(img);
+    }).join('');
+
+    container.querySelectorAll('[data-attach-image-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var imageId = btn.getAttribute('data-attach-image-id');
+        attachImage(imageId);
+      });
+    });
+
+    container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var imageId = btn.getAttribute('data-copy-image-id');
+        copyImageUrlToClipboard(imageId);
+      });
+    });
+  }
+
+  /**
+   * Render an available image row
+   * @param {Object} img - Image object
+   * @returns {string} HTML string
+   */
+  function renderAvailableImageItem(img) {
+    var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, img.id));
+    var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
+    var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+
+    return `
+      <div class="flex items-center p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+        <img 
+          src="${thumbnailUrl}" 
+          alt="${escapeHtmlAttribute(img.name)}"
+          class="w-10 h-10 object-cover rounded flex-shrink-0"
+        />
+        <div class="ml-3 flex-1 min-w-0">
+          <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(img.name)}</div>
+          <div class="text-xs text-gray-500">${dimensionsLabel} • ${sizeLabel}</div>
+        </div>
+        <button 
+          type="button"
+          data-copy-image-id="${escapeHtmlAttribute(img.id)}"
+          class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
+          title="Copiar URL"
+        >
+          Copiar
+        </button>
+        <button 
+          type="button"
+          data-attach-image-id="${escapeHtmlAttribute(img.id)}"
+          class="ml-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+        >
+          Adjuntar
+        </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Update the available files list (company library)
+   */
+  function updateAvailableFilesDisplay() {
+    var container = document.getElementById('new-article-available-files');
+    if (!container) return;
+
+    var filteredFiles = pageState.allFiles.slice();
+
+    if (pageState.fileSearchQuery) {
+      var query = pageState.fileSearchQuery.toLowerCase();
+      filteredFiles = filteredFiles.filter(function(file) {
+        return (file.name && file.name.toLowerCase().includes(query)) ||
+          (file.description && file.description.toLowerCase().includes(query));
+      });
+    }
+
+    filteredFiles = filteredFiles.filter(function(file) {
+      return findIdIndex(pageState.attachedFiles, file.id) === -1;
+    });
+
+    if (filteredFiles.length === 0) {
+      container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay archivos disponibles</div>';
+      return;
+    }
+
+    container.innerHTML = filteredFiles.map(function(file) {
+      return renderAvailableFileItem(file);
+    }).join('');
+
+    container.querySelectorAll('[data-attach-file-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var fileId = btn.getAttribute('data-attach-file-id');
+        attachFile(fileId);
+      });
+    });
+  }
+
+  /**
+   * Render an available file row
+   * @param {Object} file - File object
+   * @returns {string} HTML string
+   */
+  function renderAvailableFileItem(file) {
+    var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
+    var fileSizeLabel = escapeHtml(formatFileSize(file.size));
+
+    return `
+      <div class="flex items-center p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+        <div class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded flex-shrink-0">
+          <span class="text-xs font-medium text-gray-500">${extension}</span>
+        </div>
+        <div class="ml-3 flex-1 min-w-0">
+          <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(file.name)}</div>
+          <div class="text-xs text-gray-500">${fileSizeLabel}</div>
+        </div>
+        <button 
+          type="button"
+          data-attach-file-id="${escapeHtmlAttribute(file.id)}"
+          class="ml-2 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+        >
+          Adjuntar
+        </button>
+      </div>
+    `;
+  }
+
+  /**
+   * Attach an image to the article
+   * @param {string} imageId - Image ID to attach
+   */
+  function attachImage(imageId) {
+    if (findIdIndex(pageState.attachedImages, imageId) !== -1) return;
+    pageState.attachedImages.push(imageId);
+    updateAttachedImagesDisplay();
+    updateAvailableImagesDisplay();
+    updateMediaCounts();
+    markFormDirty();
+  }
+
+  /**
+   * Detach an image from the article
+   * @param {string} imageId - Image ID to detach
+   */
+  function detachImage(imageId) {
+    var index = findIdIndex(pageState.attachedImages, imageId);
+    if (index === -1) return;
+    pageState.attachedImages.splice(index, 1);
+    updateAttachedImagesDisplay();
+    updateAvailableImagesDisplay();
+    updateMediaCounts();
+    markFormDirty();
+  }
+
+  /**
+   * Attach a file to the article
+   * @param {string} fileId - File ID to attach
+   */
+  function attachFile(fileId) {
+    if (findIdIndex(pageState.attachedFiles, fileId) !== -1) return;
+    pageState.attachedFiles.push(fileId);
+    updateAttachedFilesDisplay();
+    updateAvailableFilesDisplay();
+    updateMediaCounts();
+    markFormDirty();
+  }
+
+  /**
+   * Detach a file from the article
+   * @param {string} fileId - File ID to detach
+   */
+  function detachFile(fileId) {
+    var index = findIdIndex(pageState.attachedFiles, fileId);
+    if (index === -1) return;
+    pageState.attachedFiles.splice(index, 1);
+    updateAttachedFilesDisplay();
+    updateAvailableFilesDisplay();
+    updateMediaCounts();
+    markFormDirty();
+  }
+
+  /**
+   * Update attached images display
+   */
+  function updateAttachedImagesDisplay() {
+    var container = document.getElementById('new-article-attached-images');
+    if (!container) return;
+
+    if (pageState.attachedImages.length === 0) {
+      container.innerHTML = '<div class="text-sm text-gray-400">Sin imágenes adjuntas</div>';
+      return;
+    }
+
+    var attachedImageObjects = pageState.attachedImages.map(function(id) {
+      return pageState.allImages.find(function(img) {
+        return String(img.id) === String(id);
+      });
+    }).filter(function(img) { return img; });
+
+    if (attachedImageObjects.length === 0) {
+      container.innerHTML = '<div class="text-sm text-gray-400">Imágenes adjuntas no disponibles</div>';
+      return;
+    }
+
+    container.innerHTML = attachedImageObjects.map(function(img) {
+      var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, img.id));
+      var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
+      var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+
+      return `
+        <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
+          <img 
+            src="${thumbnailUrl}" 
+            alt="${escapeHtmlAttribute(img.name)}"
+            class="w-10 h-10 object-cover rounded flex-shrink-0"
+          />
+          <div class="ml-3 flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(img.name)}</div>
+            <div class="text-xs text-gray-500">${dimensionsLabel} • ${sizeLabel}</div>
+          </div>
+          <button 
+            type="button"
+            data-copy-image-id="${escapeHtmlAttribute(img.id)}"
+            class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-white rounded"
+            title="Copiar URL"
+          >
+            Copiar
+          </button>
+          <button 
+            type="button"
+            data-detach-image-id="${escapeHtmlAttribute(img.id)}"
+            class="ml-1 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+          >
+            Quitar
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('[data-detach-image-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var imageId = btn.getAttribute('data-detach-image-id');
+        detachImage(imageId);
+      });
+    });
+
+    container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var imageId = btn.getAttribute('data-copy-image-id');
+        copyImageUrlToClipboard(imageId);
+      });
+    });
+  }
+
+  /**
+   * Update attached files display
+   */
+  function updateAttachedFilesDisplay() {
+    var container = document.getElementById('new-article-attached-files');
+    if (!container) return;
+
+    if (pageState.attachedFiles.length === 0) {
+      container.innerHTML = '<div class="text-sm text-gray-400">Sin archivos adjuntos</div>';
+      return;
+    }
+
+    var attachedFileObjects = pageState.attachedFiles.map(function(id) {
+      return pageState.allFiles.find(function(file) {
+        return String(file.id) === String(id);
+      });
+    }).filter(function(file) { return file; });
+
+    if (attachedFileObjects.length === 0) {
+      container.innerHTML = '<div class="text-sm text-gray-400">Archivos adjuntos no disponibles</div>';
+      return;
+    }
+
+    container.innerHTML = attachedFileObjects.map(function(file) {
+      var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
+      var fileSizeLabel = escapeHtml(formatFileSize(file.size));
+
+      return `
+        <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
+          <div class="w-8 h-8 flex items-center justify-center bg-white rounded flex-shrink-0">
+            <span class="text-xs font-medium text-gray-500">${extension}</span>
+          </div>
+          <div class="ml-2 flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-900 truncate">${escapeHtml(file.name)}</div>
+            <div class="text-xs text-gray-500">${fileSizeLabel}</div>
+          </div>
+          <button 
+            type="button"
+            data-detach-file-id="${escapeHtmlAttribute(file.id)}"
+            class="ml-2 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+          >
+            Quitar
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    container.querySelectorAll('[data-detach-file-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var fileId = btn.getAttribute('data-detach-file-id');
+        detachFile(fileId);
+      });
+    });
+  }
+
+  /**
+   * Copy image URL to clipboard with feedback
+   * @param {string|number} imageId - Image ID
+   */
+  function copyImageUrlToClipboard(imageId) {
+    var imageUrl = buildEditorImageUrl(pageState.companyCode, imageId);
+
+    function showCopySuccess() {
+      dhtmlx.message({
+        type: 'success',
+        text: 'URL de la imagen copiada'
+      });
+    }
+
+    function showCopyError() {
+      dhtmlx.message({
+        type: 'error',
+        text: 'No se pudo copiar la URL de la imagen'
+      });
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(imageUrl)
+        .then(showCopySuccess)
+        .catch(function(error) {
+          console.warn('Clipboard write failed:', error);
+          showCopyError();
+        });
+      return;
+    }
+
+    try {
+      // Legacy fallback for browsers without the navigator.clipboard API.
+      var temporaryInput = document.createElement('textarea');
+      temporaryInput.value = imageUrl;
+      temporaryInput.style.position = 'fixed';
+      temporaryInput.style.opacity = '0';
+      document.body.appendChild(temporaryInput);
+      temporaryInput.select();
+      var wasCopied = document.execCommand('copy');
+      document.body.removeChild(temporaryInput);
+      if (wasCopied) {
+        showCopySuccess();
+      } else {
+        showCopyError();
+      }
+    } catch (error) {
+      console.warn('Clipboard fallback failed:', error);
+      showCopyError();
+    }
   }
 
   /**
@@ -1374,12 +2010,9 @@ var NewArticlePageUI = (function() {
       clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
       companyCode: pageState.companyCode,
       tags: tagIds,
-      attachedImages: pageState.stagedImages.map(function(img) { return img.id; }),
-      attachedFiles: pageState.stagedFiles.map(function(file) { return file.id; }),
-      fileIds: [
-        ...pageState.stagedImages.map(function(img) { return img.id; }),
-        ...pageState.stagedFiles.map(function(file) { return file.id; })
-      ]
+      attachedImages: pageState.attachedImages.slice(),
+      attachedFiles: pageState.attachedFiles.slice(),
+      fileIds: pageState.attachedImages.slice().concat(pageState.attachedFiles.slice())
     };
   }
 
@@ -1424,27 +2057,27 @@ var NewArticlePageUI = (function() {
 
         pageState.stagedFiles.forEach(function(fileData) {
           uploadPromises.push(
-            FileService.createFile({
-              name: fileData.name,
-              size: fileData.size,
-              companyCode: pageState.companyCode,
-              file: fileData.file
-            }).then(function(response) {
-              return { type: 'file', id: response.data.id };
-            })
+            FileService.uploadFiles([fileData.file], '', pageState.companyCode)
+              .then(function(files) {
+                var uploadedFile = files && files[0];
+                if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
+                  throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
+                }
+                return { type: 'file', id: uploadedFile.id };
+              })
           );
         });
 
         pageState.stagedImages.forEach(function(imageData) {
           uploadPromises.push(
-            ImageService.createImage({
-              name: imageData.name,
-              size: imageData.size,
-              companyCode: pageState.companyCode,
-              file: imageData.file
-            }).then(function(response) {
-              return { type: 'image', id: response.data.id };
-            })
+            ImageService.uploadImages([imageData.file], [], '', pageState.companyCode)
+              .then(function(images) {
+                var uploadedImage = images && images[0];
+                if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {
+                  throw new Error('La respuesta del servidor no contiene el identificador de la imagen.');
+                }
+                return { type: 'image', id: uploadedImage.id };
+              })
           );
         });
 
@@ -1458,6 +2091,8 @@ var NewArticlePageUI = (function() {
                 formData.attachedImages.push(result.id);
               }
             });
+
+            formData.fileIds = formData.attachedImages.slice().concat(formData.attachedFiles.slice());
 
             if (pageState.editMode) {
               return ArticleService.updateArticle(pageState.articleId, formData, pageState.companyCode);
@@ -1595,6 +2230,14 @@ var NewArticlePageUI = (function() {
       setTimeout(function() {
         attachEventHandlers();
         initializeEditor();
+        updateStagedFilesDisplay();
+        updateStagedImagesDisplay();
+        updateAttachedFilesDisplay();
+        updateAttachedImagesDisplay();
+        updateAvailableFilesDisplay();
+        updateAvailableImagesDisplay();
+        updateMediaCounts();
+        loadMediaData();
         if (pageState.editMode) {
           populateFormForEditMode();
         }
@@ -1624,6 +2267,12 @@ var NewArticlePageUI = (function() {
     pageState.articleId = null;
     pageState.originalArticleData = null;
     pageState.selectedTags = [];
+    pageState.allImages = [];
+    pageState.allFiles = [];
+    pageState.attachedImages = [];
+    pageState.attachedFiles = [];
+    pageState.imageSearchQuery = '';
+    pageState.fileSearchQuery = '';
     pageState.stagedFiles = [];
     pageState.stagedImages = [];
     pageState.isFormDirty = false;
@@ -1658,6 +2307,12 @@ var NewArticlePageUI = (function() {
     pageState.editMode = true;
     pageState.articleId = articleData.id;
     pageState.originalArticleData = articleData;
+    pageState.allImages = [];
+    pageState.allFiles = [];
+    pageState.attachedImages = [];
+    pageState.attachedFiles = [];
+    pageState.imageSearchQuery = '';
+    pageState.fileSearchQuery = '';
     pageState.stagedFiles = [];
     pageState.stagedImages = [];
     pageState.isFormDirty = false;
@@ -1671,6 +2326,14 @@ var NewArticlePageUI = (function() {
         }
         return tag;
       });
+    }
+
+    if (articleData.attachedImages && Array.isArray(articleData.attachedImages)) {
+      pageState.attachedImages = articleData.attachedImages.slice();
+    }
+
+    if (articleData.attachedFiles && Array.isArray(articleData.attachedFiles)) {
+      pageState.attachedFiles = articleData.attachedFiles.slice();
     }
 
     initializePage(layoutCell, articleData.companyCode, companyName, onNavigateBack);

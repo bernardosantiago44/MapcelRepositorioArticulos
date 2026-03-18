@@ -704,11 +704,11 @@ var NewArticlePageUI = (function() {
   /**
    * Build the public file URL used by Editor.js image blocks
    * @param {string} companyCode - Company identifier
-   * @param {string|number} fileId - Uploaded file identifier
+   * @param {string|number} fileId - Uploaded file identifier with extension
    * @returns {string} Image retrieval URL
    */
   function buildEditorImageUrl(companyCode, fileId) {
-    return API_BASE_URL + '/files/' + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId) + '/download';
+    return WEBSITE_BASE_URL + API_FILES_URL + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId);
   }
 
   /**
@@ -776,9 +776,10 @@ var NewArticlePageUI = (function() {
       })
       .then(function(uploadResult) {
         var uploadedFile = uploadResult && uploadResult.file ? uploadResult.file : uploadResult;
-        if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
+        if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {
           throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
         }
+        var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
 
         markFormDirty();
 
@@ -786,7 +787,7 @@ var NewArticlePageUI = (function() {
           success: 1,
           file: {
             id: uploadedFile.id,
-            url: buildEditorImageUrl(pageState.companyCode, uploadedFile.id)
+            url: buildEditorImageUrl(pageState.companyCode, imageIdAndExtension)
           }
         };
       })
@@ -1584,7 +1585,8 @@ var NewArticlePageUI = (function() {
    * @returns {string} HTML string
    */
   function renderAvailableImageItem(img) {
-    var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, img.id));
+    var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
+    var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
     var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
     var sizeLabel = img.size ? escapeHtml(img.size) : '—';
 
@@ -1601,7 +1603,7 @@ var NewArticlePageUI = (function() {
         </div>
         <button 
           type="button"
-          data-copy-image-id="${escapeHtmlAttribute(img.id)}"
+          data-copy-image-id="${imageIdAndExtension}"
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
           title="Copiar URL"
         >
@@ -1763,7 +1765,8 @@ var NewArticlePageUI = (function() {
     }
 
     container.innerHTML = attachedImageObjects.map(function(img) {
-      var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, img.id));
+      var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
+      var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
       var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
       var sizeLabel = img.size ? escapeHtml(img.size) : '—';
 
@@ -1869,10 +1872,10 @@ var NewArticlePageUI = (function() {
 
   /**
    * Copy image URL to clipboard with feedback
-   * @param {string|number} imageId - Image ID
+   * @param {string|number} imageIdAndExtension - Image ID
    */
-  function copyImageUrlToClipboard(imageId) {
-    var imageUrl = buildEditorImageUrl(pageState.companyCode, imageId);
+  function copyImageUrlToClipboard(imageIdAndExtension) {
+    var imageUrl = buildEditorImageUrl(pageState.companyCode, imageIdAndExtension);
 
     function showCopySuccess() {
       dhtmlx.message({

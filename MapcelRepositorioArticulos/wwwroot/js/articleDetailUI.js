@@ -466,7 +466,7 @@ const ArticleDetailUI = (function() {
     const editButtonHtml = typeof AdminEditArticleButton !== 'undefined' ? `
       <button
         id="edit-article-btn"
-        class="w-full p-3 bg-green-500 hover:bg-green-400 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200"
+        class="w-1/4 p-3 bg-green-500 hover:bg-green-400 text-white border-none rounded-lg text-sm font-semibold cursor-pointer transition-colors duration-200"
       >
         Editar Artículo
       </button>
@@ -474,104 +474,101 @@ const ArticleDetailUI = (function() {
     
     return `
       <div style="
-        padding: 20px;
         height: 100%;
         overflow-y: auto;
         box-sizing: border-box;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       ">
-        <!-- Header: Status and ID -->
-        <div style="margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
-          ${renderStatusBadge(article.status, statusConfig)}
-        </div>
-        
-        <!-- Metadata: Created and Updated dates -->
-        <div style="
-          font-size: 12px;
-          color: #8c8c8c;
-          margin-bottom: 20px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid #e8e8e8;
-        ">
-          <span>Creado: ${formatDate(article.createdAt)}</span>
-          <span style="margin: 0 8px;">|</span>
-          <span>Modificado: ${formatDate(article.updatedAt)}</span>
-        </div>
-        
-        <!-- Title -->
-        <h2 style="
-          font-size: 20px;
-          font-weight: 700;
-          color: #262626;
-          line-height: 1.4;
-          margin: 0 0 16px 0;
-          word-wrap: break-word;
-        ">${article.title}</h2>
-        
-        <!-- Context: Company Name -->
-        <div
-          class="text-sm text-gray-600 mb-5 p-2.5 bg-gray-100 rounded-lg"
-        >
-          <strong>Empresa:</strong> ${companyName}
-        </div>
-
-        
-        <!-- Tags Section -->
-        <div style="margin-bottom: 24px;">
-          <div style="
-            font-size: 13px;
-            font-weight: 600;
-            color: #262626;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          ">Etiquetas</div>
-          ${renderTagBadges(article.tags)}
-        </div>
-        
-        <!-- External Link Section -->
-        <div style="margin-bottom: 24px;">
-          <div style="
-            font-size: 13px;
-            font-weight: 600;
-            color: #262626;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          ">Enlace Externo</div>
-          ${renderExternalLinkSection(article.externalLink)}
-        </div>
-        
-        <!-- Description Section -->
-        ${renderContentSection('Descripción del artículo', article.description)}
-        
-        <!-- Client Comments Section -->
-        ${renderContentSection('Comentarios del cliente', article.clientComments)}
-        
-        <!-- Attachments Section: Images and Files -->
-        <div style="margin-bottom: 24px;">
-          <div style="
-            font-size: 13px;
-            font-weight: 600;
-            color: #262626;
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          ">Archivos e Imágenes adjuntos</div>
-          <div id="article-attachments-container" data-article-id="${article.id}">
-            <!-- Attachments will be loaded asynchronously -->
-            <div class="flex items-center justify-center py-4 text-gray-400">
-              <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <span class="text-sm">Cargando adjuntos...</span>
+        <div class="p-6">
+          <div class="flex justify-between items-center w-full bg-white border-b-2 border-zinc-300 mb-4 sticky top-0 pt-2">
+            <div>
+              <!-- Title -->
+              <h2 class="text-[20px] font-bold text-zinc-800 mb-2 break-words">${article.title}</h2>
+            
+              <!-- Header: Status and ID -->
+              <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                ${renderStatusBadge(article.status, statusConfig)}
+              </div>
+              
+              <!-- Metadata: Created and Updated dates -->
+              <div style="
+                font-size: 12px;
+                color: #8c8c8c;
+                padding-bottom: 16px;
+              ">
+                <span>Creado: ${formatDate(article.createdAt)}</span>
+                <span style="margin: 0 8px;">|</span>
+                <span>Modificado: ${formatDate(article.updatedAt)}</span>
+              </div>
+            </div>
+            
+            <!-- Admin Edit button -->
+            ${editButtonHtml}
+            
+          </div>
+          
+          <!-- Context: Company Name -->
+          <div
+            class="text-sm text-gray-600 mb-5 p-2.5 bg-gray-100 rounded-lg"
+          >
+            <strong>Empresa:</strong> ${companyName}
+          </div>
+  
+          
+          <!-- Tags Section -->
+          <div style="margin-bottom: 24px;">
+            <div style="
+              font-size: 13px;
+              font-weight: 600;
+              color: #262626;
+              margin-bottom: 8px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            ">Etiquetas</div>
+            ${renderTagBadges(article.tags)}
+          </div>
+          
+          <!-- External Link Section -->
+          <div style="margin-bottom: 24px;">
+            <div style="
+              font-size: 13px;
+              font-weight: 600;
+              color: #262626;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            ">Enlace Externo</div>
+            ${renderExternalLinkSection(article.externalLink)}
+          </div>
+          
+          <!-- Description Section -->
+          ${renderContentSection('Descripción del artículo', article.description)}
+          
+          <!-- Client Comments Section -->
+          ${renderContentSection('Comentarios del cliente', article.clientComments)}
+          
+          <!-- Attachments Section: Images and Files -->
+          <div style="margin-bottom: 24px;">
+            <div style="
+              font-size: 13px;
+              font-weight: 600;
+              color: #262626;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            ">Archivos e Imágenes adjuntos</div>
+            <div id="article-attachments-container" data-article-id="${article.id}">
+              <!-- Attachments will be loaded asynchronously -->
+              <div class="flex items-center justify-center py-4 text-gray-400">
+                <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-sm">Cargando adjuntos...</span>
+              </div>
             </div>
           </div>
         </div>
-        
-        <!-- Edit Button (Admin Only) -->
-        ${editButtonHtml}
       </div>
     `;
   }

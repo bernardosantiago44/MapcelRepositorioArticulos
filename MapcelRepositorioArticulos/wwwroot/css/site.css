@@ -21,6 +21,16 @@ body {
   margin-bottom: 60px;
 }
 
+/* Border of the article detail sidebar */
+.article-detail-sidebar {
+  border: 2px solid black !important;
+  box-sizing: border-box;
+}
+
+.article-detail-sidebar div.dhx_cell_cont_layout {
+  border: none !important;
+}
+
 /* =========================================================================
    Article HTML Content Styling
    Styles for HTML elements rendered in the Article Detail sidebar.

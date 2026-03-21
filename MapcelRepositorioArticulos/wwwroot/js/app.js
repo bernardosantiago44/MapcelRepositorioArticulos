@@ -158,6 +158,7 @@ grid_cell.hideHeader();
 
 // Sidebar Cell
 var sidebar_cell = grid_sidebar_split.cells('b');
+sidebar_cell.cell.className += " article-detail-sidebar";
 sidebar_cell.setWidth(LAYOUT_CONFIG.SIDEBAR_WIDTH);
 sidebar_cell.hideHeader();
 sidebar_cell.fixSize(0, 0);
@@ -1089,6 +1090,7 @@ function rebuildArticlesTabLayout() {
   
   // Sidebar Cell
   sidebar_cell = grid_sidebar_split.cells('b');
+  sidebar_cell.cell.className += " article-detail-sidebar";
   sidebar_cell.setWidth(LAYOUT_CONFIG.SIDEBAR_WIDTH);
   sidebar_cell.hideHeader();
   sidebar_cell.fixSize(0, 0);

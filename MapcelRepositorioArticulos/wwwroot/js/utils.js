@@ -170,3 +170,5 @@ const Utils = (function() {
 })();
 
 const API_BASE_URL = '/nuevos/repositorioarticulos/produccion/api';
+const API_FILES_URL = '/nuevos/repositorioarticulos/Archivos/';
+const WEBSITE_BASE_URL = 'https://cbmex8wvs.com'

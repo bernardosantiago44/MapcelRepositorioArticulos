@@ -309,14 +309,22 @@ var NewArticlePageUI = (function() {
                 data-editor-action="heading"
                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
               >
-                <span>Encabezado</span>
+                <span>⋆ Encabezado</span>
               </button>
               <button 
                 type="button" 
                 data-editor-action="list"
                 class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
               >
-                <span>Lista</span>
+                <span>• Lista</span>
+              </button>
+              
+              <button
+                type="button"
+                data-editor-action="ordered-list"
+                class="d-inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"  
+              >
+                <span># Enumeración</span>
               </button>
               <button 
                 type="button" 
@@ -746,28 +754,54 @@ var NewArticlePageUI = (function() {
 
   /**
    * Insert a block into the editor after the current selection.
+   * If the current block is empty, it replaces it.
+   * If the current block has content, it inserts after it.
    * @param {string} blockType
    * @param {Object} blockData
    */
-  function insertEditorBlock(blockType, blockData) {
+  async function insertEditorBlock(blockType, blockData) {
     if (!pageState.editorInstance) return;
 
-    pageState.editorInstance.isReady
-      .then(function() {
-        var currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-        var insertIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
-        pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, insertIndex, true);
-        var targetIndex = (typeof insertIndex === 'number') ? insertIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
-        if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && targetIndex >= 0) {
-          pageState.editorInstance.caret.setToBlock(targetIndex);
-        } else if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToLastBlock === 'function') {
-          pageState.editorInstance.caret.setToLastBlock();
+    try {
+      await pageState.editorInstance.isReady;
+
+      const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
+      let shouldReplace = false;
+      let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
+
+      // Check if the current block is empty
+      if (typeof currentIndex === 'number' && currentIndex >= 0) {
+        const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
+        const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
+
+        // If it's an empty paragraph, we mark it for replacement
+        if (isCurrentBlockEmpty) {
+          shouldReplace = true;
+          targetIndex = currentIndex; // Insert at the same position
         }
-        markFormDirty();
-      })
-      .catch(function(error) {
-        console.warn('Unable to insert block:', error);
-      });
+      }
+
+      // 2. If replacing, delete the empty block first
+      if (shouldReplace) {
+        pageState.editorInstance.blocks.delete(currentIndex);
+      }
+
+      // 3. Insert the new block
+      pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
+
+      // 4. Move Caret to the new block
+      // We use a small timeout to ensure the DOM has rendered the new block before focusing
+      setTimeout(() => {
+        const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
+        if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
+          pageState.editorInstance.caret.setToBlock(finalIndex);
+        }
+      }, 10);
+
+      markFormDirty();
+    } catch (error) {
+      console.warn('Unable to insert block:', error);
+    }
   }
 
   /**
@@ -784,6 +818,9 @@ var NewArticlePageUI = (function() {
         break;
       case 'list':
         insertEditorBlock('list', { style: 'unordered', items: [{ content: '', items: [] }] });
+        break;
+      case 'ordered-list':
+        insertEditorBlock('list', { style: 'ordered', items: [{ content: '', items: [] }] });
         break;
       case 'table':
         insertEditorBlock('table', { withHeadings: false, content: [['', ''], ['', '']] });
@@ -2507,8 +2544,6 @@ var NewArticlePageUI = (function() {
   return {
     openPage: openPage,
     openEditPage: openEditPage,
-    closePage: closePage,
-    isPageOpen: isPageOpen,
-    navigateToGrid: navigateToGrid
+    closePage: closePage
   };
 })();

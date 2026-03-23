@@ -510,8 +510,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var finalThumbnailUrl = thumbnailUrl;
-            var thumbnailUri = finalThumbnailUrl is null ? null : new Uri(finalThumbnailUrl, UriKind.RelativeOrAbsolute);
+            var thumbnailUri = thumbnailUrl is null ? null : new Uri(thumbnailUrl, UriKind.RelativeOrAbsolute);
 
             await tx.CommitAsync(cancellationToken);
 
@@ -527,8 +526,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 CompanyCode = companyCode,
                 LinkedArticles = [],
                 ThumbnailUrl = thumbnailUri,
-                Width = width is null ? null : (long?)width.Value,
-                Height = height is null ? null : (long?)height.Value
+                Width = (long?)width,
+                Height = (long?)height
             };
         }
         catch (Exception ex)

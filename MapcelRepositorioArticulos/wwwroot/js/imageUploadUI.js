@@ -16,7 +16,7 @@ const ImageUploadUI = (function() {
   const THUMBNAIL_SIZE = 64;
   
   let currentWindow = null;
-  let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string }
+  let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string, description?: string, desiredFileName?: string }
   
   /**
    * Open the image upload modal
@@ -106,18 +106,37 @@ const ImageUploadUI = (function() {
           <div id="selected-images-container" class="flex flex-wrap gap-3"></div>
         </div>
         
-        <!-- Description Field -->
-        <div class="mb-4 flex-shrink-0">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Descripción (opcional)
-          </label>
-          <textarea 
-            id="image-upload-description"
-            rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="Agrega una descripción para las imágenes..."
-          ></textarea>
-        </div>
+         <!-- Description Field -->
+         <div class="mb-4 flex-shrink-0 space-y-2">
+           <div class="flex items-center justify-between">
+             <label class="block text-sm font-medium text-gray-700">
+               Descripción rápida (opcional)
+             </label>
+             <div class="flex items-center gap-2">
+               <button 
+                 type="button"
+                 id="image-upload-copy-name-btn"
+                 class="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded border border-gray-200 hover:bg-gray-200 transition-colors"
+               >
+                 Copiar nombre
+               </button>
+               <button 
+                 type="button"
+                 id="image-upload-apply-all-btn"
+                 class="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+               >
+                 Aplicar a todas
+               </button>
+             </div>
+           </div>
+           <textarea 
+             id="image-upload-description"
+             rows="3"
+             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+             placeholder="Agrega una descripción para las imágenes..."
+           ></textarea>
+           <p class="text-xs text-gray-500">Puedes personalizar cada imagen más abajo. Usa “Copiar nombre” para usar el nombre del archivo como descripción.</p>
+         </div>
         
         <!-- Action Buttons -->
         <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 flex-shrink-0">
@@ -151,6 +170,8 @@ const ImageUploadUI = (function() {
     const cancelBtn = document.getElementById('image-upload-cancel-btn');
     const submitBtn = document.getElementById('image-upload-submit-btn');
     const descriptionTextarea = document.getElementById('image-upload-description');
+    const applyAllBtn = document.getElementById('image-upload-apply-all-btn');
+    const copyNameBtn = document.getElementById('image-upload-copy-name-btn');
     
     // Click to select files
     dropzone.addEventListener('click', () => {
@@ -184,6 +205,31 @@ const ImageUploadUI = (function() {
       fileInput.value = '';
     });
     
+    if (applyAllBtn) {
+      applyAllBtn.addEventListener('click', () => {
+        const text = (descriptionTextarea && descriptionTextarea.value ? descriptionTextarea.value.trim() : '');
+        if (!text) {
+          dhtmlx.message({ type: 'warning', text: 'Agrega una descripción antes de aplicarla.' });
+          return;
+        }
+        selectedImages = selectedImages.map(img => Object.assign({}, img, { description: text }));
+        updateSelectedImagesGallery();
+      });
+    }
+    
+    if (copyNameBtn) {
+      copyNameBtn.addEventListener('click', () => {
+        if (!selectedImages.length) {
+          dhtmlx.message({ type: 'warning', text: 'Primero selecciona al menos una imagen.' });
+          return;
+        }
+        const firstName = selectedImages[0].desiredFileName || selectedImages[0].file.name;
+        if (descriptionTextarea) {
+          descriptionTextarea.value = firstName;
+        }
+      });
+    }
+    
     // Cancel button
     cancelBtn.addEventListener('click', () => {
       selectedImages = [];
@@ -205,9 +251,13 @@ const ImageUploadUI = (function() {
       // Extract files and dimensions for upload
       const imageFiles = selectedImages.map(img => img.file);
       const imageDimensions = selectedImages.map(img => img.dimensions);
+      const perFileMetadata = selectedImages.map(img => ({
+        description: img.description || description,
+        desiredFileName: img.desiredFileName || img.file.name
+      }));
       
       // Call image service to upload
-      ImageService.uploadImages(imageFiles, imageDimensions, description, companyCode)
+      ImageService.uploadImages(imageFiles, imageDimensions, description, companyCode, perFileMetadata)
         .then(uploadedImages => {
           // Show success message
           dhtmlx.message({
@@ -348,7 +398,9 @@ const ImageUploadUI = (function() {
               width: img.naturalWidth,
               height: img.naturalHeight
             },
-            previewUrl: e.target.result
+            previewUrl: e.target.result,
+            description: '',
+            desiredFileName: file.name
           });
         };
         
@@ -393,11 +445,13 @@ const ImageUploadUI = (function() {
       
       // Escape file name for display
       const escapedName = Utils.escapeHtml(imageData.file.name);
+      const escapedDesiredName = Utils.escapeHtml(imageData.desiredFileName || imageData.file.name);
+      const escapedDescription = Utils.escapeHtml(imageData.description || '');
       
       return `
-        <div class="relative group bg-gray-50 rounded-lg border border-gray-200 p-2" style="width: 140px;">
+        <div class="relative group bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-3" style="width: 240px;">
           <!-- Thumbnail -->
-          <div class="relative mx-auto mb-2" style="width: ${THUMBNAIL_SIZE}px; height: ${THUMBNAIL_SIZE}px;">
+          <div class="relative mx-auto mb-1" style="width: ${THUMBNAIL_SIZE}px; height: ${THUMBNAIL_SIZE}px;">
             <img 
               src="${imageData.previewUrl}" 
               alt="${escapedName}"
@@ -416,16 +470,79 @@ const ImageUploadUI = (function() {
           </div>
           
           <!-- Image info -->
-          <div class="text-center">
+          <div class="text-center space-y-1">
             <p class="text-xs font-medium text-gray-900 truncate" title="${escapedName}">
               ${escapedName}
             </p>
             <p class="text-xs text-blue-600 font-medium">${dimensionsDisplay}</p>
             <p class="text-xs text-gray-500">${fileSizeDisplay}</p>
           </div>
+          
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[11px] font-medium text-gray-700 mb-1">Nombre deseado</label>
+              <input 
+                type="text" 
+                class="image-meta-name-input w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                data-image-index="${index}"
+                value="${escapedDesiredName}"
+              />
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-[11px] font-medium text-gray-700">Descripción</label>
+                <button 
+                  type="button"
+                  class="image-meta-copy-btn text-[11px] px-2 py-1 bg-gray-100 text-gray-700 rounded border border-gray-200 hover:bg-gray-200 transition-colors"
+                  data-image-index="${index}"
+                >
+                  Copiar nombre
+                </button>
+              </div>
+              <textarea 
+                class="image-meta-description-input w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                rows="2"
+                data-image-index="${index}"
+              >${escapedDescription}</textarea>
+            </div>
+          </div>
         </div>
       `;
     }).join('');
+    
+    // Bind metadata inputs
+    imagesContainer.querySelectorAll('.image-meta-name-input').forEach(input => {
+      const idx = parseInt(input.getAttribute('data-image-index'), 10);
+      input.addEventListener('input', () => {
+        if (selectedImages[idx]) {
+          selectedImages[idx].desiredFileName = input.value;
+        }
+      });
+    });
+    
+    imagesContainer.querySelectorAll('.image-meta-description-input').forEach(textarea => {
+      const idx = parseInt(textarea.getAttribute('data-image-index'), 10);
+      textarea.addEventListener('input', () => {
+        if (selectedImages[idx]) {
+          selectedImages[idx].description = textarea.value;
+        }
+      });
+    });
+    
+    imagesContainer.querySelectorAll('.image-meta-copy-btn').forEach(btn => {
+      const idx = parseInt(btn.getAttribute('data-image-index'), 10);
+      btn.addEventListener('click', () => {
+        if (selectedImages[idx]) {
+          const textToCopy = selectedImages[idx].desiredFileName || selectedImages[idx].file.name;
+          selectedImages[idx].description = textToCopy;
+          const descriptionField = imagesContainer.querySelector('.image-meta-description-input[data-image-index="' + idx + '"]');
+          if (descriptionField) {
+            descriptionField.value = textToCopy;
+            descriptionField.focus();
+          }
+        }
+      });
+    });
   }
   
   /**

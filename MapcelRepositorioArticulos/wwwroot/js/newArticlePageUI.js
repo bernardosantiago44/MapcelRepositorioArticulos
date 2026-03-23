@@ -712,6 +712,8 @@ var NewArticlePageUI = (function() {
         markFormDirty();
       }
     });
+    
+    attachEditorDragAndDrop();
   }
 
   /**
@@ -750,6 +752,108 @@ var NewArticlePageUI = (function() {
     };
 
     document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+  
+  /**
+   * Attach drag & drop upload directly inside Editor.js holder
+   */
+  function attachEditorDragAndDrop() {
+    var editorHolder = document.getElementById('new-article-editorjs');
+    if (!editorHolder || editorHolder.dataset.dndAttached === 'true') return;
+    
+    var highlightClasses = ['ring-2', 'ring-blue-400', 'ring-offset-2', 'bg-blue-50'];
+    
+    function hasImageFile(dt) {
+      if (!dt || !dt.files || !dt.files.length) return false;
+      return Array.prototype.some.call(dt.files, function(file) {
+        return file && file.type && file.type.indexOf('image/') === 0;
+      });
+    }
+    
+    function toggleHighlight(add) {
+      highlightClasses.forEach(function(cls) {
+        if (add) {
+          editorHolder.classList.add(cls);
+        } else {
+          editorHolder.classList.remove(cls);
+        }
+      });
+    }
+    
+    editorHolder.addEventListener('dragover', function(event) {
+      if (!hasImageFile(event.dataTransfer)) return;
+      event.preventDefault();
+      toggleHighlight(true);
+    });
+    
+    editorHolder.addEventListener('dragleave', function() {
+      toggleHighlight(false);
+    });
+    
+    editorHolder.addEventListener('drop', function(event) {
+      if (!hasImageFile(event.dataTransfer)) return;
+      event.preventDefault();
+      toggleHighlight(false);
+      
+      var files = Array.prototype.filter.call(event.dataTransfer.files, function(file) {
+        return file && file.type && file.type.indexOf('image/') === 0;
+      });
+      
+      if (!files.length) {
+        dhtmlx.message({ type: 'warning', text: 'Solo se pueden arrastrar imágenes al editor.' });
+        return;
+      }
+      
+      // Process files sequentially to respect user prompts
+      files.reduce(function(chain, file) {
+        return chain.then(function() {
+          return promptAndInsertEditorImage(file);
+        });
+      }, Promise.resolve());
+    });
+    
+    editorHolder.dataset.dndAttached = 'true';
+  }
+  
+  /**
+   * Prompt for metadata and upload before inserting into Editor.js
+   * @param {File} file
+   */
+  function promptAndInsertEditorImage(file) {
+    var defaultMetadata = {
+      description: file && file.name ? file.name : '',
+      desiredFileName: file && file.name ? file.name : ''
+    };
+    
+    return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
+      .then(function(metadata) {
+        if (!metadata) {
+          dhtmlx.message({ type: 'info', text: 'Carga de imagen cancelada' });
+          return null;
+        }
+        
+        return uploadEditorImageByFile(file, metadata)
+          .then(function(result) {
+            if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
+            
+            var currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
+            var blockData = pageState.editorUsesSimpleImage
+              ? { url: result.file.url, caption: metadata.description || '' }
+              : { file: { url: result.file.url }, caption: metadata.description || '' };
+            
+            pageState.editorInstance.blocks.insert('image', blockData, {}, currentIndex + 1, true);
+            markFormDirty();
+            return result;
+          });
+      })
+      .catch(function(error) {
+        console.error('Error al subir imagen arrastrada:', error);
+        dhtmlx.message({
+          type: 'error',
+          text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
+        });
+        return null;
+      });
   }
 
   /**
@@ -881,7 +985,7 @@ var NewArticlePageUI = (function() {
    * @param {File} file - Local file selected in Editor.js
    * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
    */
-  function uploadEditorImageByFile(file) {
+  function uploadEditorImageByFile(file, metadata) {
     if (!file) {
       var emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
       dhtmlx.message({ type: 'error', text: emptyFileError.message });
@@ -908,6 +1012,14 @@ var NewArticlePageUI = (function() {
 
     var formData = new FormData();
     formData.append('file', file);
+    var hasDescription = metadata && metadata.description && metadata.description.trim();
+    var desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
+    if (hasDescription) {
+      formData.append('description', metadata.description.trim());
+    }
+    if (desiredFileName) {
+      formData.append('desiredFileName', desiredFileName);
+    }
 
     return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
       method: 'POST',
@@ -1470,7 +1582,9 @@ var NewArticlePageUI = (function() {
         file: file,
         name: file.name,
         size: file.size,
-        previewUrl: previewUrl
+        previewUrl: previewUrl,
+        desiredFileName: file.name,
+        description: ''
       });
     }
 
@@ -2245,7 +2359,10 @@ var NewArticlePageUI = (function() {
 
         pageState.stagedImages.forEach(function(imageData) {
           uploadPromises.push(
-            ImageService.uploadImages([imageData.file], [], '', pageState.companyCode)
+            ImageService.uploadImages([imageData.file], [], imageData.description || '', pageState.companyCode, [{
+              description: imageData.description || '',
+              desiredFileName: imageData.desiredFileName || imageData.file.name
+            }])
               .then(function(images) {
                 var uploadedImage = images && images[0];
                 if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {

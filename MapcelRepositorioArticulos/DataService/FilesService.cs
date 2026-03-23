@@ -511,13 +511,9 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            Uri? thumbnailUri = null;
-            if (thumbnailUrl is not null)
-            {
-                var thumbnailKind = generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute;
-                if (!Uri.TryCreate(thumbnailUrl, thumbnailKind, out thumbnailUri))
-                    throw new ArgumentException("FilesService.CreateAsync: ThumbnailUrl is not a valid URI.", nameof(upload));
-            }
+            var thumbnailUri = thumbnailUrl is null
+                ? null
+                : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute);
 
             await tx.CommitAsync(cancellationToken);
 
@@ -533,8 +529,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 CompanyCode = companyCode,
                 LinkedArticles = [],
                 ThumbnailUrl = thumbnailUri,
-                Width = (long?)width,
-                Height = (long?)height
+                Width = width,
+                Height = height
             };
         }
         catch (Exception ex)

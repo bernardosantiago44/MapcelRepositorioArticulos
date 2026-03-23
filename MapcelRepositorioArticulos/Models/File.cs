@@ -14,8 +14,8 @@ public class FileAsset
     public Guid CompanyCode { get; set; }
     public IReadOnlyList<string> LinkedArticles { get; set; }
     public Uri? ThumbnailUrl { get; set; }
-    public long? Width { get; set; }
-    public long? Height { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
 
     // Empty Constructor (for serialization or EF Core)
     public FileAsset()
@@ -40,8 +40,8 @@ public class FileAsset
         Guid companyCode, 
         IReadOnlyList<string> linkedArticles,
         Uri? thumbnailUrl,
-        long? width,
-        long? height)
+        int? width,
+        int? height)
     {
         Id = id;
         Name = name;

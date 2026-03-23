@@ -443,7 +443,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
         var isImage = IsImage(file, extension);
-        var hasImageMetadata = upload.Width is not null || upload.Height is not null || !string.IsNullOrWhiteSpace(upload.ThumbnailUrl);
+        var trimmedThumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? null : upload.ThumbnailUrl.Trim();
+        var hasImageMetadata = upload.Width is not null || upload.Height is not null || trimmedThumbnailUrl is not null;
         if (!isImage && hasImageMetadata)
         {
             Log.Warning(
@@ -454,9 +455,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         var description = string.IsNullOrWhiteSpace(upload.Description) ? null : upload.Description.Trim();
         var width = isImage ? upload.Width : null;
         var height = isImage ? upload.Height : null;
-        var thumbnailUrl = isImage && !string.IsNullOrWhiteSpace(upload.ThumbnailUrl)
-            ? upload.ThumbnailUrl.Trim()
-            : null;
+        var thumbnailUrl = isImage ? trimmedThumbnailUrl : null;
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -512,9 +511,13 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var thumbnailUri = thumbnailUrl is null
-                ? null
-                : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute);
+            Uri? thumbnailUri = null;
+            if (thumbnailUrl is not null)
+            {
+                var thumbnailKind = generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute;
+                if (!Uri.TryCreate(thumbnailUrl, thumbnailKind, out thumbnailUri))
+                    throw new ArgumentException("FilesService.CreateAsync: ThumbnailUrl is not a valid URI.", nameof(upload));
+            }
 
             await tx.CommitAsync(cancellationToken);
 

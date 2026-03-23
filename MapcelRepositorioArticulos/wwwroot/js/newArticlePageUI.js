@@ -292,8 +292,58 @@ var NewArticlePageUI = (function() {
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
             Descripción <span class="text-red-500">*</span>
           </label>
-          <div id="new-article-editor-container" class="border border-gray-300 rounded-lg overflow-hidden bg-white">
-            <div id="new-article-editorjs" class="min-h-[200px] px-4 py-2"></div>
+          <div id="new-article-editor-container" class="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-[520px] min-h-[420px]">
+            <div 
+              id="new-article-editor-toolbar" 
+              class="sticky top-0 z-20 bg-gray-50 border-b border-gray-200 px-3 py-2 flex flex-wrap gap-2"
+            >
+              <button 
+                type="button" 
+                data-editor-action="paragraph"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
+              >
+                <span>+ Párrafo</span>
+              </button>
+              <button 
+                type="button" 
+                data-editor-action="heading"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
+              >
+                <span>⋆ Encabezado</span>
+              </button>
+              <button 
+                type="button" 
+                data-editor-action="list"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
+              >
+                <span>• Lista</span>
+              </button>
+              
+              <button
+                type="button"
+                data-editor-action="ordered-list"
+                class="d-inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"  
+              >
+                <span># Enumeración</span>
+              </button>
+              <button 
+                type="button" 
+                data-editor-action="table"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
+              >
+                <span>Tabla</span>
+              </button>
+              <button 
+                type="button" 
+                data-editor-action="image"
+                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
+              >
+                <span>Imagen</span>
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto bg-white" id="new-article-editor-scroll">
+              <div id="new-article-editorjs" class="min-h-[360px] px-4 py-4"></div>
+            </div>
           </div>
           <div class="mt-2 text-xs text-gray-500">
             Editor de texto enriquecido: encabezados, listas, tablas.
@@ -626,6 +676,7 @@ var NewArticlePageUI = (function() {
     pageState.editorInstance = new EditorJS({
       holder: 'new-article-editorjs',
       placeholder: 'Describe el artículo en detalle...',
+      minHeight: 360,
       tools: {
         header: {
           class: Header,
@@ -699,6 +750,102 @@ var NewArticlePageUI = (function() {
     };
 
     document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+
+  /**
+   * Insert a block into the editor after the current selection.
+   * If the current block is empty, it replaces it.
+   * If the current block has content, it inserts after it.
+   * @param {string} blockType
+   * @param {Object} blockData
+   */
+  async function insertEditorBlock(blockType, blockData) {
+    if (!pageState.editorInstance) return;
+
+    try {
+      await pageState.editorInstance.isReady;
+
+      const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
+      let shouldReplace = false;
+      let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
+
+      // Check if the current block is empty
+      if (typeof currentIndex === 'number' && currentIndex >= 0) {
+        const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
+        const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
+
+        // If it's an empty paragraph, we mark it for replacement
+        if (isCurrentBlockEmpty) {
+          shouldReplace = true;
+          targetIndex = currentIndex; // Insert at the same position
+        }
+      }
+
+      // 2. If replacing, delete the empty block first
+      if (shouldReplace) {
+        pageState.editorInstance.blocks.delete(currentIndex);
+      }
+
+      // 3. Insert the new block
+      pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
+
+      // 4. Move Caret to the new block
+      // We use a small timeout to ensure the DOM has rendered the new block before focusing
+      setTimeout(() => {
+        const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
+        if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
+          pageState.editorInstance.caret.setToBlock(finalIndex);
+        }
+      }, 10);
+
+      markFormDirty();
+    } catch (error) {
+      console.warn('Unable to insert block:', error);
+    }
+  }
+
+  /**
+   * Handle quick action toolbar clicks.
+   * @param {string} action
+   */
+  function handleEditorToolbarAction(action) {
+    switch (action) {
+      case 'paragraph':
+        insertEditorBlock('paragraph', { text: '' });
+        break;
+      case 'heading':
+        insertEditorBlock('header', { text: '', level: 2 });
+        break;
+      case 'list':
+        insertEditorBlock('list', { style: 'unordered', items: [{ content: '', items: [] }] });
+        break;
+      case 'ordered-list':
+        insertEditorBlock('list', { style: 'ordered', items: [{ content: '', items: [] }] });
+        break;
+      case 'table':
+        insertEditorBlock('table', { withHeadings: false, content: [['', ''], ['', '']] });
+        break;
+      case 'image':
+        insertEditorBlock('image', pageState.editorUsesSimpleImage ? { url: '', caption: 'Haz clic para editar la imagen' } : { file: { url: '' }, caption: 'Selecciona o pega una imagen' });
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Attach click handlers to the persistent editor toolbar.
+   */
+  function attachEditorToolbarHandlers() {
+    var toolbar = document.getElementById('new-article-editor-toolbar');
+    if (!toolbar) return;
+
+    toolbar.addEventListener('click', function(event) {
+      var button = event.target.closest('[data-editor-action]');
+      if (!button) return;
+      var action = button.getAttribute('data-editor-action');
+      handleEditorToolbarAction(action);
+    });
   }
 
   /**
@@ -779,7 +926,7 @@ var NewArticlePageUI = (function() {
         if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {
           throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
         }
-        var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
+        var imageIdAndExtension = escapeHtmlAttribute(uploadedFile.id + uploadedFile.extension);
 
         markFormDirty();
 
@@ -845,6 +992,33 @@ var NewArticlePageUI = (function() {
     }
   }
 
+  var EDITOR_HTML_SANITIZE_CONFIG = {
+    USE_PROFILES: { html: true },
+    ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+    ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class']
+  };
+
+  /**
+   * Sanitize HTML fragments while allowing rich content inside table cells.
+   * @param {string} htmlString
+   * @returns {string}
+   */
+  function sanitizeEditorHtml(htmlString) {
+    if (typeof DOMPurify === 'undefined') {
+      return htmlString;
+    }
+    return DOMPurify.sanitize(htmlString, EDITOR_HTML_SANITIZE_CONFIG);
+  }
+
+  /**
+   * Sanitize table cell HTML content, preserving headings, images, and inline styles.
+   * @param {string} cellHtml
+   * @returns {string}
+   */
+  function sanitizeEditorTableCellHtml(cellHtml) {
+    return sanitizeEditorHtml(cellHtml || '');
+  }
+
   /**
    * Render list items recursively for editorjs-html custom parser
    * Handles both simple string items and nested object-based items (list v2.0+)
@@ -888,7 +1062,8 @@ var NewArticlePageUI = (function() {
           tableHtml += '<tr>';
           row.forEach(function(cell) {
             var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
-            tableHtml += '<' + cellTag + '>' + cell + '</' + cellTag + '>';
+            var safeCellHtml = sanitizeEditorTableCellHtml(cell);
+            tableHtml += '<' + cellTag + '>' + safeCellHtml + '</' + cellTag + '>';
           });
           tableHtml += '</tr>';
         });
@@ -1031,9 +1206,10 @@ var NewArticlePageUI = (function() {
    * @param {string} htmlString - The HTML content to load
    */
   function hydrateEditorFromHtml(editor, htmlString) {
-    var sanitizedHtml = typeof DOMPurify !== 'undefined'
-      ? DOMPurify.sanitize(htmlString, { USE_PROFILES: { html: true } })
-      : (console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration'), htmlString);
+    var sanitizedHtml = sanitizeEditorHtml(htmlString);
+    if (typeof DOMPurify === 'undefined') {
+      console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration');
+    }
 
     editor.isReady.then(function() {
       if (typeof editor.blocks.renderFromHTML === 'function') {
@@ -2035,12 +2211,8 @@ var NewArticlePageUI = (function() {
     pageState.editorInstance.save()
       .then(function(editorData) {
         // Convert Editor.js JSON blocks to standard HTML
-        var descriptionHtml = convertEditorDataToHtml(editorData);
-
-        // Sanitize the output HTML
-        if (typeof DOMPurify !== 'undefined') {
-          descriptionHtml = DOMPurify.sanitize(descriptionHtml, { USE_PROFILES: { html: true } });
-        } else {
+        var descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
+        if (typeof DOMPurify === 'undefined') {
           console.warn('DOMPurify not loaded: HTML output will not be sanitized');
         }
 
@@ -2232,6 +2404,7 @@ var NewArticlePageUI = (function() {
       layoutCell.attachHTMLString(renderPageHtml());
       setTimeout(function() {
         attachEventHandlers();
+        attachEditorToolbarHandlers();
         initializeEditor();
         updateStagedFilesDisplay();
         updateStagedImagesDisplay();
@@ -2371,8 +2544,6 @@ var NewArticlePageUI = (function() {
   return {
     openPage: openPage,
     openEditPage: openEditPage,
-    closePage: closePage,
-    isPageOpen: isPageOpen,
-    navigateToGrid: navigateToGrid
+    closePage: closePage
   };
 })();

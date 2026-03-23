@@ -510,7 +510,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var thumbnailUri = thumbnailUrl is null ? null : new Uri(thumbnailUrl, UriKind.RelativeOrAbsolute);
+            var finalThumbnailUrl = thumbnailUrl;
+            var thumbnailUri = finalThumbnailUrl is null ? null : new Uri(finalThumbnailUrl, UriKind.RelativeOrAbsolute);
 
             await tx.CommitAsync(cancellationToken);
 

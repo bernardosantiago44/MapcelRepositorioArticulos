@@ -762,11 +762,13 @@ var NewArticlePageUI = (function() {
     
     var highlightClasses = ['ring-2', 'ring-blue-400', 'ring-offset-2', 'bg-blue-50'];
     
+    function isImageFile(file) {
+      return file && file.type && file.type.indexOf('image/') === 0;
+    }
+    
     function hasImageFile(dt) {
       if (!dt || !dt.files || !dt.files.length) return false;
-      return Array.prototype.some.call(dt.files, function(file) {
-        return file && file.type && file.type.indexOf('image/') === 0;
-      });
+      return Array.prototype.some.call(dt.files, isImageFile);
     }
     
     function toggleHighlight(add) {
@@ -794,9 +796,7 @@ var NewArticlePageUI = (function() {
       event.preventDefault();
       toggleHighlight(false);
       
-      var files = Array.prototype.filter.call(event.dataTransfer.files, function(file) {
-        return file && file.type && file.type.indexOf('image/') === 0;
-      });
+      var files = Array.prototype.filter.call(event.dataTransfer.files, isImageFile);
       
       if (!files.length) {
         dhtmlx.message({ type: 'warning', text: 'Solo se pueden arrastrar imágenes al editor.' });

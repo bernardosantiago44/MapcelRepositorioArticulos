@@ -14,6 +14,7 @@ const ImageUploadUI = (function() {
   const ACCEPTED_IMAGE_FORMATS = ['.jpg', '.jpeg', '.png', '.svg', '.webp'];
   const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
   const THUMBNAIL_SIZE = 64;
+  const SELECTED_CARD_WIDTH = 240;
   
   let currentWindow = null;
   let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string, description?: string, desiredFileName?: string }
@@ -449,7 +450,7 @@ const ImageUploadUI = (function() {
       const escapedDescription = Utils.escapeHtml(imageData.description || '');
       
       return `
-        <div class="relative group bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-3" style="width: 240px;">
+        <div class="relative group bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-3" style="width: ${SELECTED_CARD_WIDTH}px;">
           <!-- Thumbnail -->
           <div class="relative mx-auto mb-1" style="width: ${THUMBNAIL_SIZE}px; height: ${THUMBNAIL_SIZE}px;">
             <img 
@@ -510,9 +511,13 @@ const ImageUploadUI = (function() {
       `;
     }).join('');
     
+    function parseImageIndex(element) {
+      return parseInt(element.getAttribute('data-image-index'), 10);
+    }
+    
     // Bind metadata inputs
     imagesContainer.querySelectorAll('.image-meta-name-input').forEach(input => {
-      const idx = parseInt(input.getAttribute('data-image-index'), 10);
+      const idx = parseImageIndex(input);
       input.addEventListener('input', () => {
         if (selectedImages[idx]) {
           selectedImages[idx].desiredFileName = input.value;
@@ -521,7 +526,7 @@ const ImageUploadUI = (function() {
     });
     
     imagesContainer.querySelectorAll('.image-meta-description-input').forEach(textarea => {
-      const idx = parseInt(textarea.getAttribute('data-image-index'), 10);
+      const idx = parseImageIndex(textarea);
       textarea.addEventListener('input', () => {
         if (selectedImages[idx]) {
           selectedImages[idx].description = textarea.value;
@@ -530,7 +535,7 @@ const ImageUploadUI = (function() {
     });
     
     imagesContainer.querySelectorAll('.image-meta-copy-btn').forEach(btn => {
-      const idx = parseInt(btn.getAttribute('data-image-index'), 10);
+      const idx = parseImageIndex(btn);
       btn.addEventListener('click', () => {
         if (selectedImages[idx]) {
           const textToCopy = selectedImages[idx].desiredFileName || selectedImages[idx].file.name;

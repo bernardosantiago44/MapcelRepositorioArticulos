@@ -31,9 +31,12 @@ const ImageMetadataEditorUI = (function() {
   function promptForFileMetadata(file, initialMetadata) {
     if (!file) return Promise.resolve(null);
     
-    if (activeRejecter) {
+    if (activeRejecter || activeResolver) {
+      const previousReject = activeRejecter;
       closeCurrentWindow();
-      activeRejecter(new Error('Ya hay un diálogo de metadatos abierto.'));
+      if (typeof previousReject === 'function') {
+        previousReject(new Error('Ya hay un diálogo de metadatos abierto.'));
+      }
       activeRejecter = null;
       activeResolver = null;
     }

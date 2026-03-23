@@ -39,9 +39,10 @@ const ImagesGalleryViewUI = (function() {
    * @returns {string} HTML string for a card
    */
   function renderCard(image, selectedImageIds = []) {
+    console.log(image)
     const formattedDate = Utils.formatDate(image.upload_date);
     const isSelected = selectedImageIds.includes(image.id);
-    const fileExtension = Utils.getFileExtension(image.name);
+    const fileExtension = image.extension;
     const extensionColor = getExtensionBadgeColor(fileExtension);
     
     // Escape user-controlled data to prevent XSS
@@ -66,13 +67,6 @@ const ImagesGalleryViewUI = (function() {
             ${isSelected ? 'checked' : ''}
             onclick="event.stopPropagation(); ImagesGalleryViewUI.handleCheckboxChange('${escapedId}')"
           />
-        </div>
-        
-        <!-- Extension Badge -->
-        <div class="absolute top-3 right-3 z-10">
-          <span class="px-2 py-1 text-xs font-semibold rounded ${extensionColor}">
-            ${fileExtension.toUpperCase()}
-          </span>
         </div>
         
         <!-- Thumbnail with Lazy Loading -->

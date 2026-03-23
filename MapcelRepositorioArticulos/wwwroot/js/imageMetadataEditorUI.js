@@ -10,6 +10,7 @@ const ImageMetadataEditorUI = (function() {
   let currentWindow = null;
   let activeResolver = null;
   let activeRejecter = null;
+  let dimensions = null;
   
   function closeCurrentWindow() {
     if (currentWindow) {
@@ -39,11 +40,13 @@ const ImageMetadataEditorUI = (function() {
       }
       activeRejecter = null;
       activeResolver = null;
+      dimensions = null;
     }
     
     return new Promise((resolve, reject) => {
       activeResolver = resolve;
       activeRejecter = reject;
+      dimensions = initialMetadata.dimensions;
       
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -53,7 +56,7 @@ const ImageMetadataEditorUI = (function() {
       reader.onerror = () => {
         reject(new Error('No se pudo leer el archivo para vista previa.'));
       };
-      reader.readAsDataURL(file);
+      return reader.readAsDataURL(file);
     });
   }
   
@@ -169,7 +172,8 @@ const ImageMetadataEditorUI = (function() {
         
         resolver({
           description: descriptionValue,
-          desiredFileName: desiredFileName
+          desiredFileName: desiredFileName,
+          dimensions: dimensions,
         });
         
         closeCurrentWindow();
@@ -231,8 +235,8 @@ const ImageMetadataEditorUI = (function() {
     // Escape user-controlled data to prevent XSS
     const escapedName = Utils.escapeHtml(image.name || '');
     const escapedDescription = Utils.escapeHtml(image.description || '');
-    const escapedDimensions = Utils.escapeHtml(image.dimensions || '');
-    const escapedSize = Utils.escapeHtml(image.size || '');
+    const escapedDimensions = image.width && image.height ? Utils.escapeHtml(`${image.width}px x ${image.height}px` || '') : '—';
+    const escapedSize = Utils.escapeHtml(Utils.formatBytes(image.sizeBytes ?? 0));
     const escapedThumbnailUrl = Utils.escapeHtml(image.thumbnailUrl);
     
     return `
@@ -353,7 +357,7 @@ const ImageMetadataEditorUI = (function() {
           // Show success message
           dhtmlx.message({
             type: 'success',
-            text: 'Descripción actualizada correctamente'
+            text: 'Descripción actualizada correctamente',
           });
           
           // Call completion callback

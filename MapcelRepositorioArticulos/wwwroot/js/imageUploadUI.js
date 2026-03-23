@@ -15,6 +15,8 @@ const ImageUploadUI = (function() {
   const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
   const THUMBNAIL_SIZE = 64;
   const SELECTED_CARD_WIDTH = 240;
+  const WINDOW_WIDTH = 1200;
+  const WINDOW_HEIGHT = 900;
   
   let currentWindow = null;
   let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string, description?: string, desiredFileName?: string }
@@ -39,7 +41,7 @@ const ImageUploadUI = (function() {
     selectedImages = [];
     
     currentWindow = new dhtmlXWindows();
-    const uploadWindow = currentWindow.createWindow('image_upload_window', 0, 0, 650, 650);
+    const uploadWindow = currentWindow.createWindow('image_upload_window', 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     uploadWindow.setText('Subir imágenes');
     uploadWindow.centerOnScreen();
     uploadWindow.button('minmax').hide();

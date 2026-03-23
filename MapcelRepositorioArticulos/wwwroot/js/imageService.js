@@ -289,6 +289,9 @@ const ImageService = (function() {
       let descriptionValue = '';
       let desiredFileName = '';
       
+      const width = imageDimensions[index].width;
+      const height = imageDimensions[index].height;
+      
       if (metadataForFile && typeof metadataForFile.description === 'string') {
         descriptionValue = metadataForFile.description;
       } else if (typeof description === 'string') {
@@ -304,7 +307,12 @@ const ImageService = (function() {
       }
       
       if (desiredFileName) {
-        formData.append('desiredFileName', desiredFileName);
+        formData.append('name', desiredFileName);
+      }
+      
+      if (width && height) {
+        formData.append("width", `${width}`);
+        formData.append("height", `${height}`);
       }
       
       const requestOptions = {

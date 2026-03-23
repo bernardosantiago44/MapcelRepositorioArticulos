@@ -657,7 +657,7 @@ var NewArticlePageUI = (function() {
         class: ImageTool,
         config: {
           uploader: {
-            uploadByFile: uploadEditorImageByFile,
+            // uploadByFile: uploadEditorImageByFile,
             uploadByUrl: uploadEditorImageByUrl
           }
         }
@@ -790,26 +790,46 @@ var NewArticlePageUI = (function() {
     editorHolder.addEventListener('dragleave', function() {
       toggleHighlight(false);
     });
-    
+
     editorHolder.addEventListener('drop', function(event) {
       if (!hasImageFile(event.dataTransfer)) return;
       event.preventDefault();
       toggleHighlight(false);
-      
+
       var files = Array.prototype.filter.call(event.dataTransfer.files, isImageFile);
-      
+
       if (!files.length) {
         dhtmlx.message({ type: 'warning', text: 'Solo se pueden arrastrar imágenes al editor.' });
         return;
       }
-      
-      // Process files sequentially to respect user prompts
+
+      // Process files sequentially
       files.reduce(function(chain, file) {
         return chain.then(function() {
-          return promptAndInsertEditorImage(file);
+          // 1. Get dimensions first
+          return getImageDimensions(file).then(function(dimensions) {
+            // 2. Pass dimensions to your prompt/insert function
+            // You'll need to update promptAndInsertEditorImage to accept this 2nd argument
+            return promptAndInsertEditorImage(file, dimensions);
+          });
         });
       }, Promise.resolve());
     });
+
+    // The helper function from before
+    function getImageDimensions(file) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+          const dimensions = { width: img.width, height: img.height };
+          URL.revokeObjectURL(img.src);
+          resolve(dimensions);
+        };
+        // Handle potential load errors
+        img.onerror = () => resolve({ width: 0, height: 0 });
+      });
+    }
     
     editorHolder.dataset.dndAttached = 'true';
   }
@@ -817,20 +837,24 @@ var NewArticlePageUI = (function() {
   /**
    * Prompt for metadata and upload before inserting into Editor.js
    * @param {File} file
+   * @param {{width: number, height: number}} dimensions
    */
-  function promptAndInsertEditorImage(file) {
+  function promptAndInsertEditorImage(file, dimensions) {
     var defaultMetadata = {
       description: file && file.name ? file.name : '',
-      desiredFileName: file && file.name ? file.name : ''
+      desiredFileName: file && file.name ? file.name : '',
+      dimensions: dimensions ? dimensions : {},
     };
     
     return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
+      // Load image preview
       .then(function(metadata) {
         if (!metadata) {
           dhtmlx.message({ type: 'info', text: 'Carga de imagen cancelada' });
           return null;
         }
         
+        console.log(metadata);
         return uploadEditorImageByFile(file, metadata)
           .then(function(result) {
             if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
@@ -1014,26 +1038,20 @@ var NewArticlePageUI = (function() {
     var descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
     var desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
     if (descriptionValue) {
-      formData.append('description', descriptionValue);
+      formData.append('Description', descriptionValue);
     }
     if (desiredFileName) {
-      formData.append('desiredFileName', desiredFileName);
+      formData.append('Name', desiredFileName);
     }
 
-    return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
-      method: 'POST',
-      body: formData
-    })
-      .then(function(response) {
-        if (!response.ok) {
-          return parseUploadErrorMessage(response).then(function(errorText) {
-            throw new Error(errorText);
-          });
-        }
-        return response.json();
-      })
+    // return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
+    //   method: 'POST',
+    //   body: formData
+    // })
+      return ImageService.uploadImages([file], [metadata.dimensions], descriptionValue, appState.selectedCompanyCode, [metadata])
+      
       .then(function(uploadResult) {
-        var uploadedFile = uploadResult && uploadResult.file ? uploadResult.file : uploadResult;
+        var uploadedFile = uploadResult[0] && uploadResult[0].file ? uploadResult[0].file : uploadResult[0];
         if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {
           throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
         }
@@ -1058,6 +1076,30 @@ var NewArticlePageUI = (function() {
       });
   }
 
+  /**
+  * Edits the name and description fields for an existing image.
+  * Use this for editing, since uploadEditorImageByFile creates 
+  * a new image.
+  * 
+  * @param {integer} fileId - File id
+  * @param {{Name: string, Description: string}} metadata
+  */
+  function editImageFields(fileId, metadata) {
+    if (!fileId || !metadata) {
+      var emptyParameterError = new Error('Los campos id, nombre y descripción son obligatorios');
+      dhtmlx.message({ type: 'error', text: emptyParameterError.message });
+      return Promise.reject(emptyParameterError);
+    }
+
+    if (!pageState.canUserUpload) {
+      var permissionError = new Error('No tienes permisos para subir imágenes.');
+      dhtmlx.message({ type: 'error', text: permissionError.message });
+      return Promise.reject(permissionError);
+    }
+    
+    // Check that the image was successfully uploaded 
+  }
+  
   /**
    * Keep URL-based image insertion available in Image Tool.
    * @param {string} imageUrl - URL entered in Editor.js

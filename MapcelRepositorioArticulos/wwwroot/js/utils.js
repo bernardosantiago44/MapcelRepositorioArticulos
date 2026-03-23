@@ -157,6 +157,29 @@ const Utils = (function() {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
   }
 
+  /**
+   * Formats the given bytes to human-readable units.
+   * @param bytes
+   * @return {string}
+   */
+  function formatBytes(bytes) {
+    if (bytes === 0) return '';
+    const units = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+
+    while (bytes >= 1024 && i < units.length - 1) {
+      bytes /= 1024;
+      i++;
+    }
+
+    return `${bytes.toFixed(2)} ${units[i]}`;
+  }
+
+// Example usage:
+  console.log(formatBytes(1550));       // "1.51 KB"
+  console.log(formatBytes(5000000));    // "4.77 MB"
+  console.log(formatBytes(1234567890)); // "1.15 GB"
+
   // Public API
   return {
     escapeHtml,
@@ -165,7 +188,8 @@ const Utils = (function() {
     debounce,
     applyMarkdownActionToTextArea,
     renderMarkdown,
-    isValidUUID
+    isValidUUID,
+    formatBytes,
   };
 })();
 

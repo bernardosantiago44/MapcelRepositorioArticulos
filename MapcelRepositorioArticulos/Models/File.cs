@@ -94,7 +94,7 @@ public sealed class UpdateFileRequest
 
 public sealed class FileUploadDto
 {
-    public IFormFile File { get; set; } = null!;
+    public required IFormFile File { get; set; }
     public string? Description { get; set; }
     public int? Width { get; set; }
     public int? Height { get; set; }

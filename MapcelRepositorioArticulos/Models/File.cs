@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Http;
+
 namespace MapcelRepositorioArticulos.Models;
 
 public class FileAsset
@@ -87,5 +89,29 @@ public sealed class UpdateFileRequest
 
         if (!descEmpty && Description!.Trim().Length > 500)
             throw new ArgumentException("UpdateFileRequest: Description cannot exceed 500 characters.");
+    }
+}
+
+public sealed class FileUploadDto
+{
+    public IFormFile File { get; set; } = null!;
+    public string? Description { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public string? ThumbnailUrl { get; set; }
+
+    public void Validate()
+    {
+        if (!string.IsNullOrWhiteSpace(Description) && Description.Trim().Length > 500)
+            throw new ArgumentException("FileUploadDto: Description cannot exceed 500 characters.");
+
+        if (!string.IsNullOrWhiteSpace(ThumbnailUrl) && ThumbnailUrl.Trim().Length > 500)
+            throw new ArgumentException("FileUploadDto: ThumbnailUrl cannot exceed 500 characters.");
+
+        if (Width is < 0)
+            throw new ArgumentOutOfRangeException(nameof(Width), "FileUploadDto: Width cannot be negative.");
+
+        if (Height is < 0)
+            throw new ArgumentOutOfRangeException(nameof(Height), "FileUploadDto: Height cannot be negative.");
     }
 }

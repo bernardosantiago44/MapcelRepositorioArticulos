@@ -148,12 +148,12 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
     [RequestSizeLimit(50L * 1024 * 1024)]
     public async Task<ActionResult<object>> Create(
         [FromRoute] Guid companyCode,
-        [FromForm] IFormFile file,
+        [FromForm] FileUploadDto upload,
         CancellationToken cancellationToken)
     {
         try
         {
-            var createdFile = await service.CreateAsync(companyCode, file, cancellationToken);
+            var createdFile = await service.CreateAsync(companyCode, upload, cancellationToken);
             
             var downloadUrl = Url.Action(
                 action: nameof(Download),

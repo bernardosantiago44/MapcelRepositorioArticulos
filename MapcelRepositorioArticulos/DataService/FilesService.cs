@@ -496,12 +496,10 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await file.CopyToAsync(fs, cancellationToken);
             }
             
-            var generatedThumbnail = false;
             if (isImage && thumbnailUrl is null)
             {
                 // Relative URL is fine; frontend can prepend API base if needed
                 thumbnailUrl = $"/nuevos/repositorioarticulos/Archivos/{companyCode:D}/{newFileId}{extension}";
-                generatedThumbnail = true;
 
                 await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
                 updateThumbCmd.CommandType = CommandType.Text;
@@ -512,17 +510,11 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
+            var thumbnailUri = thumbnailUrl is null ? null : new Uri(thumbnailUrl, UriKind.RelativeOrAbsolute);
+
             await tx.CommitAsync(cancellationToken);
 
             // 4) Return DTO
-            Uri? thumbnailUri = null;
-            if (thumbnailUrl is not null)
-            {
-                var thumbnailKind = generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute;
-                if (!Uri.TryCreate(thumbnailUrl, thumbnailKind, out thumbnailUri))
-                    throw new ArgumentException("FilesService.CreateAsync: ThumbnailUrl is not a valid URI.", nameof(upload));
-            }
-
             return new FileAsset
             {
                 Id = newFileId.ToString(),

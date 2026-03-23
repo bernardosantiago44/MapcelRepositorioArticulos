@@ -496,10 +496,12 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await file.CopyToAsync(fs, cancellationToken);
             }
             
+            var generatedThumbnail = false;
             if (isImage && thumbnailUrl is null)
             {
                 // Relative URL is fine; frontend can prepend API base if needed
                 thumbnailUrl = $"/nuevos/repositorioarticulos/Archivos/{companyCode:D}/{newFileId}{extension}";
+                generatedThumbnail = true;
 
                 await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
                 updateThumbCmd.CommandType = CommandType.Text;
@@ -510,7 +512,9 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            var thumbnailUri = thumbnailUrl is null ? null : new Uri(thumbnailUrl, UriKind.RelativeOrAbsolute);
+            var thumbnailUri = thumbnailUrl is null
+                ? null
+                : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute);
 
             await tx.CommitAsync(cancellationToken);
 

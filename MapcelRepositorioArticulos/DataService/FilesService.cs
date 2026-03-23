@@ -515,6 +515,14 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             await tx.CommitAsync(cancellationToken);
 
             // 4) Return DTO
+            Uri? thumbnailUri = null;
+            if (thumbnailUrl is not null)
+            {
+                var thumbnailKind = generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute;
+                if (!Uri.TryCreate(thumbnailUrl, thumbnailKind, out thumbnailUri))
+                    throw new ArgumentException("FilesService.CreateAsync: ThumbnailUrl is not a valid URI.", nameof(upload));
+            }
+
             return new FileAsset
             {
                 Id = newFileId.ToString(),
@@ -525,9 +533,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 UploadDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 CompanyCode = companyCode,
                 LinkedArticles = [],
-                ThumbnailUrl = thumbnailUrl is null
-                    ? null
-                    : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute),
+                ThumbnailUrl = thumbnailUri,
                 Width = width is null ? null : (long?)width.Value,
                 Height = height is null ? null : (long?)height.Value
             };

@@ -443,7 +443,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
         var isImage = IsImage(file, extension);
-        if (!isImage && (upload.Width is not null || upload.Height is not null || !string.IsNullOrWhiteSpace(upload.ThumbnailUrl)))
+        var hasImageMetadata = upload.Width is not null || upload.Height is not null || !string.IsNullOrWhiteSpace(upload.ThumbnailUrl);
+        if (!isImage && hasImageMetadata)
         {
             Log.Warning(
                 "FilesService.CreateAsync received image metadata for non-image file {FileName} in companyCode={CompanyCode}",
@@ -495,12 +496,12 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await file.CopyToAsync(fs, cancellationToken);
             }
             
-            var thumbnailUriKind = UriKind.RelativeOrAbsolute;
+            var generatedThumbnail = false;
             if (isImage && thumbnailUrl is null)
             {
                 // Relative URL is fine; frontend can prepend API base if needed
                 thumbnailUrl = $"/nuevos/repositorioarticulos/Archivos/{companyCode:D}/{newFileId}{extension}";
-                thumbnailUriKind = UriKind.Relative;
+                generatedThumbnail = true;
 
                 await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
                 updateThumbCmd.CommandType = CommandType.Text;
@@ -524,7 +525,9 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 UploadDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 CompanyCode = companyCode,
                 LinkedArticles = [],
-                ThumbnailUrl = thumbnailUrl is null ? null : new Uri(thumbnailUrl, thumbnailUriKind),
+                ThumbnailUrl = thumbnailUrl is null
+                    ? null
+                    : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute),
                 Width = width is null ? null : (long?)width.Value,
                 Height = height is null ? null : (long?)height.Value
             };

@@ -353,6 +353,9 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 Extension = reader.GetString(extensionsPos),
                 ThumbnailUrl =  reader.IsDBNull(thumbnailUrlPos) ? "" : reader.GetString(thumbnailUrlPos),
                 IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
+                Width = reader.IsDBNull(widthPos) ? null : reader.GetInt32(widthPos),
+                Height = reader.IsDBNull(heightPos) ? null : reader.GetInt32(heightPos),
+                SizeBytes =  reader.IsDBNull(sizeBytesPos) ? null : reader.GetInt64(sizeBytesPos)
             });
         }
 

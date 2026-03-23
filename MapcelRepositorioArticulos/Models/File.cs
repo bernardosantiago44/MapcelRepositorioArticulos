@@ -65,6 +65,9 @@ public class FileDto
     public string Extension { get; set; }
     public string? ThumbnailUrl { get; set; } = null;
     public bool IsImage { get; set; } = false;
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public long? SizeBytes { get; set; }
 }
 
 public sealed class UpdateFileRequest

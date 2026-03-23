@@ -443,6 +443,13 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
         var isImage = IsImage(file, extension);
+        if (!isImage && (upload.Width is not null || upload.Height is not null || !string.IsNullOrWhiteSpace(upload.ThumbnailUrl)))
+        {
+            Log.Warning(
+                "FilesService.CreateAsync received image metadata for non-image file {FileName} in companyCode={CompanyCode}",
+                originalFileName,
+                companyCode);
+        }
         var description = string.IsNullOrWhiteSpace(upload.Description) ? null : upload.Description.Trim();
         var width = isImage ? upload.Width : null;
         var height = isImage ? upload.Height : null;

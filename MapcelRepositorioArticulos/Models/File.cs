@@ -102,11 +102,18 @@ public sealed class FileUploadDto
 
     public void Validate()
     {
+        if (File is null)
+            throw new ArgumentNullException(nameof(File), "FileUploadDto: File is required.");
+
         if (!string.IsNullOrWhiteSpace(Description) && Description.Trim().Length > 500)
             throw new ArgumentException("FileUploadDto: Description cannot exceed 500 characters.");
 
         if (!string.IsNullOrWhiteSpace(ThumbnailUrl) && ThumbnailUrl.Trim().Length > 500)
             throw new ArgumentException("FileUploadDto: ThumbnailUrl cannot exceed 500 characters.");
+
+        if (!string.IsNullOrWhiteSpace(ThumbnailUrl)
+            && !Uri.IsWellFormedUriString(ThumbnailUrl.Trim(), UriKind.RelativeOrAbsolute))
+            throw new ArgumentException("FileUploadDto: ThumbnailUrl is not a valid URI.");
 
         if (Width is < 0)
             throw new ArgumentOutOfRangeException(nameof(Width), "FileUploadDto: Width cannot be negative.");

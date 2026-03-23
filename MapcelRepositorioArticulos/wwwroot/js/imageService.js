@@ -286,12 +286,18 @@ const ImageService = (function() {
       formData.append('file', file);
       
       const metadataForFile = Array.isArray(perFileMetadata) ? perFileMetadata[index] : null;
-      const descriptionValue = metadataForFile && typeof metadataForFile.description === 'string'
-        ? metadataForFile.description
-        : (typeof description === 'string' ? description : '');
-      const desiredFileName = metadataForFile && metadataForFile.desiredFileName
-        ? metadataForFile.desiredFileName
-        : '';
+      let descriptionValue = '';
+      let desiredFileName = '';
+      
+      if (metadataForFile && typeof metadataForFile.description === 'string') {
+        descriptionValue = metadataForFile.description;
+      } else if (typeof description === 'string') {
+        descriptionValue = description;
+      }
+      
+      if (metadataForFile && metadataForFile.desiredFileName) {
+        desiredFileName = metadataForFile.desiredFileName;
+      }
       
       if (descriptionValue) {
         formData.append('description', descriptionValue);

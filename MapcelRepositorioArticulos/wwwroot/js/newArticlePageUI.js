@@ -712,7 +712,6 @@ var NewArticlePageUI = (function() {
         markFormDirty();
       }
     });
-    
     attachEditorDragAndDrop();
   }
 
@@ -1012,10 +1011,10 @@ var NewArticlePageUI = (function() {
 
     var formData = new FormData();
     formData.append('file', file);
-    var hasDescription = metadata && metadata.description && metadata.description.trim();
+    var descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
     var desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
-    if (hasDescription) {
-      formData.append('description', metadata.description.trim());
+    if (descriptionValue) {
+      formData.append('description', descriptionValue);
     }
     if (desiredFileName) {
       formData.append('desiredFileName', desiredFileName);

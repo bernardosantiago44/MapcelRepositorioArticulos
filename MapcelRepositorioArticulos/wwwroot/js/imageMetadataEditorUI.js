@@ -32,7 +32,8 @@ const ImageMetadataEditorUI = (function() {
     if (!file) return Promise.resolve(null);
     
     if (activeRejecter) {
-      activeRejecter(new Error('A metadata dialog is already open.'));
+      closeCurrentWindow();
+      activeRejecter(new Error('Ya hay un diálogo de metadatos abierto.'));
       activeRejecter = null;
       activeResolver = null;
     }
@@ -47,7 +48,7 @@ const ImageMetadataEditorUI = (function() {
         openNewFileWindow(file, previewUrl, initialMetadata || {}, resolve);
       };
       reader.onerror = () => {
-        reject(new Error('No se pudo leer el archivo para previsualización.'));
+        reject(new Error('No se pudo leer el archivo para vista previa.'));
       };
       reader.readAsDataURL(file);
     });
@@ -141,7 +142,7 @@ const ImageMetadataEditorUI = (function() {
     
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
-        const desiredName = (nameInput && nameInput.value ? nameInput.value : file.name) || file.name;
+        const desiredName = (nameInput && nameInput.value) || file.name;
         if (descriptionTextarea) {
           descriptionTextarea.value = desiredName;
           descriptionTextarea.focus();

@@ -175,11 +175,6 @@ const Utils = (function() {
     return `${bytes.toFixed(2)} ${units[i]}`;
   }
 
-// Example usage:
-  console.log(formatBytes(1550));       // "1.51 KB"
-  console.log(formatBytes(5000000));    // "4.77 MB"
-  console.log(formatBytes(1234567890)); // "1.15 GB"
-
   // Public API
   return {
     escapeHtml,

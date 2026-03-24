@@ -39,7 +39,6 @@ const ImagesGalleryViewUI = (function() {
    * @returns {string} HTML string for a card
    */
   function renderCard(image, selectedImageIds = []) {
-    console.log(image)
     const formattedDate = Utils.formatDate(image.upload_date);
     const isSelected = selectedImageIds.includes(image.id);
     const fileExtension = image.extension;

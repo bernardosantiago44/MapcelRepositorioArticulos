@@ -1863,8 +1863,13 @@ var NewArticlePageUI = (function() {
 
     container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-copy-image-id');
-        copyImageUrlToClipboard(imageId);
+        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+        insertEditorBlock('image', {
+          file: {
+            url: imageUrl
+          }
+        });
       });
     });
   }
@@ -1897,7 +1902,7 @@ var NewArticlePageUI = (function() {
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
           title="Copiar URL"
         >
-          Copiar
+          Insertar
         </button>
         <button 
           type="button"
@@ -2099,8 +2104,13 @@ var NewArticlePageUI = (function() {
 
     container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-copy-image-id');
-        copyImageUrlToClipboard(imageId);
+        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+        insertEditorBlock('image', {
+          file: {
+            url: imageUrl
+          }
+        });
       });
     });
   }
@@ -2661,6 +2671,7 @@ var NewArticlePageUI = (function() {
   return {
     openPage: openPage,
     openEditPage: openEditPage,
-    closePage: closePage
+    closePage: closePage,
+    pageState: pageState,
   };
 })();

@@ -638,7 +638,7 @@ var NewArticlePageUI = (function() {
         class: ImageTool,
         config: {
           uploader: {
-            // uploadByFile: uploadEditorImageByFile,
+            uploadByFile: imageUploadProcess,
             uploadByUrl: uploadEditorImageByUrl
           }
         }
@@ -693,7 +693,6 @@ var NewArticlePageUI = (function() {
         markFormDirty();
       }
     });
-    attachEditorDragAndDrop();
   }
 
   /**
@@ -733,82 +732,25 @@ var NewArticlePageUI = (function() {
 
     document.addEventListener('paste', pageState.imagePasteHandler);
   }
+
+  function getImageDimensions(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const dimensions = { width: img.width, height: img.height };
+        URL.revokeObjectURL(img.src);
+        resolve(dimensions);
+      };
+      // Handle potential load errors
+      img.onerror = () => resolve({ width: 0, height: 0 });
+    });
+  }
   
-  /**
-   * Attach drag & drop upload directly inside Editor.js holder
-   */
-  function attachEditorDragAndDrop() {
-    var editorHolder = document.getElementById('new-article-editorjs');
-    if (!editorHolder || editorHolder.dataset.dndAttached === 'true') return;
-    
-    var highlightClasses = ['ring-2', 'ring-blue-400', 'ring-offset-2', 'bg-blue-50'];
-    
-    function isImageFile(file) {
-      return file && file.type && file.type.indexOf('image/') === 0;
-    }
-    
-    function hasImageFile(dt) {
-      if (!dt || !dt.files || !dt.files.length) return false;
-      return Array.prototype.some.call(dt.files, isImageFile);
-    }
-    
-    function toggleHighlight(add) {
-      highlightClasses.forEach(function(cls) {
-        if (add) {
-          editorHolder.classList.add(cls);
-        } else {
-          editorHolder.classList.remove(cls);
-        }
-      });
-    }
-    
-    editorHolder.addEventListener('dragover', function(event) {
-      if (!hasImageFile(event.dataTransfer)) return;
-      event.preventDefault();
-      toggleHighlight(true);
+  function imageUploadProcess(file) {
+    return getImageDimensions(file).then(function(dimensions) {
+      return promptAndInsertEditorImage(file, dimensions);
     });
-    
-    editorHolder.addEventListener('dragleave', function() {
-      toggleHighlight(false);
-    });
-
-    editorHolder.addEventListener('drop', function(event) {
-      if (!hasImageFile(event.dataTransfer)) return;
-      event.preventDefault();
-      toggleHighlight(false);
-
-      var files = Array.prototype.filter.call(event.dataTransfer.files, isImageFile);
-
-      if (!files.length) {
-        dhtmlx.message({ type: 'warning', text: 'Solo se pueden arrastrar imágenes al editor.' });
-        return;
-      }
-
-      // Process files sequentially
-      files.reduce(function(chain, file) {
-        return chain.then(function() {
-          return getImageDimensions(file).then(function(dimensions) {
-            return promptAndInsertEditorImage(file, dimensions);
-          });
-        });
-      }, Promise.resolve());
-    });
-    
-    function getImageDimensions(file) {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-          const dimensions = { width: img.width, height: img.height };
-          URL.revokeObjectURL(img.src);
-          resolve(dimensions);
-        };
-        // Handle potential load errors
-        img.onerror = () => resolve({ width: 0, height: 0 });
-      });
-    }
-    
-    editorHolder.dataset.dndAttached = 'true';
   }
   
   /**
@@ -840,7 +782,6 @@ var NewArticlePageUI = (function() {
               ? { url: result.file.url, caption: metadata.description || '' }
               : { file: { url: result.file.url }, caption: metadata.description || '' };
             
-            pageState.editorInstance.blocks.insert('image', blockData, {}, currentIndex + 1, true);
             markFormDirty();
             return result;
           });
@@ -1026,7 +967,6 @@ var NewArticlePageUI = (function() {
     //   body: formData
     // })
       return ImageService.uploadImages([file], [metadata.dimensions], descriptionValue, appState.selectedCompanyCode, [metadata])
-      
       .then(function(uploadResult) {
         var uploadedFile = uploadResult[0] && uploadResult[0].file ? uploadResult[0].file : uploadResult[0];
         if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {

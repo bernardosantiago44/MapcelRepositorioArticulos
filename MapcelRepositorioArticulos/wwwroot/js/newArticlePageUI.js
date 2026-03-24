@@ -424,9 +424,6 @@ var NewArticlePageUI = (function() {
 
           <!-- Attached Files -->
           <div class="mt-4">
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-              Ya cargados
-            </div>
             <div id="new-article-attached-files" class="space-y-2">
               <!-- Attached files will be listed here -->
             </div>
@@ -457,20 +454,6 @@ var NewArticlePageUI = (function() {
             </label>
             <span id="new-article-images-count" class="text-xs text-gray-500">0 imágenes</span>
           </div>
-          
-          <!-- Image Drop Zone -->
-          <div 
-            id="new-article-image-dropzone"
-            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors ${uploadDisabledClass}"
-            ${uploadDisabledAttr}
-          >
-            <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-            </svg>
-            <p class="text-sm text-gray-600">Arrastra imágenes o haz clic</p>
-            <p class="text-xs text-gray-400 mt-1">JPG, PNG, WebP (Max 10MB)</p>
-          </div>
-          <input type="file" id="new-article-image-input" multiple accept="image/jpeg,image/png,image/webp,image/svg+xml" class="hidden" />
           <!-- Staged Images Grid -->
           <div id="new-article-staged-images" class="mt-3 grid grid-cols-3 gap-2">
             <!-- Images will be listed here -->
@@ -478,9 +461,7 @@ var NewArticlePageUI = (function() {
 
           <!-- Attached Images -->
           <div class="mt-4">
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-              Ya cargados
-            </div>
+            
             <div id="new-article-attached-images" class="space-y-2">
               <!-- Attached images will be listed here -->
             </div>
@@ -806,17 +787,13 @@ var NewArticlePageUI = (function() {
       // Process files sequentially
       files.reduce(function(chain, file) {
         return chain.then(function() {
-          // 1. Get dimensions first
           return getImageDimensions(file).then(function(dimensions) {
-            // 2. Pass dimensions to your prompt/insert function
-            // You'll need to update promptAndInsertEditorImage to accept this 2nd argument
             return promptAndInsertEditorImage(file, dimensions);
           });
         });
       }, Promise.resolve());
     });
-
-    // The helper function from before
+    
     function getImageDimensions(file) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -840,7 +817,7 @@ var NewArticlePageUI = (function() {
    * @param {{width: number, height: number}} dimensions
    */
   function promptAndInsertEditorImage(file, dimensions) {
-    var defaultMetadata = {
+    const defaultMetadata = {
       description: file && file.name ? file.name : '',
       desiredFileName: file && file.name ? file.name : '',
       dimensions: dimensions ? dimensions : {},
@@ -854,7 +831,6 @@ var NewArticlePageUI = (function() {
           return null;
         }
         
-        console.log(metadata);
         return uploadEditorImageByFile(file, metadata)
           .then(function(result) {
             if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
@@ -1006,6 +982,7 @@ var NewArticlePageUI = (function() {
   /**
    * Upload an image file to FilesController for Editor.js Image Tool
    * @param {File} file - Local file selected in Editor.js
+   * @param {{description: string, desiredFileName: string, dimensions: [number, number]}} metadata
    * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
    */
   function uploadEditorImageByFile(file, metadata) {
@@ -1058,6 +1035,8 @@ var NewArticlePageUI = (function() {
         var imageIdAndExtension = escapeHtmlAttribute(uploadedFile.id + uploadedFile.extension);
 
         markFormDirty();
+        ImagesTabManager.refreshImagesList();
+        loadMediaData();
 
         return {
           success: 1,
@@ -1536,29 +1515,9 @@ var NewArticlePageUI = (function() {
    * Setup image upload handlers
    */
   function setupImageUploadHandlers() {
-    var dropzone = document.getElementById('new-article-image-dropzone');
     var imageInput = document.getElementById('new-article-image-input');
 
-    if (!dropzone || !imageInput || !pageState.canUserUpload) return;
-
-    dropzone.addEventListener('click', function() {
-      imageInput.click();
-    });
-
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.classList.add('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('dragleave', function() {
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-      handleImageSelect(e.dataTransfer.files);
-    });
+    if (!imageInput || !pageState.canUserUpload) return;
 
     imageInput.addEventListener('change', function(e) {
       handleImageSelect(e.target.files);
@@ -2080,7 +2039,7 @@ var NewArticlePageUI = (function() {
     if (!container) return;
 
     if (pageState.attachedImages.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400">Sin imágenes adjuntas</div>';
+      container.innerHTML = '<div class="text-sm text-gray-400"></div>';
       return;
     }
 

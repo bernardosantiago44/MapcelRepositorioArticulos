@@ -51,7 +51,8 @@ var NewArticlePageUI = (function() {
     imagePasteHandler: null, // Paste handler reference for cleanup
     editMode: false,         // true when editing an existing article
     articleId: null,         // Article ID when in edit mode
-    originalArticleData: null // Original article data for edit mode
+    originalArticleData: null, // Original article data for edit mode
+    isCurrentlyUploading: false
   };
 
   // Constants
@@ -184,6 +185,7 @@ var NewArticlePageUI = (function() {
     pageState.editMode = false;
     pageState.articleId = null;
     pageState.originalArticleData = null;
+    pageState.isCurrentlyUploading = false;
   }
 
   /**
@@ -750,6 +752,8 @@ var NewArticlePageUI = (function() {
   function imageUploadProcess(file) {
     return getImageDimensions(file).then(function(dimensions) {
       return promptAndInsertEditorImage(file, dimensions);
+    }).catch(function(error) {
+      return { success: 0, file: '' }
     });
   }
   
@@ -759,6 +763,12 @@ var NewArticlePageUI = (function() {
    * @param {{width: number, height: number}} dimensions
    */
   function promptAndInsertEditorImage(file, dimensions) {
+    if (pageState.isCurrentlyUploading) {
+      return Promise.reject("Otra imagen está en proceso de subida.");
+    }
+    
+    pageState.isCurrentlyUploading = true;
+    
     const defaultMetadata = {
       description: file && file.name ? file.name : '',
       desiredFileName: file && file.name ? file.name : '',
@@ -793,7 +803,7 @@ var NewArticlePageUI = (function() {
           text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
         });
         return null;
-      });
+      }).finally(function() { pageState.isCurrentlyUploading = false; });
   }
 
   /**

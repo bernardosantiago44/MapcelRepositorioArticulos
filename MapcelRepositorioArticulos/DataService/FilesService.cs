@@ -44,12 +44,12 @@ public interface IFilesService
     /// Creates a new File record in the database, asynchronously.
     /// </summary>
     /// <param name="companyCode">Guid</param>
-    /// <param name="file">IFormFile</param>
+    /// <param name="upload">FileUploadDto</param>
     /// <param name="cancellationToken"></param>
     /// <returns>FileAsset</returns>
     /// <exception cref="ArgumentException">If companyCode is empty.</exception>
     /// <exception cref="ArgumentNullException">If provided file is null, empty or invalid.</exception>
-    Task<FileAsset> CreateAsync(Guid companyCode, IFormFile file, CancellationToken cancellationToken);
+    Task<FileAsset> CreateAsync(Guid companyCode, FileUploadDto upload, CancellationToken cancellationToken);
     
     /// <summary>
     /// Updates all the fields of the provided fileId with the given request.
@@ -353,6 +353,9 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 Extension = reader.GetString(extensionsPos),
                 ThumbnailUrl =  reader.IsDBNull(thumbnailUrlPos) ? "" : reader.GetString(thumbnailUrlPos),
                 IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
+                Width = reader.IsDBNull(widthPos) ? null : reader.GetInt32(widthPos),
+                Height = reader.IsDBNull(heightPos) ? null : reader.GetInt32(heightPos),
+                SizeBytes =  reader.IsDBNull(sizeBytesPos) ? null : reader.GetInt64(sizeBytesPos)
             });
         }
 
@@ -429,17 +432,33 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         return rows;
     }
     
-    public async Task<FileAsset> CreateAsync(Guid companyCode, IFormFile file, CancellationToken cancellationToken)
+    public async Task<FileAsset> CreateAsync(Guid companyCode, FileUploadDto upload, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(upload);
         ValidateCompany(companyCode);
-        ValidateFile(file);
+        ValidateFile(upload.File);
+        upload.Validate();
 
+        var file = upload.File;
         var originalFileName = Path.GetFileName(file.FileName);
         var name = Path.GetFileNameWithoutExtension(originalFileName).Trim();
         var extension = Path.GetExtension(originalFileName);
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
         var isImage = IsImage(file, extension);
+        var trimmedThumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? null : upload.ThumbnailUrl.Trim();
+        var hasImageMetadata = upload.Width is not null || upload.Height is not null || trimmedThumbnailUrl is not null;
+        if (!isImage && hasImageMetadata)
+        {
+            Log.Warning(
+                "FilesService.CreateAsync received image metadata for non-image file {FileName} in companyCode={CompanyCode}",
+                originalFileName,
+                companyCode);
+        }
+        var description = string.IsNullOrWhiteSpace(upload.Description) ? null : upload.Description.Trim();
+        var width = isImage ? upload.Width : null;
+        var height = isImage ? upload.Height : null;
+        var thumbnailUrl = isImage ? trimmedThumbnailUrl : null;
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -454,10 +473,10 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             insertFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             insertFileCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = name });
             insertFileCommand.Parameters.Add(new SqlParameter("@SizeBytes", SqlDbType.BigInt) { Value = file.Length });
-            insertFileCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = DBNull.Value });
-            insertFileCommand.Parameters.Add(new SqlParameter("@Width", SqlDbType.Int) { Value = DBNull.Value });
-            insertFileCommand.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = DBNull.Value });
-            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = (object?)description ?? DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@Width", SqlDbType.Int) { Value = (object?)width ?? DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = (object?)height ?? DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = (object?)thumbnailUrl ?? DBNull.Value });
             insertFileCommand.Parameters.Add(new SqlParameter("@IsImage", SqlDbType.Bit) { Value = isImage });
             insertFileCommand.Parameters.Add(new SqlParameter("@Extension", SqlDbType.VarChar, 15) { Value = extension });
 
@@ -479,11 +498,12 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await file.CopyToAsync(fs, cancellationToken);
             }
             
-            string? thumbnailUrl = null;
-            if (isImage)
+            var generatedThumbnail = false;
+            if (isImage && thumbnailUrl is null)
             {
                 // Relative URL is fine; frontend can prepend API base if needed
                 thumbnailUrl = $"/nuevos/repositorioarticulos/Archivos/{companyCode:D}/{newFileId}{extension}";
+                generatedThumbnail = true;
 
                 await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
                 updateThumbCmd.CommandType = CommandType.Text;
@@ -494,6 +514,10 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
             }
 
+            var thumbnailUri = thumbnailUrl is null
+                ? null
+                : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute);
+
             await tx.CommitAsync(cancellationToken);
 
             // 4) Return DTO
@@ -501,15 +525,15 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             {
                 Id = newFileId.ToString(),
                 Name = name,
-                Description = string.Empty,
+                Description = description ?? string.Empty,
                 Extension = extension,
                 SizeBytes = file.Length,
                 UploadDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 CompanyCode = companyCode,
                 LinkedArticles = [],
-                ThumbnailUrl = thumbnailUrl is null ? null : new Uri(thumbnailUrl, UriKind.Relative),
-                Width = null,
-                Height = null
+                ThumbnailUrl = thumbnailUri,
+                Width = width,
+                Height = height
             };
         }
         catch (Exception ex)

@@ -51,7 +51,8 @@ var NewArticlePageUI = (function() {
     imagePasteHandler: null, // Paste handler reference for cleanup
     editMode: false,         // true when editing an existing article
     articleId: null,         // Article ID when in edit mode
-    originalArticleData: null // Original article data for edit mode
+    originalArticleData: null, // Original article data for edit mode
+    isCurrentlyUploading: false
   };
 
   // Constants
@@ -184,6 +185,7 @@ var NewArticlePageUI = (function() {
     pageState.editMode = false;
     pageState.articleId = null;
     pageState.originalArticleData = null;
+    pageState.isCurrentlyUploading = false;
   }
 
   /**
@@ -424,9 +426,6 @@ var NewArticlePageUI = (function() {
 
           <!-- Attached Files -->
           <div class="mt-4">
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-              Ya cargados
-            </div>
             <div id="new-article-attached-files" class="space-y-2">
               <!-- Attached files will be listed here -->
             </div>
@@ -457,20 +456,6 @@ var NewArticlePageUI = (function() {
             </label>
             <span id="new-article-images-count" class="text-xs text-gray-500">0 imágenes</span>
           </div>
-          
-          <!-- Image Drop Zone -->
-          <div 
-            id="new-article-image-dropzone"
-            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors ${uploadDisabledClass}"
-            ${uploadDisabledAttr}
-          >
-            <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-            </svg>
-            <p class="text-sm text-gray-600">Arrastra imágenes o haz clic</p>
-            <p class="text-xs text-gray-400 mt-1">JPG, PNG, WebP (Max 10MB)</p>
-          </div>
-          <input type="file" id="new-article-image-input" multiple accept="image/jpeg,image/png,image/webp,image/svg+xml" class="hidden" />
           <!-- Staged Images Grid -->
           <div id="new-article-staged-images" class="mt-3 grid grid-cols-3 gap-2">
             <!-- Images will be listed here -->
@@ -478,9 +463,7 @@ var NewArticlePageUI = (function() {
 
           <!-- Attached Images -->
           <div class="mt-4">
-            <div class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-              Ya cargados
-            </div>
+            
             <div id="new-article-attached-images" class="space-y-2">
               <!-- Attached images will be listed here -->
             </div>
@@ -657,7 +640,7 @@ var NewArticlePageUI = (function() {
         class: ImageTool,
         config: {
           uploader: {
-            uploadByFile: uploadEditorImageByFile,
+            uploadByFile: imageUploadProcess,
             uploadByUrl: uploadEditorImageByUrl
           }
         }
@@ -750,6 +733,77 @@ var NewArticlePageUI = (function() {
     };
 
     document.addEventListener('paste', pageState.imagePasteHandler);
+  }
+
+  function getImageDimensions(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const dimensions = { width: img.width, height: img.height };
+        URL.revokeObjectURL(img.src);
+        resolve(dimensions);
+      };
+      // Handle potential load errors
+      img.onerror = () => resolve({ width: 0, height: 0 });
+    });
+  }
+  
+  function imageUploadProcess(file) {
+    return getImageDimensions(file).then(function(dimensions) {
+      return promptAndInsertEditorImage(file, dimensions);
+    }).catch(function(error) {
+      return { success: 0, file: '' }
+    });
+  }
+  
+  /**
+   * Prompt for metadata and upload before inserting into Editor.js
+   * @param {File} file
+   * @param {{width: number, height: number}} dimensions
+   */
+  function promptAndInsertEditorImage(file, dimensions) {
+    if (pageState.isCurrentlyUploading) {
+      return Promise.reject("Otra imagen está en proceso de subida.");
+    }
+    
+    pageState.isCurrentlyUploading = true;
+    
+    const defaultMetadata = {
+      description: file && file.name ? file.name : '',
+      desiredFileName: file && file.name ? file.name : '',
+      dimensions: dimensions ? dimensions : {},
+    };
+    
+    return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
+      // Load image preview
+      .then(function(metadata) {
+        if (!metadata) {
+          dhtmlx.message({ type: 'info', text: 'Carga de imagen cancelada' });
+          return null;
+        }
+        
+        return uploadEditorImageByFile(file, metadata)
+          .then(function(result) {
+            if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
+            
+            var currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
+            var blockData = pageState.editorUsesSimpleImage
+              ? { url: result.file.url, caption: metadata.description || '' }
+              : { file: { url: result.file.url }, caption: metadata.description || '' };
+            
+            markFormDirty();
+            return result;
+          });
+      })
+      .catch(function(error) {
+        console.error('Error al subir imagen arrastrada:', error);
+        dhtmlx.message({
+          type: 'error',
+          text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
+        });
+        return null;
+      }).finally(function() { pageState.isCurrentlyUploading = false; });
   }
 
   /**
@@ -879,9 +933,10 @@ var NewArticlePageUI = (function() {
   /**
    * Upload an image file to FilesController for Editor.js Image Tool
    * @param {File} file - Local file selected in Editor.js
+   * @param {{description: string, desiredFileName: string, dimensions: [number, number]}} metadata
    * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
    */
-  function uploadEditorImageByFile(file) {
+  function uploadEditorImageByFile(file, metadata) {
     if (!file) {
       var emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
       dhtmlx.message({ type: 'error', text: emptyFileError.message });
@@ -908,27 +963,30 @@ var NewArticlePageUI = (function() {
 
     var formData = new FormData();
     formData.append('file', file);
+    var descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
+    var desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
+    if (descriptionValue) {
+      formData.append('Description', descriptionValue);
+    }
+    if (desiredFileName) {
+      formData.append('Name', desiredFileName);
+    }
 
-    return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
-      method: 'POST',
-      body: formData
-    })
-      .then(function(response) {
-        if (!response.ok) {
-          return parseUploadErrorMessage(response).then(function(errorText) {
-            throw new Error(errorText);
-          });
-        }
-        return response.json();
-      })
+    // return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
+    //   method: 'POST',
+    //   body: formData
+    // })
+      return ImageService.uploadImages([file], [metadata.dimensions], descriptionValue, appState.selectedCompanyCode, [metadata])
       .then(function(uploadResult) {
-        var uploadedFile = uploadResult && uploadResult.file ? uploadResult.file : uploadResult;
+        var uploadedFile = uploadResult[0] && uploadResult[0].file ? uploadResult[0].file : uploadResult[0];
         if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {
           throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
         }
         var imageIdAndExtension = escapeHtmlAttribute(uploadedFile.id + uploadedFile.extension);
 
         markFormDirty();
+        ImagesTabManager.refreshImagesList();
+        loadMediaData();
 
         return {
           success: 1,
@@ -947,6 +1005,30 @@ var NewArticlePageUI = (function() {
       });
   }
 
+  /**
+  * Edits the name and description fields for an existing image.
+  * Use this for editing, since uploadEditorImageByFile creates 
+  * a new image.
+  * 
+  * @param {integer} fileId - File id
+  * @param {{Name: string, Description: string}} metadata
+  */
+  function editImageFields(fileId, metadata) {
+    if (!fileId || !metadata) {
+      var emptyParameterError = new Error('Los campos id, nombre y descripción son obligatorios');
+      dhtmlx.message({ type: 'error', text: emptyParameterError.message });
+      return Promise.reject(emptyParameterError);
+    }
+
+    if (!pageState.canUserUpload) {
+      var permissionError = new Error('No tienes permisos para subir imágenes.');
+      dhtmlx.message({ type: 'error', text: permissionError.message });
+      return Promise.reject(permissionError);
+    }
+    
+    // Check that the image was successfully uploaded 
+  }
+  
   /**
    * Keep URL-based image insertion available in Image Tool.
    * @param {string} imageUrl - URL entered in Editor.js
@@ -1383,29 +1465,9 @@ var NewArticlePageUI = (function() {
    * Setup image upload handlers
    */
   function setupImageUploadHandlers() {
-    var dropzone = document.getElementById('new-article-image-dropzone');
     var imageInput = document.getElementById('new-article-image-input');
 
-    if (!dropzone || !imageInput || !pageState.canUserUpload) return;
-
-    dropzone.addEventListener('click', function() {
-      imageInput.click();
-    });
-
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.classList.add('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('dragleave', function() {
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-      handleImageSelect(e.dataTransfer.files);
-    });
+    if (!imageInput || !pageState.canUserUpload) return;
 
     imageInput.addEventListener('change', function(e) {
       handleImageSelect(e.target.files);
@@ -1470,7 +1532,9 @@ var NewArticlePageUI = (function() {
         file: file,
         name: file.name,
         size: file.size,
-        previewUrl: previewUrl
+        previewUrl: previewUrl,
+        desiredFileName: file.name,
+        description: ''
       });
     }
 
@@ -1749,8 +1813,13 @@ var NewArticlePageUI = (function() {
 
     container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-copy-image-id');
-        copyImageUrlToClipboard(imageId);
+        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+        insertEditorBlock('image', {
+          file: {
+            url: imageUrl
+          }
+        });
       });
     });
   }
@@ -1781,9 +1850,9 @@ var NewArticlePageUI = (function() {
           type="button"
           data-copy-image-id="${imageIdAndExtension}"
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-          title="Copiar URL"
+          title="Insertar a la descripción"
         >
-          Copiar
+          Insertar
         </button>
         <button 
           type="button"
@@ -1925,7 +1994,7 @@ var NewArticlePageUI = (function() {
     if (!container) return;
 
     if (pageState.attachedImages.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400">Sin imágenes adjuntas</div>';
+      container.innerHTML = '<div class="text-sm text-gray-400"></div>';
       return;
     }
 
@@ -1961,9 +2030,9 @@ var NewArticlePageUI = (function() {
             type="button"
             data-copy-image-id="${escapeHtmlAttribute(img.id)}"
             class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-white rounded"
-            title="Copiar URL"
+            title="Insertar a la descripción"
           >
-            Copiar
+            Insertar
           </button>
           <button 
             type="button"
@@ -1985,8 +2054,13 @@ var NewArticlePageUI = (function() {
 
     container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-copy-image-id');
-        copyImageUrlToClipboard(imageId);
+        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+        insertEditorBlock('image', {
+          file: {
+            url: imageUrl
+          }
+        });
       });
     });
   }
@@ -2245,7 +2319,10 @@ var NewArticlePageUI = (function() {
 
         pageState.stagedImages.forEach(function(imageData) {
           uploadPromises.push(
-            ImageService.uploadImages([imageData.file], [], '', pageState.companyCode)
+            ImageService.uploadImages([imageData.file], [], imageData.description || '', pageState.companyCode, [{
+              description: imageData.description || '',
+              desiredFileName: imageData.desiredFileName || imageData.file.name
+            }])
               .then(function(images) {
                 var uploadedImage = images && images[0];
                 if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {
@@ -2544,6 +2621,7 @@ var NewArticlePageUI = (function() {
   return {
     openPage: openPage,
     openEditPage: openEditPage,
-    closePage: closePage
+    closePage: closePage,
+    pageState: pageState,
   };
 })();

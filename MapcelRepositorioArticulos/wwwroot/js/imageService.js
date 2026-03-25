@@ -269,20 +269,51 @@ const ImageService = (function() {
   }
   
   /**
-   * Upload one or more images with optional description
+   * Upload one or more images with optional metadata
    * @param {FileList|Array<File>} imageFiles - Image files to upload
    * @param {Array<Object>} imageDimensions - Array of {width, height} objects for each file (kept for backwards compatibility)
    * @param {string} description - Optional description for the images (batch) (kept for backwards compatibility)
    * @param {string} companyCode - Company code to associate images with
+   * @param {Array<{description?: string, desiredFileName?: string}>} [perFileMetadata] - Optional metadata aligned with imageFiles
    * @returns {Promise<Array<Object>>} Promise resolving to array of uploaded image objects
    */
-  function uploadImages(imageFiles, imageDimensions, description, companyCode) {
+  function uploadImages(imageFiles, imageDimensions, description, companyCode, perFileMetadata) {
     // Convert FileList to Array if needed
     const filesArray = Array.from(imageFiles);
     
-    const uploadPromises = filesArray.map(file => {
+    const uploadPromises = filesArray.map((file, index) => {
       const formData = new FormData();
       formData.append('file', file);
+      
+      const metadataForFile = Array.isArray(perFileMetadata) ? perFileMetadata[index] : null;
+      let descriptionValue = '';
+      let desiredFileName = '';
+      
+      const width = imageDimensions[index].width;
+      const height = imageDimensions[index].height;
+      
+      if (metadataForFile && typeof metadataForFile.description === 'string') {
+        descriptionValue = metadataForFile.description;
+      } else if (typeof description === 'string') {
+        descriptionValue = description;
+      }
+      
+      if (metadataForFile && metadataForFile.desiredFileName) {
+        desiredFileName = metadataForFile.desiredFileName;
+      }
+      
+      if (descriptionValue) {
+        formData.append('description', descriptionValue);
+      }
+      
+      if (desiredFileName) {
+        formData.append('name', desiredFileName);
+      }
+      
+      if (width && height) {
+        formData.append("width", `${width}`);
+        formData.append("height", `${height}`);
+      }
       
       const requestOptions = {
         method: "POST",

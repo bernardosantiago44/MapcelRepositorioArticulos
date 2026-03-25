@@ -157,6 +157,24 @@ const Utils = (function() {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
   }
 
+  /**
+   * Formats the given bytes to human-readable units.
+   * @param bytes
+   * @return {string}
+   */
+  function formatBytes(bytes) {
+    if (bytes === 0) return '';
+    const units = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+
+    while (bytes >= 1024 && i < units.length - 1) {
+      bytes /= 1024;
+      i++;
+    }
+
+    return `${bytes.toFixed(2)} ${units[i]}`;
+  }
+
   // Public API
   return {
     escapeHtml,
@@ -165,7 +183,8 @@ const Utils = (function() {
     debounce,
     applyMarkdownActionToTextArea,
     renderMarkdown,
-    isValidUUID
+    isValidUUID,
+    formatBytes,
   };
 })();
 

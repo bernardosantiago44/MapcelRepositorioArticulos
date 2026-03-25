@@ -193,6 +193,9 @@ tr.odd_material td {
     height: 18px;
 }
 
+.dhx_cell_cont_layout {
+    padding-bottom: 0.25rem;
+}
 
 /*-----------------------------ESTILOS HTMLX-----------------------*/
 /*---------------------------------------------------------------------------*/
@@ -215,6 +218,10 @@ tr.odd_material td {
 /*Padding en el header del grid*/
 div.gridbox_material.gridbox table.hdr td div.hdrcell {
     padding-left: 0px;
+}
+
+table.hdrcell {
+    color: black;
 }
 
 /*Alto de headers*/

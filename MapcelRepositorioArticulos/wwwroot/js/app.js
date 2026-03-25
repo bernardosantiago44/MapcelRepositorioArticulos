@@ -51,7 +51,7 @@ var appState = {
   articlesLayoutCache: null,     // Cache for the articles layout when showing new article page
   // Pagination state
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 10,
   totalArticles: 0,
   totalPages: 1
 };

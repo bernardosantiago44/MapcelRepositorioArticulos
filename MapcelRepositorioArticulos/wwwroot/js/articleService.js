@@ -203,10 +203,13 @@ const ArticleService = (function() {
    * Get articles filtered by company code
    * Articles will have their tag IDs resolved to full tag objects
    * @param {object} params - Parameters for filtering articles
-   * @returns {Promise<Array<Article>>} Promise resolving to array of filtered articles
+   * @returns {Promise<{data: Array<Article>, total: number, page: number, pageSize: number, totalPages: number}>}
    */
   async function getArticles(params = {}) {
     const qs = new URLSearchParams();
+    const isValidTagId = function(tagId) {
+      return tagId !== null && tagId !== undefined && tagId !== "" && tagId !== "Todas";
+    };
 
     // FIX: ensure search is string, not function
     const searchValue =
@@ -215,7 +218,7 @@ const ArticleService = (function() {
         : params.search;
 
     if (searchValue && String(searchValue).trim() !== "")
-      qs.set("search", String(searchValue).trim());
+      qs.set("searchString", String(searchValue).trim());
 
     if (params.status && params.status !== "Todos")
       qs.set("status", params.status);
@@ -223,11 +226,16 @@ const ArticleService = (function() {
     if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
     if (params.dateTo) qs.set("dateTo", params.dateTo);
 
-    if (params.tagId && params.tagId !== "Todas")
-      qs.set("tagId", params.tagId);
+    if (params.tagIds && Array.isArray(params.tagIds)) {
+      params.tagIds
+        .filter(isValidTagId)
+        .forEach(function(tagId) {
+          qs.append("tags", tagId);
+        });
+    }
 
     qs.set("page", String(params.page ?? 1));
-    qs.set("pageSize", String(params.pageSize ?? 50));
+    qs.set("pageSize", String(params.pageSize ?? 20));
 
     const url = `${API_BASE_URL}/articles/${encodeURIComponent(params.companyCode)}?${qs.toString()}`;
 
@@ -239,6 +247,10 @@ const ArticleService = (function() {
 
     const response = await res.json();
     const allArticles = response.data || [];
+    const total = response.total !== undefined ? response.total : allArticles.length;
+    const pageNumber = response.page !== undefined ? response.page : (params.page ?? 1);
+    const pageSizeValue = response.pageSize !== undefined ? response.pageSize : (params.pageSize ?? 20);
+    const totalPages = Math.max(1, Math.ceil(total / pageSizeValue));
 
     const tags = await getTags(params.companyCode);
 
@@ -264,7 +276,13 @@ const ArticleService = (function() {
       }
     }
 
-    return articlesWithResolvedTags;
+    return {
+      data: articlesWithResolvedTags,
+      total: total,
+      page: pageNumber,
+      pageSize: pageSizeValue,
+      totalPages: totalPages
+    };
   }
 
   

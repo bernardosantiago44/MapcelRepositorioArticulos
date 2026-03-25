@@ -48,7 +48,12 @@ var appState = {
   selectedFilterTags: [],    // Tags selected for filtering
   // View state for articles tab
   currentArticlesView: 'grid',  // 'grid' or 'new-article'
-  articlesLayoutCache: null     // Cache for the articles layout when showing new article page
+  articlesLayoutCache: null,     // Cache for the articles layout when showing new article page
+  // Pagination state
+  currentPage: 1,
+  pageSize: 20,
+  totalArticles: 0,
+  totalPages: 1
 };
 
 // ============================================================================
@@ -104,6 +109,202 @@ main_layout.setSizes();
 
 var main_content = main_layout.cells('b');
 var tabbar = main_content.attachTabbar();
+
+// ============================================================================
+// Pagination Helpers
+// ============================================================================
+
+const PAGINATION_TEXT = {
+  empty: 'Sin resultados',
+  rangePrefix: 'Mostrando',
+  of: 'de'
+};
+
+/**
+ * Get the current page number from the URL query string.
+ * Normalizes invalid values to page 1.
+ * @returns {number} The normalized page number
+ */
+function getPageFromUrl() {
+  var params = new URLSearchParams(window.location.search);
+  var pageParam = parseInt(params.get('page'), 10);
+  if (isNaN(pageParam) || pageParam <= 0) {
+    return 1;
+  }
+  return pageParam;
+}
+
+/**
+ * Update the page parameter in the URL without reloading the page.
+ * @param {number} pageNumber - Page number to set
+ */
+function updatePageInUrl(pageNumber) {
+  var url = new URL(window.location.href);
+  var currentPageParam = url.searchParams.get('page');
+  if (currentPageParam === String(pageNumber)) {
+    return;
+  }
+  url.searchParams.set('page', pageNumber);
+  window.history.pushState({}, '', url.toString());
+}
+
+/**
+ * Clamp a page number to a valid range based on total pages.
+ * @param {number} pageNumber - Desired page number
+ * @param {number} totalPages - Maximum available pages
+ * @returns {number} Normalized page number
+ */
+function normalizePageNumber(pageNumber, totalPages) {
+  var safePage = isNaN(pageNumber) || pageNumber <= 0 ? 1 : pageNumber;
+  if (!totalPages || totalPages <= 0) return safePage;
+  return Math.min(Math.max(safePage, 1), totalPages);
+}
+
+/**
+ * Get the current filter values from the UI.
+ * @returns {{search: string, status: string, dateFrom: string|null, dateTo: string|null, tagIds: Array<string>}}
+ */
+function getCurrentFilterValues() {
+  var searchInput = document.getElementById('filter-search');
+  var statusSelect = document.getElementById('filter-status');
+  var startDateInput = document.getElementById('filter-date-start');
+  var endDateInput = document.getElementById('filter-date-end');
+  var filterState = GridFilterService.getFilterState();
+
+  return {
+    search: searchInput ? searchInput.value : '',
+    status: statusSelect ? statusSelect.value : '',
+    dateFrom: startDateInput ? startDateInput.value : null,
+    dateTo: endDateInput ? endDateInput.value : null,
+    tagIds: filterState.selectedTagIds
+  };
+}
+
+/**
+ * Persist pagination metadata into the global state and URL.
+ * @param {Object} meta - Pagination metadata
+ */
+function updatePaginationState(meta) {
+  var incomingPageSize = meta.pageSize || appState.pageSize || 20;
+  var incomingTotal = meta.total || 0;
+  var calculatedTotalPages = meta.totalPages || Math.max(1, Math.ceil(incomingTotal / (incomingPageSize || 1)));
+  var normalizedPage = normalizePageNumber(meta.page || 1, calculatedTotalPages);
+
+  appState.currentPage = normalizedPage;
+  appState.pageSize = incomingPageSize;
+  appState.totalArticles = incomingTotal;
+  appState.totalPages = calculatedTotalPages;
+  updatePageInUrl(appState.currentPage);
+}
+
+/**
+ * Render pagination controls inside the grid footer.
+ */
+function renderPaginationControls() {
+  var container = document.getElementById('articles_grid_pagination');
+  if (!container) return;
+
+  var currentPage = appState.currentPage || 1;
+  var totalPages = appState.totalPages || 1;
+  var total = appState.totalArticles || 0;
+  var start = total === 0 ? 0 : ((currentPage - 1) * appState.pageSize) + 1;
+  var end = Math.min(total, currentPage * appState.pageSize);
+  var safeTotal = Number(total) || 0;
+  var safeStart = Number(start) || 0;
+  var safeEnd = Number(end) || 0;
+  var safeCurrentPage = Number(currentPage) || 1;
+  var safeTotalPages = Number(totalPages) || 1;
+
+  container.innerHTML = '';
+
+  var wrapper = document.createElement('div');
+  wrapper.className = 'flex h-full w-full items-center justify-between px-3 py-2 text-sm';
+
+  var infoText = document.createElement('div');
+  infoText.className = 'text-gray-700';
+  infoText.textContent = safeTotal === 0
+    ? PAGINATION_TEXT.empty
+    : PAGINATION_TEXT.rangePrefix + ' ' + safeStart + ' - ' + safeEnd + ' ' + PAGINATION_TEXT.of + ' ' + safeTotal;
+
+  var controls = document.createElement('div');
+  controls.className = 'flex items-center gap-2';
+
+  function createButton(label, action, disabled) {
+    var btn = document.createElement('button');
+    btn.textContent = label;
+    btn.dataset.action = action;
+    btn.className = 'px-2 py-1 rounded border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50';
+    btn.disabled = disabled;
+    return btn;
+  }
+
+  var firstBtn = createButton('«', 'first', safeCurrentPage <= 1);
+  var prevBtn = createButton('Anterior', 'prev', safeCurrentPage <= 1);
+  var pageLabel = document.createElement('div');
+  pageLabel.className = 'px-3 py-1 rounded bg-gray-100 text-gray-700 font-medium';
+  pageLabel.textContent = 'Página ' + safeCurrentPage + ' de ' + safeTotalPages;
+  var nextBtn = createButton('Siguiente', 'next', safeCurrentPage >= safeTotalPages);
+  var lastBtn = createButton('»', 'last', safeCurrentPage >= safeTotalPages);
+
+  controls.appendChild(firstBtn);
+  controls.appendChild(prevBtn);
+  controls.appendChild(pageLabel);
+  controls.appendChild(nextBtn);
+  controls.appendChild(lastBtn);
+
+  wrapper.appendChild(infoText);
+  wrapper.appendChild(controls);
+  container.appendChild(wrapper);
+
+  var actionButtons = container.querySelectorAll('button[data-action]');
+  actionButtons.forEach(function(btn) {
+    btn.onclick = function() {
+      var action = btn.getAttribute('data-action');
+      if (action === 'prev') {
+        handlePageChange(currentPage - 1);
+      } else if (action === 'next') {
+        handlePageChange(currentPage + 1);
+      } else if (action === 'first') {
+        handlePageChange(1);
+      } else if (action === 'last') {
+        handlePageChange(appState.totalPages);
+      }
+    };
+  });
+}
+
+/**
+ * Trigger a page change and reload grid data.
+ * @param {number} nextPage - Desired page number
+ */
+function handlePageChange(nextPage) {
+  var safePage = normalizePageNumber(nextPage, appState.totalPages);
+  if (safePage === appState.currentPage) return;
+  main_content.progressOn();
+  loadArticlesForCompany(appState.selectedCompanyCode, { page: safePage })
+    .catch(function(error) {
+      console.error('Error changing page:', error);
+      main_content.progressOff();
+      dhtmlx.message({
+        text: 'No se pudo cambiar de página',
+        type: 'error',
+        expire: 3000
+      });
+    });
+}
+
+// Sync grid when the user navigates with browser back/forward buttons
+window.addEventListener('popstate', function() {
+  if (!appState.selectedCompanyCode) return;
+  var pageFromUrl = getPageFromUrl();
+  if (pageFromUrl !== appState.currentPage) {
+    main_content.progressOn();
+    loadArticlesForCompany(appState.selectedCompanyCode, { page: pageFromUrl })
+      .catch(function() {
+        main_content.progressOff();
+      });
+  }
+});
 
 // Articles Tab
 tabbar.addTab('articles', 'Artículos');
@@ -197,6 +398,7 @@ function initializeApplication() {
   
   // Derive companyCode from URL path
   var companyCodeFromUrl = CompanyRouting.getCompanyCodeFromUrl();
+  appState.currentPage = getPageFromUrl();
   
   if (companyCodeFromUrl) {
     appState.selectedCompanyCode = companyCodeFromUrl;
@@ -431,7 +633,7 @@ function initializeFilterControls(companies, showCompanyPicker) {
   var searchInput = document.getElementById('filter-search');
   if (searchInput) {
     searchInput.addEventListener('input', function() {
-      GridFilterService.setSearchQuery(searchInput.value, applyFiltersToGrid);
+      GridFilterService.setSearchQuery(searchInput.value, reloadArticlesWithFilters);
     });
   }
   
@@ -440,7 +642,7 @@ function initializeFilterControls(companies, showCompanyPicker) {
   if (statusSelect) {
     statusSelect.addEventListener('change', function() {
       GridFilterService.setStatusFilter(statusSelect.value || null);
-      applyFiltersToGrid();
+      reloadArticlesWithFilters();
     });
   }
   
@@ -452,7 +654,7 @@ function initializeFilterControls(companies, showCompanyPicker) {
     startDateInput.addEventListener('change', function() {
       var endDate = endDateInput ? endDateInput.value : null;
       GridFilterService.setDateRangeFilter(startDateInput.value || null, endDate || null);
-      applyFiltersToGrid();
+      reloadArticlesWithFilters();
     });
   }
   
@@ -460,7 +662,7 @@ function initializeFilterControls(companies, showCompanyPicker) {
     endDateInput.addEventListener('change', function() {
       var startDate = startDateInput ? startDateInput.value : null;
       GridFilterService.setDateRangeFilter(startDate || null, endDateInput.value || null);
-      applyFiltersToGrid();
+      reloadArticlesWithFilters();
     });
   }
   
@@ -473,6 +675,31 @@ function initializeFilterControls(companies, showCompanyPicker) {
   }
   
   // Initialize the filter active indicator to hidden state
+  updateFilterActiveIndicator();
+}
+
+/**
+ * Reset filter inputs and internal filter state (used when switching company).
+ */
+function resetFilterControls() {
+  GridFilterService.clearAllFilters();
+  appState.selectedFilterTags = [];
+
+  var searchInput = document.getElementById('filter-search');
+  if (searchInput) searchInput.value = '';
+  
+  var statusSelect = document.getElementById('filter-status');
+  if (statusSelect) statusSelect.value = '';
+  
+  var startDateInput = document.getElementById('filter-date-start');
+  if (startDateInput) startDateInput.value = '';
+  
+  var endDateInput = document.getElementById('filter-date-end');
+  if (endDateInput) endDateInput.value = '';
+  
+  var tagsCountSpan = document.getElementById('filter-tags-count');
+  if (tagsCountSpan) tagsCountSpan.textContent = 'Todas';
+
   updateFilterActiveIndicator();
 }
 
@@ -502,7 +729,7 @@ function openTagFilterPicker() {
       
       // Update filter service and apply
       GridFilterService.setTagFilter(selectedTags.map(function(tag) { return tag.id; }));
-      applyFiltersToGrid();
+      reloadArticlesWithFilters();
     }
   );
 }
@@ -510,19 +737,28 @@ function openTagFilterPicker() {
 /**
  * Apply current filters to the grid
  */
-function applyFiltersToGrid() {
-  if (!appState.allArticles) {
+function reloadArticlesWithFilters() {
+  if (!appState.selectedCompanyCode) {
     return;
   }
-  
-  // Filter articles
-  appState.filteredArticles = GridFilterService.filterArticles(appState.allArticles);
   
   // Update filter active indicator
   updateFilterActiveIndicator();
   
-  // Rebuild grid with filtered articles
-  buildGridWithArticles(appState.filteredArticles);
+  // When filters change, reset to first page and reload from API
+  appState.currentPage = 1;
+  updatePageInUrl(1);
+  main_content.progressOn();
+  loadArticlesForCompany(appState.selectedCompanyCode, { page: 1 })
+    .catch(function(error) {
+      console.error('Error applying filters:', error);
+      main_content.progressOff();
+      dhtmlx.message({
+        text: 'No se pudieron aplicar los filtros',
+        type: 'error',
+        expire: 3000
+      });
+    });
 }
 
 /**
@@ -575,28 +811,10 @@ function buildGridWithArticles(articles) {
  * Clear all filters and reset the grid
  */
 function clearAllFilters() {
-  // Clear filter service state
-  GridFilterService.clearAllFilters();
-  appState.selectedFilterTags = [];
-  
-  // Reset UI controls
-  var searchInput = document.getElementById('filter-search');
-  if (searchInput) searchInput.value = '';
-  
-  var statusSelect = document.getElementById('filter-status');
-  if (statusSelect) statusSelect.value = '';
-  
-  var startDateInput = document.getElementById('filter-date-start');
-  if (startDateInput) startDateInput.value = '';
-  
-  var endDateInput = document.getElementById('filter-date-end');
-  if (endDateInput) endDateInput.value = '';
-  
-  var tagsCountSpan = document.getElementById('filter-tags-count');
-  if (tagsCountSpan) tagsCountSpan.textContent = 'Todas';
+  resetFilterControls();
   
   // Apply (which will show all articles)
-  applyFiltersToGrid();
+  reloadArticlesWithFilters();
   
   dhtmlx.message({
     text: 'Filtros limpiados',
@@ -658,40 +876,46 @@ function initializeImagesTab(companyCode) {
  * @param {string} companyCode - Company code to load articles for
  * @returns {Promise} Promise that resolves when articles are loaded
  */
-function loadArticlesForCompany(companyCode) {
-  return ArticleService.getArticles({companyCode: companyCode})
-    .then(function(articles) {
-      // Precompute search index for O(n) filtering performance
+function loadArticlesForCompany(companyCode, options) {
+  var requestedPage = options && options.page ? options.page : getPageFromUrl();
+  var normalizedRequestedPage = isNaN(requestedPage) || requestedPage <= 0 ? 1 : requestedPage;
+
+  var filterValues = getCurrentFilterValues();
+  var queryParams = {
+    companyCode: companyCode,
+    search: filterValues.search,
+    status: filterValues.status,
+    dateFrom: filterValues.dateFrom,
+    dateTo: filterValues.dateTo,
+    tagIds: filterValues.tagIds,
+    page: normalizedRequestedPage,
+    pageSize: appState.pageSize
+  };
+
+  return ArticleService.getArticles(queryParams)
+    .then(function(result) {
+      var articles = result.data || [];
+
+      var safePage = normalizePageNumber(result.page, result.totalPages);
+      if (safePage !== result.page) {
+        console.warn(`Received page ${result.page} outside valid range [1, ${result.totalPages}]. Normalized to: ${safePage}`);
+        result.page = safePage;
+        updatePageInUrl(safePage);
+      }
+
+      // Precompute search index for client-side interactions (e.g., quick filtering)
       GridFilterService.precomputeSearchIndex(articles);
-      
-      // Store all articles for filtering
+
       appState.allArticles = articles;
-      
-      // Clear filters when changing company
-      GridFilterService.clearAllFilters();
-      appState.selectedFilterTags = [];
-      
-      // Reset filter UI if it exists
-      var searchInput = document.getElementById('filter-search');
-      if (searchInput) searchInput.value = '';
-      
-      var statusSelect = document.getElementById('filter-status');
-      if (statusSelect) statusSelect.value = '';
-      
-      var startDateInput = document.getElementById('filter-date-start');
-      if (startDateInput) startDateInput.value = '';
-      
-      var endDateInput = document.getElementById('filter-date-end');
-      if (endDateInput) endDateInput.value = '';
-      
-      var tagsCountSpan = document.getElementById('filter-tags-count');
-      if (tagsCountSpan) tagsCountSpan.textContent = 'Todas';
-      
-      updateFilterActiveIndicator();
-      
-      // Initially show all articles (no filters applied)
       appState.filteredArticles = articles;
-      
+
+      updatePaginationState({
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages
+      });
+
       // Destroy existing grid if it exists
       // Note: destructor() handles cleanup including clearing data
       if (appState.articlesGrid) {
@@ -706,6 +930,8 @@ function loadArticlesForCompany(companyCode) {
       appState.articlesGrid.attachEvent('onRowSelect', function(rowId) {
         onArticleSelect(rowId, companyCode);
       });
+
+      renderPaginationControls();
       
       // Initialize Files tab with current company
       initializeFilesTab(companyCode);
@@ -715,6 +941,10 @@ function loadArticlesForCompany(companyCode) {
       
       main_content.progressOff();
       return articles;
+    })
+    .catch(function(error) {
+      main_content.progressOff();
+      throw error;
     });
 }
 

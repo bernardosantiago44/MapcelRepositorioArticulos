@@ -14,6 +14,10 @@ const FileUploadUI = (function() {
   let currentWindow = null;
   let selectedFiles = []; // Array of { file: File, description: string }
   
+  function parseFileIndex(element) {
+    return parseInt(element.getAttribute('data-file-index'), 10);
+  }
+  
   /**
    * Open the file upload modal
    * @param {string} companyCode - Company code to associate uploaded files with
@@ -159,7 +163,11 @@ const FileUploadUI = (function() {
     fileInput.addEventListener('change', (e) => {
       const files = e.target.files;
       handleFileSelection(files);
-      fileInput.value = '';
+      // Reset asynchronously so the browser completes the current change event first,
+      // allowing users to pick the same file again in a subsequent selection.
+      setTimeout(() => {
+        fileInput.value = '';
+      }, 0);
     });
     
     // Cancel button
@@ -329,10 +337,6 @@ const FileUploadUI = (function() {
       `;
     }).join('');
     
-    function parseFileIndex(element) {
-      return parseInt(element.getAttribute('data-file-index'), 10);
-    }
-    
     filesContainer.querySelectorAll('.file-meta-description-input').forEach(textarea => {
       const index = parseFileIndex(textarea);
       textarea.addEventListener('input', () => {
@@ -348,7 +352,8 @@ const FileUploadUI = (function() {
         if (selectedFiles[index]) {
           const descriptionText = selectedFiles[index].file.name;
           selectedFiles[index].description = descriptionText;
-          const descriptionField = filesContainer.querySelector('.file-meta-description-input[data-file-index="' + index + '"]');
+          const descriptionField = Array.from(filesContainer.querySelectorAll('.file-meta-description-input'))
+            .find(field => parseFileIndex(field) === index);
           if (descriptionField) {
             descriptionField.value = descriptionText;
             descriptionField.focus();

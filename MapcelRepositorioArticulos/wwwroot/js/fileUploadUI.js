@@ -228,7 +228,6 @@ const FileUploadUI = (function() {
    * @param {FileList} files - Selected files
    */
   function handleFileSelection(files) {
-    selectedFiles = [];
     const filesArray = Array.from(files);
     
     // Validate file sizes
@@ -253,7 +252,7 @@ const FileUploadUI = (function() {
     }
     
     // Store valid files
-    selectedFiles = validFiles;
+    selectedFiles.push(...validFiles);
     
     // Update UI
     updateSelectedFilesList();

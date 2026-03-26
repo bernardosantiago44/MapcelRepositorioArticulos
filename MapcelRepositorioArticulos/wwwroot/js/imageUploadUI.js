@@ -265,9 +265,6 @@ const ImageUploadUI = (function() {
    * @param {FileList} files - Selected files
    */
   function handleImageSelection(files) {
-    // Clean up previous previews
-    selectedImages = [];
-    
     const filesArray = Array.from(files);
     
     // Validate file types and sizes
@@ -337,7 +334,7 @@ const ImageUploadUI = (function() {
           }
         });
         
-        selectedImages = successfulImages;
+        selectedImages.push(...successfulImages);
         updateSelectedImagesGallery();
         updateSubmitButtonState();
         

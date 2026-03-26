@@ -17,6 +17,7 @@ const ImageUploadUI = (function() {
   const SELECTED_CARD_WIDTH = 240;
   const WINDOW_WIDTH = 850;
   const WINDOW_HEIGHT = 700;
+  const EMPTY_STRING = "";
   
   let currentWindow = null;
   let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string, description?: string, desiredFileName?: string }
@@ -141,9 +142,6 @@ const ImageUploadUI = (function() {
     const fileInput = document.getElementById('image-upload-input');
     const cancelBtn = document.getElementById('image-upload-cancel-btn');
     const submitBtn = document.getElementById('image-upload-submit-btn');
-    const descriptionTextarea = document.getElementById('image-upload-description');
-    const applyAllBtn = document.getElementById('image-upload-apply-all-btn');
-    const copyNameBtn = document.getElementById('image-upload-copy-name-btn');
     
     // Click to select files
     dropzone.addEventListener('click', () => {
@@ -177,31 +175,6 @@ const ImageUploadUI = (function() {
       fileInput.value = '';
     });
     
-    if (applyAllBtn) {
-      applyAllBtn.addEventListener('click', () => {
-        const text = (descriptionTextarea && descriptionTextarea.value ? descriptionTextarea.value.trim() : '');
-        if (!text) {
-          dhtmlx.message({ type: 'warning', text: 'Agrega una descripción antes de aplicarla.' });
-          return;
-        }
-        selectedImages = selectedImages.map(img => Object.assign({}, img, { description: text }));
-        updateSelectedImagesGallery();
-      });
-    }
-    
-    if (copyNameBtn) {
-      copyNameBtn.addEventListener('click', () => {
-        if (!selectedImages.length) {
-          dhtmlx.message({ type: 'warning', text: 'Primero selecciona al menos una imagen.' });
-          return;
-        }
-        const firstName = selectedImages[0].desiredFileName || selectedImages[0].file.name;
-        if (descriptionTextarea) {
-          descriptionTextarea.value = firstName;
-        }
-      });
-    }
-    
     // Cancel button
     cancelBtn.addEventListener('click', () => {
       selectedImages = [];
@@ -214,8 +187,6 @@ const ImageUploadUI = (function() {
         return;
       }
       
-      const description = descriptionTextarea.value.trim();
-      
       // Show loading state
       submitBtn.disabled = true;
       submitBtn.textContent = 'Subiendo...';
@@ -224,12 +195,12 @@ const ImageUploadUI = (function() {
       const imageFiles = selectedImages.map(img => img.file);
       const imageDimensions = selectedImages.map(img => img.dimensions);
       const perFileMetadata = selectedImages.map(img => ({
-        description: img.description || description,
+        description: img.description || "",
         desiredFileName: img.desiredFileName || img.file.name
       }));
       
       // Call image service to upload
-      ImageService.uploadImages(imageFiles, imageDimensions, description, companyCode, perFileMetadata)
+      ImageService.uploadImages(imageFiles, imageDimensions, EMPTY_STRING, companyCode, perFileMetadata)
         .then(uploadedImages => {
           // Show success message
           dhtmlx.message({

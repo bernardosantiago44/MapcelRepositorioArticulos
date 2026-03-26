@@ -10,9 +10,15 @@ const FileUploadUI = (function() {
   // Configuration
   const MAX_FILE_SIZE_MB = 50;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+  const WINDOW_WIDTH = 900;
+  const WINDOW_HEIGHT = 800;
   
   let currentWindow = null;
-  let selectedFiles = [];
+  let selectedFiles = []; // Array of { file: File, description: string }
+  
+  function parseFileIndex(element) {
+    return parseInt(element.getAttribute('data-file-index'), 10);
+  }
   
   /**
    * Open the file upload modal
@@ -31,8 +37,10 @@ const FileUploadUI = (function() {
       currentWindow = null;
     }
     
+    selectedFiles = [];
+    
     currentWindow = new dhtmlXWindows();
-    const uploadWindow = currentWindow.createWindow('file_upload_window', 0, 0, 650, 650);
+    const uploadWindow = currentWindow.createWindow('file_upload_window', 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     uploadWindow.setText('Subir archivo');
     uploadWindow.centerOnScreen();
     uploadWindow.button('minmax').hide();
@@ -63,7 +71,7 @@ const FileUploadUI = (function() {
         <!-- Drop Zone -->
         <div 
           id="file-upload-dropzone" 
-          class="flex-1 border-2 border-dashed border-gray-300 rounded-lg p-8 mb-4 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          class="flex-shrink-0 border-2 border-dashed border-gray-300 rounded-lg p-8 mb-4 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
           style="min-height: 200px;"
         >
           <div class="text-center">
@@ -92,26 +100,13 @@ const FileUploadUI = (function() {
         />
         
         <!-- Selected Files List -->
-        <div id="selected-files-list" class="mb-4" style="display: none;">
+        <div id="selected-files-list" class="mb-4 flex-1 overflow-y-auto pr-1" style="display: none;">
           <h4 class="text-sm font-medium text-gray-700 mb-2">Archivos seleccionados:</h4>
-          <div id="selected-files-container" class="space-y-2"></div>
-        </div>
-        
-        <!-- Description Field -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Descripción (opcional)
-          </label>
-          <textarea 
-            id="file-upload-description"
-            rows="3"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="Agrega una descripción para los archivos..."
-          ></textarea>
+          <div id="selected-files-container" class="space-y-3"></div>
         </div>
         
         <!-- Action Buttons -->
-        <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+        <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 flex-shrink-0">
           <button 
             id="file-upload-cancel-btn"
             class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -141,7 +136,6 @@ const FileUploadUI = (function() {
     const fileInput = document.getElementById('file-upload-input');
     const cancelBtn = document.getElementById('file-upload-cancel-btn');
     const submitBtn = document.getElementById('file-upload-submit-btn');
-    const descriptionTextarea = document.getElementById('file-upload-description');
     
     // Click to select files
     dropzone.addEventListener('click', () => {
@@ -171,6 +165,11 @@ const FileUploadUI = (function() {
     fileInput.addEventListener('change', (e) => {
       const files = e.target.files;
       handleFileSelection(files);
+      // Reset asynchronously so the browser completes the current change event first,
+      // allowing users to pick the same file again in a subsequent selection.
+      setTimeout(() => {
+        fileInput.value = '';
+      }, 0);
     });
     
     // Cancel button
@@ -185,14 +184,17 @@ const FileUploadUI = (function() {
         return;
       }
       
-      const description = descriptionTextarea.value.trim();
-      
       // Show loading state
       submitBtn.disabled = true;
       submitBtn.textContent = 'Subiendo...';
       
+      const filesToUpload = selectedFiles.map(item => item.file);
+      const perFileMetadata = selectedFiles.map(item => ({
+        description: item.description || ''
+      }));
+      
       // Call file service to upload
-      FileService.uploadFiles(selectedFiles, description, companyCode)
+      FileService.uploadFiles(filesToUpload, '', companyCode, perFileMetadata)
         .then(uploadedFiles => {
           // Show success message
           dhtmlx.message({
@@ -238,7 +240,10 @@ const FileUploadUI = (function() {
       if (file.size > MAX_FILE_SIZE_BYTES) {
         invalidFiles.push(file);
       } else {
-        validFiles.push(file);
+        validFiles.push({
+          file: file,
+          description: ''
+        });
       }
     });
     
@@ -283,34 +288,81 @@ const FileUploadUI = (function() {
     listContainer.style.display = 'block';
     
     // Render file items
-    filesContainer.innerHTML = selectedFiles.map((file, index) => {
-      const fileSizeInKB = (file.size / 1024).toFixed(1);
+    filesContainer.innerHTML = selectedFiles.map((fileData, index) => {
+      const fileSizeInKB = (fileData.file.size / 1024).toFixed(1);
       const fileSizeDisplay = fileSizeInKB > 1024 
         ? (fileSizeInKB / 1024).toFixed(1) + ' MB'
         : fileSizeInKB + ' KB';
+      const escapedFileName = Utils.escapeHtml(fileData.file.name);
+      const escapedDescription = Utils.escapeHtml(fileData.description || '');
       
       return `
-        <div class="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
-          <div class="flex items-center space-x-2 flex-1 min-w-0">
-            <svg class="h-5 w-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"></path>
-            </svg>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">${file.name}</p>
-              <p class="text-xs text-gray-500">${fileSizeDisplay}</p>
+        <div class="p-3 bg-gray-50 rounded border border-gray-200 space-y-3">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-2 flex-1 min-w-0 pr-3">
+              <svg class="h-5 w-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd"></path>
+              </svg>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate" title="${escapedFileName}">${escapedFileName}</p>
+                <p class="text-xs text-gray-500">${fileSizeDisplay}</p>
+              </div>
             </div>
+            <button 
+              class="ml-2 text-red-600 hover:text-red-800 flex-shrink-0"
+              onclick="FileUploadUI.removeFile(${index})"
+              title="Eliminar"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
           </div>
-          <button 
-            class="ml-2 text-red-600 hover:text-red-800 flex-shrink-0"
-            onclick="FileUploadUI.removeFile(${index})"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-[11px] font-medium text-gray-700">Descripción</label>
+              <button 
+                type="button"
+                class="file-meta-copy-btn text-[11px] px-2 py-1 bg-gray-100 text-gray-700 rounded border border-gray-200 hover:bg-gray-200 transition-colors"
+                data-file-index="${index}"
+              >
+                Copiar nombre
+              </button>
+            </div>
+            <textarea 
+              class="file-meta-description-input w-full px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              rows="2"
+              data-file-index="${index}"
+            >${escapedDescription}</textarea>
+          </div>
         </div>
       `;
     }).join('');
+    
+    filesContainer.querySelectorAll('.file-meta-description-input').forEach(textarea => {
+      const index = parseFileIndex(textarea);
+      textarea.addEventListener('input', () => {
+        if (selectedFiles[index]) {
+          selectedFiles[index].description = textarea.value;
+        }
+      });
+    });
+    
+    filesContainer.querySelectorAll('.file-meta-copy-btn').forEach(button => {
+      const index = parseFileIndex(button);
+      button.addEventListener('click', () => {
+        if (selectedFiles[index]) {
+          const descriptionText = selectedFiles[index].file.name;
+          selectedFiles[index].description = descriptionText;
+          const descriptionField = Array.from(filesContainer.querySelectorAll('.file-meta-description-input'))
+            .find(field => parseFileIndex(field) === index);
+          if (descriptionField) {
+            descriptionField.value = descriptionText;
+            descriptionField.focus();
+          }
+        }
+      });
+    });
   }
   
   /**

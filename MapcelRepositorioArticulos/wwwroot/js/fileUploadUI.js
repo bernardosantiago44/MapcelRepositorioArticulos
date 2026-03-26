@@ -10,6 +10,8 @@ const FileUploadUI = (function() {
   // Configuration
   const MAX_FILE_SIZE_MB = 50;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+  const WINDOW_WIDTH = 900;
+  const WINDOW_HEIGHT = 800;
   
   let currentWindow = null;
   let selectedFiles = []; // Array of { file: File, description: string }
@@ -38,7 +40,7 @@ const FileUploadUI = (function() {
     selectedFiles = [];
     
     currentWindow = new dhtmlXWindows();
-    const uploadWindow = currentWindow.createWindow('file_upload_window', 0, 0, 650, 650);
+    const uploadWindow = currentWindow.createWindow('file_upload_window', 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     uploadWindow.setText('Subir archivo');
     uploadWindow.centerOnScreen();
     uploadWindow.button('minmax').hide();

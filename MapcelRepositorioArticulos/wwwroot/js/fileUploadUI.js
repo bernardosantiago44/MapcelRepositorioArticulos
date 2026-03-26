@@ -23,7 +23,8 @@ const FileUploadUI = (function() {
     // Create DHTMLX Window - cleanup previous window if exists
     if (currentWindow) {
       try {
-        currentWindow.close();
+        let old = currentWindow.getTopmostWindow();
+        if (old.getId() === 'file_upload_window') return;
       } catch (e) {
         // Window already closed, ignore
       }

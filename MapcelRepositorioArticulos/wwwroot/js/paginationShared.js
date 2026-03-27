@@ -32,6 +32,9 @@
     return pageSizeParam;
   }
 
+  /** Extracts the selected tab from the url. 
+   * @return {string}
+   */
   function getTabFromUrl(defaultTab, allowedTabs) {
     var params = new URLSearchParams(window.location.search);
     var tabParam = (params.get('tab') || '').toLowerCase();

@@ -127,6 +127,12 @@ const PAGINATION_TEXT = {
 };
 const SUPPORTED_TABS = ['articles', 'files', 'images'];
 
+/**
+ * Safely extracts the active tab from the url, 
+ * providing a default tab for preventing unexpected
+ * entries.
+ * @return {string}
+ */
 function getTabFromUrlOrDefault() {
   return PaginationShared.getTabFromUrl('articles', SUPPORTED_TABS);
 }
@@ -255,7 +261,7 @@ window.addEventListener('popstate', function() {
   var tabFromUrl = getTabFromUrlOrDefault();
   var pageFromUrl = PaginationShared.getPageFromUrl(1);
   if (tabFromUrl !== appState.activeTab) {
-    tabbar.setTabActive(tabFromUrl);
+    tabbar.tabs(tabFromUrl).setActive();
     return;
   }
   if (tabFromUrl === 'articles') {
@@ -419,7 +425,7 @@ function initializeApplication() {
     appState.tabPagination[initialTab].page = initialPageFromUrl;
     appState.tabPagination[initialTab].pageSize = initialPageSizeFromUrl;
   }
-  tabbar.setTabActive(initialTab);
+  tabbar.tabs(initialTab).setActive();
   
   // Derive companyCode from URL path
   var companyCodeFromUrl = CompanyRouting.getCompanyCodeFromUrl();

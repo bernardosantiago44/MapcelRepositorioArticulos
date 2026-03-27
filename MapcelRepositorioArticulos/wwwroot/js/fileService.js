@@ -109,12 +109,17 @@ const FileService = (function() {
    * Upload one or more files
    * Backend: POST /api/files/{companyCode} (multipart/form-data, field "file") [Authorize]
    */
-  function uploadFiles(files, description, companyCode) {
+  function uploadFiles(files, description, companyCode, perFileMetadata) {
     const filesArray = Array.from(files);
 
-    const uploadPromises = filesArray.map(file => {
+    const uploadPromises = filesArray.map((file, index) => {
       const formData = new FormData();
       formData.append('file', file);
+      const metadata = Array.isArray(perFileMetadata) ? perFileMetadata[index] : null;
+      const fileDescription = metadata && typeof metadata.description === 'string'
+        ? metadata.description
+        : description;
+      formData.append('description', fileDescription || '');
 
       return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}`, {
         method: 'POST',

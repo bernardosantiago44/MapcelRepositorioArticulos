@@ -15,8 +15,9 @@ const ImageUploadUI = (function() {
   const ACCEPTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/svg+xml', 'image/webp'];
   const THUMBNAIL_SIZE = 64;
   const SELECTED_CARD_WIDTH = 240;
-  const WINDOW_WIDTH = 1200;
-  const WINDOW_HEIGHT = 900;
+  const WINDOW_WIDTH = 850;
+  const WINDOW_HEIGHT = 700;
+  const EMPTY_STRING = "";
   
   let currentWindow = null;
   let selectedImages = []; // Array of { file: File, dimensions: { width, height }, previewUrl: string, description?: string, desiredFileName?: string }
@@ -30,7 +31,8 @@ const ImageUploadUI = (function() {
     // Create DHTMLX Window - cleanup previous window if exists
     if (currentWindow) {
       try {
-        currentWindow.close();
+        let old = currentWindow.getTopmostWindow();
+        if (old.getId() === 'image_upload_window') return;
       } catch (e) {
         // Window already closed, ignore
       }
@@ -104,42 +106,10 @@ const ImageUploadUI = (function() {
         />
         
         <!-- Selected Images Preview Gallery -->
-        <div id="selected-images-gallery" class="mb-4 flex-1 overflow-auto" style="display: none; max-height: 200px;">
+        <div id="selected-images-gallery" class="mb-4 flex-1 overflow-auto" style="display: none;">
           <h4 class="text-sm font-medium text-gray-700 mb-2">Imágenes seleccionadas:</h4>
           <div id="selected-images-container" class="flex flex-wrap gap-3"></div>
         </div>
-        
-         <!-- Description Field -->
-         <div class="mb-4 flex-shrink-0 space-y-2">
-           <div class="flex items-center justify-between">
-             <label class="block text-sm font-medium text-gray-700">
-               Descripción rápida (opcional)
-             </label>
-             <div class="flex items-center gap-2">
-               <button 
-                 type="button"
-                 id="image-upload-copy-name-btn"
-                 class="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded border border-gray-200 hover:bg-gray-200 transition-colors"
-               >
-                 Copiar nombre
-               </button>
-               <button 
-                 type="button"
-                 id="image-upload-apply-all-btn"
-                 class="text-xs px-3 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
-               >
-                 Aplicar a todas
-               </button>
-             </div>
-           </div>
-           <textarea 
-             id="image-upload-description"
-             rows="3"
-             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-             placeholder="Agrega una descripción para las imágenes..."
-           ></textarea>
-           <p class="text-xs text-gray-500">Puedes personalizar cada imagen más abajo. Usa “Copiar nombre” para usar el nombre del archivo como descripción.</p>
-         </div>
         
         <!-- Action Buttons -->
         <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 flex-shrink-0">
@@ -172,9 +142,6 @@ const ImageUploadUI = (function() {
     const fileInput = document.getElementById('image-upload-input');
     const cancelBtn = document.getElementById('image-upload-cancel-btn');
     const submitBtn = document.getElementById('image-upload-submit-btn');
-    const descriptionTextarea = document.getElementById('image-upload-description');
-    const applyAllBtn = document.getElementById('image-upload-apply-all-btn');
-    const copyNameBtn = document.getElementById('image-upload-copy-name-btn');
     
     // Click to select files
     dropzone.addEventListener('click', () => {
@@ -208,31 +175,6 @@ const ImageUploadUI = (function() {
       fileInput.value = '';
     });
     
-    if (applyAllBtn) {
-      applyAllBtn.addEventListener('click', () => {
-        const text = (descriptionTextarea && descriptionTextarea.value ? descriptionTextarea.value.trim() : '');
-        if (!text) {
-          dhtmlx.message({ type: 'warning', text: 'Agrega una descripción antes de aplicarla.' });
-          return;
-        }
-        selectedImages = selectedImages.map(img => Object.assign({}, img, { description: text }));
-        updateSelectedImagesGallery();
-      });
-    }
-    
-    if (copyNameBtn) {
-      copyNameBtn.addEventListener('click', () => {
-        if (!selectedImages.length) {
-          dhtmlx.message({ type: 'warning', text: 'Primero selecciona al menos una imagen.' });
-          return;
-        }
-        const firstName = selectedImages[0].desiredFileName || selectedImages[0].file.name;
-        if (descriptionTextarea) {
-          descriptionTextarea.value = firstName;
-        }
-      });
-    }
-    
     // Cancel button
     cancelBtn.addEventListener('click', () => {
       selectedImages = [];
@@ -245,8 +187,6 @@ const ImageUploadUI = (function() {
         return;
       }
       
-      const description = descriptionTextarea.value.trim();
-      
       // Show loading state
       submitBtn.disabled = true;
       submitBtn.textContent = 'Subiendo...';
@@ -255,12 +195,12 @@ const ImageUploadUI = (function() {
       const imageFiles = selectedImages.map(img => img.file);
       const imageDimensions = selectedImages.map(img => img.dimensions);
       const perFileMetadata = selectedImages.map(img => ({
-        description: img.description || description,
+        description: img.description || "",
         desiredFileName: img.desiredFileName || img.file.name
       }));
       
       // Call image service to upload
-      ImageService.uploadImages(imageFiles, imageDimensions, description, companyCode, perFileMetadata)
+      ImageService.uploadImages(imageFiles, imageDimensions, EMPTY_STRING, companyCode, perFileMetadata)
         .then(uploadedImages => {
           // Show success message
           dhtmlx.message({
@@ -296,9 +236,6 @@ const ImageUploadUI = (function() {
    * @param {FileList} files - Selected files
    */
   function handleImageSelection(files) {
-    // Clean up previous previews
-    selectedImages = [];
-    
     const filesArray = Array.from(files);
     
     // Validate file types and sizes
@@ -368,7 +305,7 @@ const ImageUploadUI = (function() {
           }
         });
         
-        selectedImages = successfulImages;
+        selectedImages.push(...successfulImages);
         updateSelectedImagesGallery();
         updateSubmitButtonState();
         

@@ -472,7 +472,7 @@ const ImagesTabManager = (function() {
             totalPages: totalPages
           };
         })
-      : ImageService.getImagesPaged(currentCompanyCode, targetPage, targetPageSize);
+      : ImageService.getImagesPagedResult(currentCompanyCode, targetPage, targetPageSize);
     
     dataPromise.then(result => {
       const images = result.data || [];

@@ -297,7 +297,7 @@ const FilesTabManager = (function() {
             totalPages: totalPages
           };
         })
-      : FileService.getFilesPaged(currentCompanyCode, targetPage, targetPageSize);
+      : FileService.getFilesPagedResult(currentCompanyCode, targetPage, targetPageSize);
 
     dataPromise.then(function(result) {
       const files = result.data || [];

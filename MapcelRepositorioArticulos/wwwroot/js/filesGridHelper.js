@@ -61,7 +61,7 @@ const FilesGridHelper = (function() {
       ? Promise.resolve(pagedResult)
       : (searchTerm 
         ? FileService.searchFiles(companyCode, searchTerm)
-        : FileService.getFilesPaged(companyCode));
+        : FileService.getFilesPagedResult(companyCode));
     
     dataPromise
       .then(result => {

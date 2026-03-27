@@ -136,8 +136,10 @@ function getTabFromUrlOrDefault() {
  * Normalizes invalid values to page 1.
  * @returns {number} The normalized page number
  */
-function getPageFromUrl() {
-  var targetTab = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : appState.activeTab;
+function getPageFromUrl(targetTab) {
+  if (!targetTab) {
+    targetTab = appState.activeTab;
+  }
   var tabInUrl = getTabFromUrlOrDefault();
   if (targetTab && targetTab !== tabInUrl) {
     var stored = appState.tabPagination[targetTab];
@@ -352,7 +354,7 @@ appState.filesTab = files;
 appState.imagesTab = images;
 appState.imagesTabInitialized = false;
 
-tabbar.attachEvent('onSelect', function(id, lastId) {
+tabbar.attachEvent('onSelect', function(id) {
   appState.activeTab = id;
   var tabState = appState.tabPagination[id] || { page: 1, pageSize: PaginationShared.DEFAULT_PAGE_SIZE };
   if (!appState.selectedCompanyCode) {

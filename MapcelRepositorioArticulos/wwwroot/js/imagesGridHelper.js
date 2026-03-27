@@ -62,7 +62,7 @@ const ImagesGridHelper = (function() {
       ? Promise.resolve(pagedResult)
       : (searchTerm 
         ? ImageService.searchImages(companyCode, searchTerm)
-        : ImageService.getImagesPaged(companyCode));
+        : ImageService.getImagesPagedResult(companyCode));
     
     dataPromise
       .then(result => {

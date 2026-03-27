@@ -13,7 +13,7 @@ const ImageService = (function() {
    * @param {string} companyCode - The company code to filter images by
    * @returns {Promise<Array<Object>>} Promise resolving to array of image objects
    */
-  function getImagesPaged(companyCode, page = 1, pageSize = 10) {
+  function getImagesPagedResult(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({
       page,
       pageSize
@@ -49,7 +49,7 @@ const ImageService = (function() {
    * Get images for a specific company (array for legacy consumers)
    */
   function getImages(companyCode, page = 1, pageSize = 10) {
-    return getImagesPaged(companyCode, page, pageSize).then(result => result.data);
+    return getImagesPagedResult(companyCode, page, pageSize).then(result => result.data);
   }
   
   /**
@@ -389,6 +389,7 @@ const ImageService = (function() {
   // Public API
   return {
     getImages,
+    getImagesPagedResult,
     getImageById,
     getImagesByArticle,
     updateImageMetadata,

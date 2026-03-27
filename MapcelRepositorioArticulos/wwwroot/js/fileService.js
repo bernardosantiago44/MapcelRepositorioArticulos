@@ -61,7 +61,7 @@ const FileService = (function() {
   /**
    * Get files for a specific company
    */
-  function getFilesPaged(companyCode, page = 1, pageSize = 10) {
+  function getFilesPagedResult(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({ page, pageSize });
 
     return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}?${params}`)
@@ -90,7 +90,7 @@ const FileService = (function() {
    * Get files for a specific company (array only, for legacy consumers)
    */
   function getFiles(companyCode, page = 1, pageSize = 10) {
-    return getFilesPaged(companyCode, page, pageSize).then(result => result.data);
+    return getFilesPagedResult(companyCode, page, pageSize).then(result => result.data);
   }
 
   /**
@@ -293,7 +293,7 @@ const FileService = (function() {
   // Public API
   return {
     getFiles,
-    getFilesPaged,
+    getFilesPagedResult,
     getFileById,
     getFilesByArticle,
     uploadFiles,

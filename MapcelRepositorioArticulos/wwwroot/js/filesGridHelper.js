@@ -54,15 +54,18 @@ const FilesGridHelper = (function() {
    * @param {string} companyCode - Company code to filter files by
    * @param {string} searchTerm - Optional search term
    */
-  function loadFilesData(grid, companyCode, searchTerm) {
+   function loadFilesData(grid, companyCode, searchTerm, pagedResult) {
     grid.clearAll();
     
-    const dataPromise = searchTerm 
-      ? FileService.searchFiles(companyCode, searchTerm)
-      : FileService.getFiles(companyCode);
+    const dataPromise = pagedResult
+      ? Promise.resolve(pagedResult)
+      : (searchTerm 
+        ? FileService.searchFiles(companyCode, searchTerm)
+        : FileService.getFilesPaged(companyCode));
     
     dataPromise
-      .then(files => {
+      .then(result => {
+        const files = Array.isArray(result) ? result : (result && result.data) ? result.data : [];
         files.forEach(file => {
           const rowId = file.id;
           

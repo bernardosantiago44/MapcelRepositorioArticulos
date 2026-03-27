@@ -61,14 +61,14 @@ const FileService = (function() {
   /**
    * Get files for a specific company
    */
-  function getFiles(companyCode, page = 1, pageSize = 10) {
+  function getFilesPaged(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({ page, pageSize });
 
     return fetch(`${API_BASE_URL}/files/${encodeURIComponent(companyCode)}?${params}`)
         .then(response => {
           if (response.status === 404) {
             // no files
-            return { data: [] };
+            return { data: [], page, pageSize, total: 0, totalPages: 1 };
           }
           if (!response.ok) throw new Error("API Error");
           return response.json();
@@ -76,8 +76,21 @@ const FileService = (function() {
         .then(pagedResult => {
           const files = Array.isArray(pagedResult.data) ? pagedResult.data : [];
           cacheFiles(files);
-          return files;
+          return {
+            data: files,
+            page: pagedResult.page || page,
+            pageSize: pagedResult.pageSize || pageSize,
+            total: pagedResult.total || files.length,
+            totalPages: pagedResult.totalPages || Math.max(1, Math.ceil((pagedResult.total || files.length) / (pagedResult.pageSize || pageSize)))
+          };
         });
+  }
+
+  /**
+   * Get files for a specific company (array only, for legacy consumers)
+   */
+  function getFiles(companyCode, page = 1, pageSize = 10) {
+    return getFilesPaged(companyCode, page, pageSize).then(result => result.data);
   }
 
   /**
@@ -280,6 +293,7 @@ const FileService = (function() {
   // Public API
   return {
     getFiles,
+    getFilesPaged,
     getFileById,
     getFilesByArticle,
     uploadFiles,

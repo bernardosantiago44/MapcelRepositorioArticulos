@@ -14,18 +14,29 @@ const ImagesTabManager = (function() {
   let imagesCell = null;
   let imagesLayout = null;
   let contentSection = null;
+  let imagesContentLayout = null;
+  let imagesDataCell = null;
+  let imagesPaginationCell = null;
   let currentSearchTerm = '';
   let selectedImageIds = [];
   let currentImages = [];
+  let currentPagination = { page: 1, pageSize: PaginationShared.DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
   
   /**
    * Initialize the Images tab
    * @param {Object} tabCell - DHTMLX tab cell for images
    * @param {string} companyCode - Current company code
+   * @param {number} initialPage - Initial page to load
    */
-  function initializeImagesTab(tabCell, companyCode) {
+  function initializeImagesTab(tabCell, companyCode, initialPage) {
     currentCompanyCode = companyCode;
     imagesCell = tabCell;
+    if (!isNaN(initialPage) && initialPage > 0) {
+      currentPagination.page = initialPage;
+    }
+    if (window.appState && window.appState.tabPagination && window.appState.tabPagination.images) {
+      currentPagination.pageSize = window.appState.tabPagination.images.pageSize || PaginationShared.DEFAULT_PAGE_SIZE;
+    }
     
     // Create layout for images tab
     imagesLayout = tabCell.attachLayout('2E');
@@ -39,12 +50,19 @@ const ImagesTabManager = (function() {
     // Bottom section - Images display (gallery or list view)
     contentSection = imagesLayout.cells('b');
     contentSection.hideHeader();
+    imagesContentLayout = contentSection.attachLayout('2E');
+    imagesDataCell = imagesContentLayout.cells('a');
+    imagesPaginationCell = imagesContentLayout.cells('b');
+    imagesPaginationCell.setHeight(56);
+    imagesPaginationCell.hideHeader();
+    imagesPaginationCell.fixSize(0, 1);
+    imagesPaginationCell.attachHTMLString('<div id="images-pagination" class="h-full w-full"></div>');
     
     // Attach top section content
     topSection.attachHTMLString(renderTopSection());
     
     // Initialize with gallery view by default
-    loadImages();
+    loadImages(currentPagination.page);
     
     // Setup event handlers
     setTimeout(() => {
@@ -285,7 +303,7 @@ const ImagesTabManager = (function() {
    */
   function handleMasterCheckboxChange() {
     const allSelected = selectedImageIds.length === currentImages.length && currentImages.length > 0;
-    const grid = contentSection.getAttachedObject();
+    const grid = imagesDataCell ? imagesDataCell.getAttachedObject() : null;
     
     if (allSelected) {
       // Deselect all
@@ -396,16 +414,16 @@ const ImagesTabManager = (function() {
     
     if (viewType === 'list') {
       // Detach gallery and attach grid view
-      contentSection.detachObject(true);
-      imagesGrid = ImagesGridHelper.initializeGrid(contentSection, handleImageSelect);
-      loadImagesIntoGrid();
+      imagesDataCell.detachObject(true);
+      imagesGrid = ImagesGridHelper.initializeGrid(imagesDataCell, handleImageSelect);
+      loadImages(currentPagination.page);
     } else {
       // Detach grid and attach gallery view
       if (imagesGrid) {
         imagesGrid.destructor();
         imagesGrid = null;
       }
-      loadImages();
+      loadImages(currentPagination.page);
     }
     
     // Update button styles
@@ -437,30 +455,63 @@ const ImagesTabManager = (function() {
   /**
    * Load images for the current company
    */
-  function loadImages() {
-    const dataPromise = currentSearchTerm 
-      ? ImageService.searchImages(currentCompanyCode, currentSearchTerm)
-      : ImageService.getImages(currentCompanyCode);
+  function loadImages(requestedPage) {
+    const targetPage = requestedPage || currentPagination.page || 1;
+    const targetPageSize = currentPagination.pageSize || PaginationShared.DEFAULT_PAGE_SIZE;
+    const dataPromise = currentSearchTerm
+      ? ImageService.searchImages(currentCompanyCode, currentSearchTerm).then(function(images) {
+          const totalPages = Math.max(1, Math.ceil(images.length / targetPageSize));
+          const safePage = PaginationShared.normalizePageNumber(targetPage, totalPages);
+          const startIndex = (safePage - 1) * targetPageSize;
+          const pageItems = images.slice(startIndex, startIndex + targetPageSize);
+          return {
+            data: pageItems,
+            page: safePage,
+            pageSize: targetPageSize,
+            total: images.length,
+            totalPages: totalPages
+          };
+        })
+      : ImageService.getImagesPaged(currentCompanyCode, targetPage, targetPageSize);
     
-    dataPromise.then(images => {
+    dataPromise.then(result => {
+      const images = result.data || [];
       currentImages = images;
+      currentPagination = {
+        page: PaginationShared.normalizePageNumber(result.page || targetPage, result.totalPages || 1),
+        pageSize: result.pageSize || targetPageSize,
+        total: result.total || images.length,
+        totalPages: result.totalPages || Math.max(1, Math.ceil((result.total || images.length) / (result.pageSize || targetPageSize)))
+      };
+      if (window.appState && window.appState.tabPagination && window.appState.tabPagination.images) {
+        window.appState.tabPagination.images = currentPagination;
+      }
+      PaginationShared.renderPagination('images-pagination', currentPagination, handleImagesPageChange);
+      if (window.appState && window.appState.activeTab === 'images') {
+        PaginationShared.updateUrlState({
+          tab: 'images',
+          page: currentPagination.page,
+          pageSize: currentPagination.pageSize
+        });
+      }
       
       // Clear selection when images change due to search
       if (currentSearchTerm) {
-        // Keep only selections that are still in the filtered results
         selectedImageIds = selectedImageIds.filter(id => 
           images.some(img => img.id === id)
         );
+      } else {
+        selectedImageIds = [];
       }
       
       if (currentView === 'gallery') {
-        contentSection.attachHTMLString(ImagesGalleryViewUI.renderGalleryView(images, selectedImageIds));
+        imagesDataCell.attachHTMLString(ImagesGalleryViewUI.renderGalleryView(images, selectedImageIds));
         // Initialize lazy loading after rendering
         setTimeout(() => {
           ImagesGalleryViewUI.initializeLazyLoading();
         }, 100);
       } else if (currentView === 'list' && imagesGrid) {
-        loadImagesIntoGrid();
+        loadImagesIntoGrid(result);
       }
       
       updateSelectionUI();
@@ -468,6 +519,12 @@ const ImagesTabManager = (function() {
       if (error.status === 404) {
         // No images found, render empty state
         currentImages = [];
+        PaginationShared.renderPagination('images-pagination', {
+          page: 1,
+          pageSize: targetPageSize,
+          total: 0,
+          totalPages: 1
+        }, handleImagesPageChange);
       } else {
         console.error('Error loading images:', error);
         dhtmlx.message({
@@ -481,10 +538,16 @@ const ImagesTabManager = (function() {
   /**
    * Load images into the grid
    */
-  function loadImagesIntoGrid() {
+  function loadImagesIntoGrid(pagedResult) {
     if (imagesGrid) {
-      ImagesGridHelper.loadImagesData(imagesGrid, currentCompanyCode, currentSearchTerm);
+      ImagesGridHelper.loadImagesData(imagesGrid, currentCompanyCode, currentSearchTerm, pagedResult || { data: currentImages });
     }
+  }
+
+  function handleImagesPageChange(nextPage) {
+    const safePage = PaginationShared.normalizePageNumber(nextPage, currentPagination.totalPages);
+    if (safePage === currentPagination.page) return;
+    loadImages(safePage);
   }
   
   /**
@@ -777,6 +840,7 @@ const ImagesTabManager = (function() {
     currentCompanyCode = companyCode;
     currentSearchTerm = '';
     selectedImageIds = [];
+    currentPagination = { page: 1, pageSize: PaginationShared.DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
     
     // Clear search input
     const searchInput = document.getElementById('images-search-input');
@@ -784,7 +848,7 @@ const ImagesTabManager = (function() {
       searchInput.value = '';
     }
     
-    loadImages();
+    loadImages(1);
   }
   
   // Public API
@@ -799,7 +863,8 @@ const ImagesTabManager = (function() {
     openEditDescriptionModal,
     deleteSingleImage,
     closeDeleteConfirmationModal,
-    openUploadModal
+    openUploadModal,
+    goToPage: loadImages
   };
 })();
 

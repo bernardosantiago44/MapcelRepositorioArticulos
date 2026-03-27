@@ -55,15 +55,18 @@ const ImagesGridHelper = (function() {
    * @param {string} companyCode - Company code to filter images by
    * @param {string} searchTerm - Optional search term
    */
-  function loadImagesData(grid, companyCode, searchTerm) {
+  function loadImagesData(grid, companyCode, searchTerm, pagedResult) {
     grid.clearAll();
     
-    const dataPromise = searchTerm 
-      ? ImageService.searchImages(companyCode, searchTerm)
-      : ImageService.getImages(companyCode);
+    const dataPromise = pagedResult
+      ? Promise.resolve(pagedResult)
+      : (searchTerm 
+        ? ImageService.searchImages(companyCode, searchTerm)
+        : ImageService.getImagesPaged(companyCode));
     
     dataPromise
-      .then(images => {
+      .then(result => {
+        const images = Array.isArray(result) ? result : (result && result.data) ? result.data : [];
         images.forEach(image => {
           const rowId = image.id;
           

@@ -137,16 +137,13 @@ function getTabFromUrlOrDefault() {
  * @returns {number} The normalized page number
  */
 function getPageFromUrl(targetTab) {
-  if (!targetTab) {
-    targetTab = appState.activeTab;
-  }
+  var tabToUse = targetTab || appState.activeTab;
+  var storedPage = (appState.tabPagination[tabToUse] && appState.tabPagination[tabToUse].page) || 1;
   var tabInUrl = getTabFromUrlOrDefault();
-  if (targetTab && targetTab !== tabInUrl) {
-    var stored = appState.tabPagination[targetTab];
-    return stored && stored.page ? stored.page : 1;
+  if (tabToUse !== tabInUrl) {
+    return storedPage;
   }
-  var fallback = (appState.tabPagination[targetTab] && appState.tabPagination[targetTab].page) || 1;
-  return PaginationShared.getPageFromUrl(fallback);
+  return PaginationShared.getPageFromUrl(storedPage);
 }
 
 /**

@@ -496,12 +496,6 @@ const ImagesTabManager = (function() {
       }
       
       // Clear selection when images change due to search
-      if (currentSearchTerm) {
-        selectedImageIds = selectedImageIds.filter(id => 
-          images.some(img => img.id === id)
-        );
-      }
-      
       if (currentView === 'gallery') {
         imagesDataCell.attachHTMLString(ImagesGalleryViewUI.renderGalleryView(images, selectedImageIds));
         // Initialize lazy loading after rendering

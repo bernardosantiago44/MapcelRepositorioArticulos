@@ -359,11 +359,19 @@ tabbar.attachEvent('onSelect', function(id, lastId) {
     return true;
   }
   if (id === 'articles') {
+    var targetArticlePage = tabState.page || appState.currentPage || 1;
     PaginationShared.updateUrlState({
       tab: 'articles',
-      page: appState.currentPage || 1,
+      page: targetArticlePage,
       pageSize: appState.pageSize || PaginationShared.DEFAULT_PAGE_SIZE
     });
+    if ((appState.currentPage || 1) !== targetArticlePage) {
+      main_content.progressOn();
+      loadArticlesForCompany(appState.selectedCompanyCode, { page: targetArticlePage })
+        .catch(function() {
+          main_content.progressOff();
+        });
+    }
     return true;
   }
   PaginationShared.updateUrlState({

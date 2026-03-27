@@ -685,8 +685,10 @@ var NewArticlePageUI = (function() {
         delimiter: {
           class: Delimiter
         },
-
-        image: imageToolConfig
+        image: imageToolConfig,
+        ColorPicker: {
+          class: ColorPicker.default,
+        },
       },
       onReady: function() {
         attachImageUrlPasteHandler();
@@ -2217,7 +2219,8 @@ var NewArticlePageUI = (function() {
    * @returns {boolean} True if valid
    */
   function validateForm(descriptionHtml) {
-    var titleInput = document.getElementById('new-article-title');
+    const titleInput = document.getElementById('new-article-title');
+    const linkInput = document.getElementById('new-article-external-link');
 
     var errors = [];
 
@@ -2227,6 +2230,10 @@ var NewArticlePageUI = (function() {
 
     if (!descriptionHtml || !descriptionHtml.trim()) {
       errors.push('La descripción es obligatoria');
+    }
+    
+    if (!validateLink(linkInput.value.trim())) {
+      errors.push('El enlace externo no es válido');
     }
 
     if (errors.length > 0) {
@@ -2238,6 +2245,19 @@ var NewArticlePageUI = (function() {
     }
 
     return true;
+  }
+  
+  function validateLink(linkContent) {
+    // Empty link is valid
+    if (linkContent.trim().length === 0) { return true }
+
+    try {
+      const url = new URL(linkContent);
+      // Optional: Ensure the protocol is http or https
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch (err) {
+      return false;
+    }
   }
 
   /**

@@ -5,6 +5,8 @@
  * - tagBadge.js (must be loaded before this module for renderTagBadges function)
  */
 
+const ARTICLES_PAGINATION_FOOTER_HEIGHT = '42px';
+
 /**
  * Generate HTML template for status column with colored bullet
  * @param {string} statusValue - The status value
@@ -91,19 +93,15 @@ function initializeArticlesGrid(gridCell, articlesData) {
   // Enable smart rendering to reduce DOM thrashing during filtering
   articlesGrid.enableSmartRendering(true);
   
-  // Add footer with pagination
+  // Add footer container for custom pagination controls
   articlesGrid.attachFooter([
-    "<div id='articles_grid_recinfoArea' style='width:100%;height:100%'></div>",
+    "<div id='articles_grid_pagination' style='width:100%;height:100%'></div>",
     "#cspan",
     "#cspan",
     "#cspan",
     "#cspan",
     "#cspan"
-  ], ['height:30px;text-align:left;background:transparent;border-color:white;padding:0px;']);
-  
-  // Enable pagination
-  articlesGrid.enablePaging(true, 6, 3, 'articles_grid_recinfoArea');
-  articlesGrid.setPagingSkin('bricks', 'dhx_skyblue');
+  ], ['height:' + ARTICLES_PAGINATION_FOOTER_HEIGHT + ';text-align:left;background:transparent;border-color:white;padding:0px;']);
   
   // Populate grid with article data
   articlesData.forEach(article => {

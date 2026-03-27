@@ -22,7 +22,7 @@ const FilesGridHelper = (function() {
       'Nombre',        // File name with icon
       'Tamaño',        // File size
       'Descripción',   // Description
-      'Fecha',         // Upload date
+      'Fecha Subido',         // Upload date
       'Artículos',     // Linked articles
       'Acciones'       // Actions (view, download, edit, delete)
     ]);
@@ -54,15 +54,18 @@ const FilesGridHelper = (function() {
    * @param {string} companyCode - Company code to filter files by
    * @param {string} searchTerm - Optional search term
    */
-  function loadFilesData(grid, companyCode, searchTerm) {
+   function loadFilesData(grid, companyCode, searchTerm, pagedResult) {
     grid.clearAll();
     
-    const dataPromise = searchTerm 
-      ? FileService.searchFiles(companyCode, searchTerm)
-      : FileService.getFiles(companyCode);
+    const dataPromise = pagedResult
+      ? Promise.resolve(pagedResult)
+      : (searchTerm 
+        ? FileService.searchFiles(companyCode, searchTerm)
+        : FileService.getFilesPagedResult(companyCode));
     
     dataPromise
-      .then(files => {
+      .then(result => {
+        const files = Array.isArray(result) ? result : (result && result.data) ? result.data : [];
         files.forEach(file => {
           const rowId = file.id;
           
@@ -71,7 +74,7 @@ const FilesGridHelper = (function() {
             renderFileNameCell(file),
             file.size,
             file.description || '—',
-            formatDate(file.upload_date),
+            formatDate(file.uploadDate),
             renderArticlesCell(file.linked_articles),
             renderActionsCell(file.id)
           ]);
@@ -124,17 +127,6 @@ const FilesGridHelper = (function() {
   function renderActionsCell(fileId) {
     return `
       <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-        <button 
-          onclick="FilesGridHelper.handleViewFile('${fileId}')"
-          class="action-btn"
-          title="Ver archivo"
-          style="border: none; background: none; cursor: pointer; padding: 4px;"
-        >
-          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: #64748b;">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-          </svg>
-        </button>
         <button 
           onclick="FilesGridHelper.handleDownloadFile('${fileId}')"
           class="action-btn"

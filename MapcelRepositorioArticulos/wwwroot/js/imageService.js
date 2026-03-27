@@ -13,7 +13,7 @@ const ImageService = (function() {
    * @param {string} companyCode - The company code to filter images by
    * @returns {Promise<Array<Object>>} Promise resolving to array of image objects
    */
-  function getImages(companyCode, page = 1, pageSize = 10) {
+  function getImagesPagedResult(companyCode, page = 1, pageSize = 10) {
     const params = new URLSearchParams({
       page,
       pageSize
@@ -24,7 +24,7 @@ const ImageService = (function() {
         if (response.status === 404) {
           // remove that id from cache if not found
           imagesCache.delete(companyCode);
-          return {data:[]};
+          return { data: [], page, pageSize, total: 0, totalPages: 1 };
         }
         if (!response.ok) throw new Error("API Error");
         return response.json();
@@ -35,8 +35,21 @@ const ImageService = (function() {
         images.forEach(image => {
           imagesCache.set(image.id, image);
         });
-        return pagedResult.data;
+        return {
+          data: images,
+          page: pagedResult.page || page,
+          pageSize: pagedResult.pageSize || pageSize,
+          total: pagedResult.total || images.length,
+          totalPages: pagedResult.totalPages || Math.max(1, Math.ceil((pagedResult.total || images.length) / (pagedResult.pageSize || pageSize)))
+        };
       });
+  }
+
+  /**
+   * Get images for a specific company (array for legacy consumers)
+   */
+  function getImages(companyCode, page = 1, pageSize = 10) {
+    return getImagesPagedResult(companyCode, page, pageSize).then(result => result.data);
   }
   
   /**
@@ -376,6 +389,7 @@ const ImageService = (function() {
   // Public API
   return {
     getImages,
+    getImagesPagedResult,
     getImageById,
     getImagesByArticle,
     updateImageMetadata,

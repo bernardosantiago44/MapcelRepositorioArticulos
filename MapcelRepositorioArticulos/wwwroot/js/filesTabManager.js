@@ -14,17 +14,28 @@ const FilesTabManager = (function() {
   let filesCell = null;
   let filesLayout = null;
   let contentSection = null;
+  let filesContentLayout = null;
+  let filesDataCell = null;
+  let filesPaginationCell = null;
   let currentSearchTerm = '';
   let selectedFileIds = [];
+  let currentPagination = { page: 1, pageSize: PaginationShared.DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
   
   /**
    * Initialize the Files tab
    * @param {Object} tabCell - DHTMLX tab cell for files
    * @param {string} companyCode - Current company code
+   * @param {number} initialPage - Initial page to load
    */
-  function initializeFilesTab(tabCell, companyCode) {
+  function initializeFilesTab(tabCell, companyCode, initialPage) {
     currentCompanyCode = companyCode;
     filesCell = tabCell;
+    if (!isNaN(initialPage) && initialPage > 0) {
+      currentPagination.page = initialPage;
+    }
+    if (window.appState && window.appState.tabPagination && window.appState.tabPagination.files) {
+      currentPagination.pageSize = window.appState.tabPagination.files.pageSize || PaginationShared.DEFAULT_PAGE_SIZE;
+    }
     
     // Create layout for files tab
     filesLayout = tabCell.attachLayout('2E');
@@ -38,17 +49,25 @@ const FilesTabManager = (function() {
     // Bottom section - Files display (grid or card view)
     contentSection = filesLayout.cells('b');
     contentSection.hideHeader();
+    filesContentLayout = contentSection.attachLayout('2E');
+    filesDataCell = filesContentLayout.cells('a');
+    filesDataCell.hideHeader();
+    filesPaginationCell = filesContentLayout.cells('b');
+    filesPaginationCell.setHeight(56);
+    filesPaginationCell.hideHeader();
+    filesPaginationCell.fixSize(0, 1);
+    filesPaginationCell.attachHTMLString('<div id="files-pagination" class="h-full w-full"></div>');
     
     // Attach top section content
     topSection.attachHTMLString(renderTopSection());
     
     // Initialize with list view by default
-    filesGrid = FilesGridHelper.initializeGrid(contentSection, handleFileSelect);
+    filesGrid = FilesGridHelper.initializeGrid(filesDataCell, handleFileSelect);
     
     // Setup event handlers
     setTimeout(() => {
       setupTopSectionHandlers();
-      loadFiles();
+      loadFiles(currentPagination.page);
       
       // Apply permission-based visibility
       applyUploadPermissions();
@@ -224,19 +243,13 @@ const FilesTabManager = (function() {
       }
       
       // Load files and render card view
-      const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyCode, currentSearchTerm)
-        : FileService.getFiles(currentCompanyCode);
-      
-      dataPromise.then(files => {
-        contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));
-      });
+      loadFiles(currentPagination.page);
       
     } else {
       // Attach grid view
-      contentSection.detachObject(true);
-      filesGrid = FilesGridHelper.initializeGrid(contentSection, handleFileSelect);
-      loadFiles();
+      filesDataCell.detachObject(true);
+      filesGrid = FilesGridHelper.initializeGrid(filesDataCell, handleFileSelect);
+      loadFiles(currentPagination.page);
     }
     
     // Update button styles
@@ -268,18 +281,63 @@ const FilesTabManager = (function() {
   /**
    * Load files for the current company
    */
-  function loadFiles() {
-    if (currentView === 'list' && filesGrid) {
-      FilesGridHelper.loadFilesData(filesGrid, currentCompanyCode, currentSearchTerm);
-    } else if (currentView === 'card' && contentSection) {
-      const dataPromise = currentSearchTerm 
-        ? FileService.searchFiles(currentCompanyCode, currentSearchTerm)
-        : FileService.getFiles(currentCompanyCode);
-      
-      dataPromise.then(files => {
-        contentSection.attachHTMLString(FilesCardViewUI.renderCardView(files));
+  function loadFiles(requestedPage) {
+    const targetPage = requestedPage || currentPagination.page || 1;
+    const targetPageSize = currentPagination.pageSize || PaginationShared.DEFAULT_PAGE_SIZE;
+    const dataPromise = currentSearchTerm
+      ? FileService.searchFiles(currentCompanyCode, currentSearchTerm).then(function(files) {
+          const totalPages = Math.max(1, Math.ceil(files.length / targetPageSize));
+          const safePage = PaginationShared.normalizePageNumber(targetPage, totalPages);
+          const startIndex = (safePage - 1) * targetPageSize;
+          const pageItems = files.slice(startIndex, startIndex + targetPageSize);
+          return {
+            data: pageItems,
+            page: safePage,
+            pageSize: targetPageSize,
+            total: files.length,
+            totalPages: totalPages
+          };
+        })
+      : FileService.getFilesPagedResult(currentCompanyCode, targetPage, targetPageSize);
+
+    dataPromise.then(function(result) {
+      const files = result.data || [];
+      currentPagination = {
+        page: PaginationShared.normalizePageNumber(result.page || targetPage, result.totalPages || 1),
+        pageSize: result.pageSize || targetPageSize,
+        total: result.total || files.length,
+        totalPages: result.totalPages || Math.max(1, Math.ceil((result.total || files.length) / (result.pageSize || targetPageSize)))
+      };
+      if (window.appState && window.appState.tabPagination && window.appState.tabPagination.files) {
+        window.appState.tabPagination.files = currentPagination;
+      }
+      PaginationShared.renderPagination('files-pagination', currentPagination, handleFilesPageChange);
+      if (window.appState && window.appState.activeTab === 'files') {
+        PaginationShared.updateUrlState({
+          tab: 'files',
+          page: currentPagination.page,
+          pageSize: currentPagination.pageSize
+        });
+      }
+
+      if (currentView === 'list' && filesGrid) {
+        FilesGridHelper.loadFilesData(filesGrid, currentCompanyCode, currentSearchTerm, { data: files });
+      } else if (currentView === 'card' && filesDataCell) {
+        filesDataCell.attachHTMLString(FilesCardViewUI.renderCardView(files));
+      }
+    }).catch(function(error) {
+      console.error('Error loading files:', error);
+      dhtmlx.message({
+        type: 'error',
+        text: 'Error al cargar archivos: ' + error.message
       });
-    }
+    });
+  }
+
+  function handleFilesPageChange(nextPage) {
+    const safePage = PaginationShared.normalizePageNumber(nextPage, currentPagination.totalPages);
+    if (safePage === currentPagination.page) return;
+    loadFiles(safePage);
   }
   
   /**
@@ -338,6 +396,7 @@ const FilesTabManager = (function() {
   function updateCompany(companyCode) {
     currentCompanyCode = companyCode;
     currentSearchTerm = '';
+    currentPagination = { page: 1, pageSize: PaginationShared.DEFAULT_PAGE_SIZE, total: 0, totalPages: 1 };
     
     // Clear search input
     const searchInput = document.getElementById('files-search-input');
@@ -345,7 +404,7 @@ const FilesTabManager = (function() {
       searchInput.value = '';
     }
     
-    loadFiles();
+    loadFiles(1);
   }
   
   /**
@@ -370,7 +429,8 @@ const FilesTabManager = (function() {
     openUploadModal,
     openEditDescriptionModal,
     handleFileSelect,
-    handleFileCheckboxChange
+    handleFileCheckboxChange,
+    goToPage: loadFiles
   };
 })();
 

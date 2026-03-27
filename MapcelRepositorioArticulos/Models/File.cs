@@ -68,6 +68,7 @@ public class FileDto
     public int? Width { get; set; }
     public int? Height { get; set; }
     public long? SizeBytes { get; set; }
+    public required DateTime UploadDate { get; set; }
 }
 
 public sealed class UpdateFileRequest

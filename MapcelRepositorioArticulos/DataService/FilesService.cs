@@ -133,7 +133,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             f.description,
             f.thumbnail_url,
             f.extension,
-            f.is_image
+            f.is_image,
+            f.upload_date
         FROM [RepositorioArticulos].[dbo].[files] f
         INNER JOIN [RepositorioArticulos].[dbo].[file_articles] fa ON f.file_id = fa.file_id
         WHERE fa.article_id = @articleId
@@ -155,7 +156,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             f.description,
             f.thumbnail_url,
             f.extension,
-            f.is_image
+            f.is_image,
+            f.upload_date
         FROM FileBase b
         INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = b.file_id
         ORDER BY f.is_image DESC, f.upload_date DESC;
@@ -199,6 +201,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             INSERTED.extension,
             INSERTED.thumbnail_url,
             INSERTED.is_image
+            DELETED.upload_date
         WHERE file_id = @FileId
           AND company_code = @CompanyCode;
     ";
@@ -355,7 +358,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
                 Width = reader.IsDBNull(widthPos) ? null : reader.GetInt32(widthPos),
                 Height = reader.IsDBNull(heightPos) ? null : reader.GetInt32(heightPos),
-                SizeBytes =  reader.IsDBNull(sizeBytesPos) ? null : reader.GetInt64(sizeBytesPos)
+                SizeBytes =  reader.IsDBNull(sizeBytesPos) ? null : reader.GetInt64(sizeBytesPos),
+                UploadDate = reader.GetDateTime(uploadDatePos)
             });
         }
 
@@ -415,6 +419,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
         int thumbnailUrlPos = reader.GetOrdinal("thumbnail_url");
         int extensionPos = reader.GetOrdinal("extension");
         int isImagePos = reader.GetOrdinal("is_image");
+        int uploadDatePos = reader.GetOrdinal("upload_date");
 
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -426,6 +431,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 ThumbnailUrl = reader.IsDBNull(thumbnailUrlPos) ? "" : reader.GetString(thumbnailUrlPos),
                 Extension = reader.IsDBNull(extensionPos) ? "" : reader.GetString(extensionPos),
                 IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
+                UploadDate = reader.GetDateTime(uploadDatePos)
             });
         }
 
@@ -590,7 +596,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
                 Description = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Extension = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
                 ThumbnailUrl = reader.IsDBNull(4) ? null : reader.GetString(4),
-                IsImage = !reader.IsDBNull(5) && reader.GetBoolean(5)
+                IsImage = !reader.IsDBNull(5) && reader.GetBoolean(5),
+                UploadDate = reader.GetDateTime(6),
             };
 
             return dto;

@@ -500,8 +500,6 @@ const ImagesTabManager = (function() {
         selectedImageIds = selectedImageIds.filter(id => 
           images.some(img => img.id === id)
         );
-      } else {
-        selectedImageIds = [];
       }
       
       if (currentView === 'gallery') {

@@ -358,11 +358,6 @@ tabbar.attachEvent('onSelect', function(id, lastId) {
   if (!appState.selectedCompanyCode) {
     return true;
   }
-  PaginationShared.updateUrlState({
-    tab: id,
-    page: tabState.page || 1,
-    pageSize: tabState.pageSize || PaginationShared.DEFAULT_PAGE_SIZE
-  });
   if (id === 'articles') {
     PaginationShared.updateUrlState({
       tab: 'articles',
@@ -371,6 +366,11 @@ tabbar.attachEvent('onSelect', function(id, lastId) {
     });
     return true;
   }
+  PaginationShared.updateUrlState({
+    tab: id,
+    page: tabState.page || 1,
+    pageSize: tabState.pageSize || PaginationShared.DEFAULT_PAGE_SIZE
+  });
   if (id === 'files') {
     if (!appState.filesTabInitialized) {
       initializeFilesTab(appState.selectedCompanyCode, tabState.page);
@@ -408,7 +408,6 @@ function initializeApplication() {
       appState.tabPagination[key].pageSize = initialPageSizeFromUrl;
     }
   });
-  appState.tabPagination.articles.pageSize = initialPageSizeFromUrl;
   if (appState.tabPagination[initialTab]) {
     appState.tabPagination[initialTab].page = initialPageFromUrl;
     appState.tabPagination[initialTab].pageSize = initialPageSizeFromUrl;

@@ -52,6 +52,8 @@ const ImagesTabManager = (function() {
     contentSection.hideHeader();
     imagesContentLayout = contentSection.attachLayout('2E');
     imagesDataCell = imagesContentLayout.cells('a');
+    imagesDataCell.hideHeader();
+    
     imagesPaginationCell = imagesContentLayout.cells('b');
     imagesPaginationCell.setHeight(56);
     imagesPaginationCell.hideHeader();

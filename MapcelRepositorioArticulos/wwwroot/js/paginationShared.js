@@ -6,17 +6,17 @@
 (function(global) {
   'use strict';
 
-  var DEFAULT_PAGE_SIZE = 10;
+  const DEFAULT_PAGE_SIZE = 10;
 
   function normalizePageNumber(pageNumber, totalPages) {
-    var safePage = isNaN(pageNumber) || pageNumber <= 0 ? 1 : pageNumber;
+    const safePage = isNaN(pageNumber) || pageNumber <= 0 ? 1 : pageNumber;
     if (!totalPages || totalPages <= 0) return safePage;
     return Math.min(Math.max(safePage, 1), totalPages);
   }
 
   function getPageFromUrl(defaultPage) {
-    var params = new URLSearchParams(window.location.search);
-    var pageParam = parseInt(params.get('page'), 10);
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = parseInt(params.get('page'), 10);
     if (isNaN(pageParam) || pageParam <= 0) {
       return defaultPage || 1;
     }
@@ -24,8 +24,8 @@
   }
 
   function getPageSizeFromUrl(defaultSize) {
-    var params = new URLSearchParams(window.location.search);
-    var pageSizeParam = parseInt(params.get('pageSize'), 10);
+    const params = new URLSearchParams(window.location.search);
+    const pageSizeParam = parseInt(params.get('pageSize'), 10);
     if (isNaN(pageSizeParam) || pageSizeParam <= 0) {
       return defaultSize || DEFAULT_PAGE_SIZE;
     }

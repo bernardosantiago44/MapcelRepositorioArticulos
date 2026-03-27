@@ -51,6 +51,7 @@ const FilesTabManager = (function() {
     contentSection.hideHeader();
     filesContentLayout = contentSection.attachLayout('2E');
     filesDataCell = filesContentLayout.cells('a');
+    filesDataCell.hideHeader();
     filesPaginationCell = filesContentLayout.cells('b');
     filesPaginationCell.setHeight(56);
     filesPaginationCell.hideHeader();

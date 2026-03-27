@@ -97,6 +97,7 @@ var header_toolbar = header_trailing.attachToolbar();
 header_toolbar.setIconsPath('/Dhtmlx/codebase/imgs/');
 header_toolbar.addButton('new_article', 1, 'Nuevo artículo');
 header_toolbar.addButton('edit_company', 2, 'Editar Compañía');
+header_toolbar.hideItem('edit_company');
 
 // Toolbar Click Handler
 header_toolbar.attachEvent('onClick', function(id) {
@@ -295,7 +296,7 @@ var filters_container = articles_layout.cells('a');
 filters_container.setHeight(LAYOUT_CONFIG.FILTERS_SECTION_HEIGHT);
 filters_container.hideHeader();
 filters_container.fixSize(0, 1);
-filters_container.setHeight(90);
+filters_container.setHeight(70);
 
 // ============================================================================
 // Grid Section (Center) and Sidebar (Right)
@@ -542,7 +543,7 @@ function initializeAppForCompany(companyCode) {
  */
 function createGridFilters(companies) {
   // Create HTML container for all filters
-  const filterHtml = createFilterContainerHtml(companies);
+  const filterHtml = createFilterContainerHtml();
   filters_container.attachHTMLString(filterHtml);
   
   // Initialize all filter controls after DOM is ready
@@ -555,8 +556,8 @@ function createGridFilters(companies) {
  * Create filter form for regular users (no company picker)
  */
 function createFilterFormForRegularUser() {
-  // Create HTML container for filters (without company picker)
-  var filterHtml = createFilterContainerHtml(null);
+  // Create HTML container for filters
+  var filterHtml = createFilterContainerHtml();
   filters_container.attachHTMLString(filterHtml);
   
   // Initialize filter controls after DOM is ready
@@ -605,10 +606,9 @@ function createCompanyTitleHtml(companyName) {
 
 /**
  * Create the HTML for the filter container
- * @param {Array<Company>|null} companies - Companies array for admin, null for regular users
  * @returns {string} HTML string for filter container
  */
-function createFilterContainerHtml(companies) {
+function createFilterContainerHtml() {
   return '<div class="p-4 space-y-3">' +
     '<div class="flex flex-wrap items-center gap-4">' +
       '<div class="flex items-center gap-2">' +
@@ -1238,6 +1238,7 @@ function openNewArticleForm() {
       
       // Switch to new article page view
       showNewArticlePage(companyName);
+      tabbar.tabs('articles').setActive();
     })
     .catch(function(error) {
       console.error('Error getting company name:', error);

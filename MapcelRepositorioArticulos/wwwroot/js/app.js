@@ -423,7 +423,7 @@ function initializeApplication() {
   
   // Derive companyCode from URL path
   var companyCodeFromUrl = CompanyRouting.getCompanyCodeFromUrl();
-  appState.currentPage = getPageFromUrl('articles');
+  appState.currentPage = initialTab === 'articles' ? getPageFromUrl('articles') : 1;
   
   if (companyCodeFromUrl) {
     appState.selectedCompanyCode = companyCodeFromUrl;

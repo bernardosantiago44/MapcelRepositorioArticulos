@@ -334,7 +334,7 @@ const FilesTabManager = (function() {
   }
 
   function handleFilesPageChange(nextPage) {
-    var safePage = PaginationShared.normalizePageNumber(nextPage, currentPagination.totalPages);
+    const safePage = PaginationShared.normalizePageNumber(nextPage, currentPagination.totalPages);
     if (safePage === currentPagination.page) return;
     loadFiles(safePage);
   }

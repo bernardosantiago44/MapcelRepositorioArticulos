@@ -685,8 +685,10 @@ var NewArticlePageUI = (function() {
         delimiter: {
           class: Delimiter
         },
-
-        image: imageToolConfig
+        image: imageToolConfig,
+        ColorPicker: {
+          class: ColorPicker.default,
+        },
       },
       onReady: function() {
         attachImageUrlPasteHandler();

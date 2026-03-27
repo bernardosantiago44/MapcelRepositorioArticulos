@@ -1,4 +1,64 @@
-﻿/*---------------------------------------------------------*/
+﻿
+.ce-popover--inline {
+    --inline-popover-width: auto !important;
+    min-width: 250px; 
+}
+
+.ce-popover__container {
+    width: auto !important;
+    max-width: none !important;
+}
+
+.ce-popover__items {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: max-content !important;
+}
+
+.ce-popover-item {
+    flex-shrink: 0 !important;
+    min-width: 32px !important;
+}
+
+.codex-editor {
+    overflow: visible !important;
+}
+
+.codex-editor__redactor {
+    overflow: visible !important;
+}
+
+/* 1. Only target the Selection/Inline Toolbar */
+.ce-popover.ce-popover--inline {
+    --inline-popover-width: auto !important;
+    min-width: 200px !important;
+}
+
+.ce-popover--inline .ce-popover__items {
+    display: flex !important;
+    flex-direction: row !important; /* Icons stay side-by-side */
+    flex-wrap: nowrap !important;
+    width: max-content !important;
+}
+
+/* 2. Protect the Block Tunes Menu (the vertical one) */
+.ce-popover:not(.ce-popover--inline) .ce-popover__items {
+    display: flex !important;
+    flex-direction: column !important; /* Items stay stacked vertically */
+    width: 100% !important;
+}
+
+.ce-popover:not(.ce-popover--inline) .ce-popover__container {
+    width: 230px !important; /* Restores standard width for the vertical menu */
+}
+
+/* 3. Global Popover Reset (Preventing scrollbars) */
+.ce-popover__items::-webkit-scrollbar {
+    display: none !important;
+}
+
+/*---------------------------------------------------------*/
 /*-----ESTILOS NECESARIO PARA VISUALIZAR LOS LAYOUTS------*/
 /*--------------------------------------------------------*/
 html, body {

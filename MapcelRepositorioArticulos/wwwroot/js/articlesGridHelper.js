@@ -83,7 +83,7 @@ function initializeArticlesGrid(gridCell, articlesData) {
   articlesGrid.setColSorting('bool,str,str,na,str,str');
   
   // Set initial column widths
-  articlesGrid.setInitWidths('40,120,*,180,120,120');
+  articlesGrid.setInitWidths('40,120,*,200,120,120');
   
   // Initialize the grid
   articlesGrid.init();

@@ -529,17 +529,20 @@ const ArticleDetailUI = (function() {
           </div>
           
           <!-- External Link Section -->
-          <div style="margin-bottom: 24px;">
-            <div style="
-              font-size: 13px;
-              font-weight: 600;
-              color: #262626;
-              margin-bottom: 12px;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-            ">Enlace Externo</div>
-            ${renderExternalLinkSection(article.externalLink)}
-          </div>
+          <!-- Render only if link is not empty -->
+          ${article.externalLink ? `
+            <div id="external-link-section" style="margin-bottom: 24px;">
+              <div style="
+                font-size: 13px;
+                font-weight: 600;
+                color: #262626;
+                margin-bottom: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              ">Enlace Externo</div>
+              ${renderExternalLinkSection(article.externalLink)}
+            </div>
+          ` : ''}
           
           <!-- Description Section -->
           ${renderContentSection('Descripción del artículo', article.description)}

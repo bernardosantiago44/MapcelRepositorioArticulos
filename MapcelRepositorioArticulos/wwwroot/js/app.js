@@ -1280,7 +1280,7 @@ function onNavigateBackFromNewArticle(newArticleData) {
   
   // Show header toolbar items
   header_toolbar.showItem('new_article');
-  header_toolbar.showItem('edit_company');
+  //header_toolbar.showItem('edit_company');
   
   // Rebuild the articles tab layout
   rebuildArticlesTabLayout();

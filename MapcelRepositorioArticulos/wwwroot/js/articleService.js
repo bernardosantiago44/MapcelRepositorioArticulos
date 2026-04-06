@@ -377,27 +377,29 @@ const ArticleService = (function() {
   
   /**
    * Create a new article (POST equivalent)
-   * @param {Object} data - Article data object
+   * @param {Object|FormData} data - Article data object or multipart FormData
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the created article
    */
   function createArticle(data, companyCode) {
-    const headers = new Headers();
-    headers.append("Content-Type", "application/json");
-
-    const raw = JSON.stringify({
-      title: data.title,
-      description: data.description,
-      externalLink: data.externalLink,
-      status: data.status,
-      clientComments: data.clientComments,
-      tagIds: data.tags,
-      fileIds: data.fileIds
-    });
-
-    const requestOptions = {
+    const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const requestOptions = isMultipartPayload ? {
       method: "POST",
-      headers: headers,
-      body: raw,
+      body: data,
+      redirect: "follow"
+    } : {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        externalLink: data.externalLink,
+        status: data.status,
+        clientComments: data.clientComments,
+        tagIds: data.tags,
+        fileIds: data.fileIds
+      }),
       redirect: "follow"
     };
 
@@ -421,27 +423,30 @@ const ArticleService = (function() {
   /**
    * Update an existing article (PUT equivalent)
    * @param {string} id - Article ID to update
-   * @param {Object} data - Updated article data
+   * @param {Object|FormData} data - Updated article data or multipart FormData
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the updated article
    */
   function updateArticle(id, data, companyCode) {
-    const headers = new Headers();
-    headers.append("Content-Type", "application/json");
-
-    const raw = JSON.stringify({
-      title: data.title || null,
-      description: data.description || null,
-      externalLink: data.externalLink || null,
-      clientComments: data.clientComments || null,
-      status: data.status || null,
-      tagIds: data.tags || null,
-      fileIds: data.fileIds || null
-    });
-
-    const requestOptions = {
+    const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const requestOptions = isMultipartPayload ? {
       method: "PUT",
-      headers: headers,
-      body: raw,
+      body: data,
+      redirect: "follow"
+    } : {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: data.title || null,
+        description: data.description || null,
+        externalLink: data.externalLink || null,
+        clientComments: data.clientComments || null,
+        status: data.status || null,
+        tagIds: data.tags || null,
+        fileIds: data.fileIds || null,
+        removedFiles: data.removedFiles || null
+      }),
       redirect: "follow"
     };
 

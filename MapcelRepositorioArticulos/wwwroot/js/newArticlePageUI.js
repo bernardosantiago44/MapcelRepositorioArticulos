@@ -2289,6 +2289,111 @@ var NewArticlePageUI = (function() {
     };
   }
 
+  function normalizeArrayToStringSet(values) {
+    var normalizedValues = Array.isArray(values) ? values : [];
+    return new Set(normalizedValues.map(function(value) { return String(value); }));
+  }
+
+  function getOriginalArticleTagIds() {
+    if (!pageState.originalArticleData || !Array.isArray(pageState.originalArticleData.tags)) {
+      return [];
+    }
+
+    return pageState.originalArticleData.tags.map(function(tag) {
+      if (tag && typeof tag === 'object' && tag.id !== undefined && tag.id !== null) {
+        return String(tag.id);
+      }
+      return String(tag);
+    });
+  }
+
+  function haveSameNormalizedValues(leftValues, rightValues) {
+    var leftSet = normalizeArrayToStringSet(leftValues);
+    var rightSet = normalizeArrayToStringSet(rightValues);
+    if (leftSet.size !== rightSet.size) {
+      return false;
+    }
+
+    var sameValues = true;
+    leftSet.forEach(function(value) {
+      if (!rightSet.has(value)) {
+        sameValues = false;
+      }
+    });
+    return sameValues;
+  }
+
+  function appendStringArray(formData, fieldName, values) {
+    if (!Array.isArray(values) || values.length === 0) return;
+    values.forEach(function(value) {
+      formData.append(fieldName, String(value));
+    });
+  }
+
+  function appendStagedUploadsToMultipart(formData) {
+    var uploads = pageState.stagedFiles.concat(pageState.stagedImages);
+    uploads.forEach(function(uploadData) {
+      if (!uploadData || !uploadData.file) return;
+      formData.append('uploads.Files', uploadData.file, uploadData.file.name);
+      if (uploadData.description !== undefined && uploadData.description !== null && String(uploadData.description).trim() !== '') {
+        formData.append('uploads.Descriptions', String(uploadData.description).trim());
+      } else {
+        formData.append('uploads.Descriptions', '');
+      }
+    });
+  }
+
+  function buildCreateArticleMultipartData(formDataValues) {
+    var multipartData = new FormData();
+    multipartData.append('Title', formDataValues.title);
+    multipartData.append('Description', formDataValues.description);
+    multipartData.append('ExternalLink', formDataValues.externalLink);
+    multipartData.append('ClientComments', formDataValues.clientComments);
+    multipartData.append('Status', formDataValues.status);
+    appendStringArray(multipartData, 'TagIds', formDataValues.tags);
+    appendStringArray(multipartData, 'FileIds', formDataValues.fileIds);
+    appendStagedUploadsToMultipart(multipartData);
+    return multipartData;
+  }
+
+  function buildUpdateArticleMultipartData(formDataValues) {
+    var multipartData = new FormData();
+    var originalArticle = pageState.originalArticleData || {};
+    var originalFileIds = Array.isArray(originalArticle.fileIds) ? originalArticle.fileIds.map(function(id) { return String(id); }) : [];
+    var currentFileIds = formDataValues.fileIds.map(function(id) { return String(id); });
+    var addedExistingFileIds = currentFileIds.filter(function(currentId) {
+      return originalFileIds.indexOf(currentId) === -1;
+    });
+    var removedFiles = originalFileIds.filter(function(originalId) {
+      return currentFileIds.indexOf(originalId) === -1;
+    });
+
+    if ((originalArticle.title || '') !== formDataValues.title) {
+      multipartData.append('Title', formDataValues.title);
+    }
+    if ((originalArticle.description || '') !== formDataValues.description) {
+      multipartData.append('Description', formDataValues.description);
+    }
+    if ((originalArticle.externalLink || '') !== formDataValues.externalLink) {
+      multipartData.append('ExternalLink', formDataValues.externalLink);
+    }
+    if ((originalArticle.clientComments || '') !== formDataValues.clientComments) {
+      multipartData.append('ClientComments', formDataValues.clientComments);
+    }
+    if ((originalArticle.status || '') !== formDataValues.status) {
+      multipartData.append('Status', formDataValues.status);
+    }
+
+    if (!haveSameNormalizedValues(getOriginalArticleTagIds(), formDataValues.tags)) {
+      appendStringArray(multipartData, 'TagIds', formDataValues.tags);
+    }
+
+    appendStringArray(multipartData, 'FileIds', addedExistingFileIds);
+    appendStringArray(multipartData, 'RemovedFiles', removedFiles);
+    appendStagedUploadsToMultipart(multipartData);
+    return multipartData;
+  }
+
   /**
    * Handle form submission (create or edit)
    * Saves editor content as HTML and sends to the backend API
@@ -2302,7 +2407,7 @@ var NewArticlePageUI = (function() {
     }
 
     // Save editor content (returns a Promise with JSON block data)
-    pageState.editorInstance.save()
+    return pageState.editorInstance.save()
       .then(function(editorData) {
         // Convert Editor.js JSON blocks to standard HTML
         var descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
@@ -2319,95 +2424,44 @@ var NewArticlePageUI = (function() {
           submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
         }
 
-        var formData = getFormData(descriptionHtml);
+        var formDataValues = getFormData(descriptionHtml);
+        var multipartPayload = pageState.editMode
+          ? buildUpdateArticleMultipartData(formDataValues)
+          : buildCreateArticleMultipartData(formDataValues);
 
-        // Upload any staged files and images
-        var uploadPromises = [];
-
-        pageState.stagedFiles.forEach(function(fileData) {
-          uploadPromises.push(
-            FileService.uploadFiles([fileData.file], '', pageState.companyCode)
-              .then(function(files) {
-                var uploadedFile = files && files[0];
-                if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
-                  throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
-                }
-                return { type: 'file', id: uploadedFile.id };
-              })
-          );
-        });
-
-        pageState.stagedImages.forEach(function(imageData) {
-          uploadPromises.push(
-            ImageService.uploadImages([imageData.file], [], imageData.description || '', pageState.companyCode, [{
-              description: imageData.description || '',
-              desiredFileName: imageData.desiredFileName || imageData.file.name
-            }])
-              .then(function(images) {
-                var uploadedImage = images && images[0];
-                if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {
-                  throw new Error('La respuesta del servidor no contiene el identificador de la imagen.');
-                }
-                return { type: 'image', id: uploadedImage.id };
-              })
-          );
-        });
-
-        // Wait for all uploads to complete, then save the article
-        Promise.all(uploadPromises)
-          .then(function(uploadResults) {
-            uploadResults.forEach(function(result) {
-              if (result.type === 'file') {
-                formData.attachedFiles.push(result.id);
-              } else if (result.type === 'image') {
-                formData.attachedImages.push(result.id);
-              }
-            });
-
-            formData.fileIds = formData.attachedImages.slice().concat(formData.attachedFiles.slice());
-
-            if (pageState.editMode) {
-              return ArticleService.updateArticle(pageState.articleId, formData, pageState.companyCode);
-            } else {
-              return ArticleService.createArticle(formData, pageState.companyCode);
-            }
-          })
-          .then(function(response) {
-            if (response.status === 'success') {
-              var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
-              dhtmlx.message({
-                text: 'Artículo ' + actionLabel + ' exitosamente',
-                type: 'success',
-                expire: 3000
-              });
-
-              var savedData = response.data;
-              var navigateBackCallback = pageState.onNavigateBack;
-              resetPageState();
-              if (navigateBackCallback) {
-                navigateBackCallback(savedData);
-              }
-            }
-          })
-          .catch(function(error) {
-            console.error('Error saving article:', error);
-            dhtmlx.alert({
-              title: 'Error',
-              text: 'Error al guardar el artículo: ' + error.message
-            });
-
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
-            }
+        if (pageState.editMode) {
+          return ArticleService.updateArticle(pageState.articleId, multipartPayload, pageState.companyCode);
+        }
+        return ArticleService.createArticle(multipartPayload, pageState.companyCode);
+      })
+      .then(function(response) {
+        if (response && response.status === 'success') {
+          var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
+          dhtmlx.message({
+            text: 'Artículo ' + actionLabel + ' exitosamente',
+            type: 'success',
+            expire: 3000
           });
+
+          var savedData = response.data;
+          var navigateBackCallback = pageState.onNavigateBack;
+          resetPageState();
+          if (navigateBackCallback) {
+            navigateBackCallback(savedData);
+          }
+        }
       })
       .catch(function(error) {
-        console.error('Error saving editor content:', error);
+        console.error('Error saving article:', error);
         dhtmlx.alert({
           title: 'Error',
-          text: 'Error al obtener el contenido del editor.'
+          text: 'Error al guardar el artículo: ' + error.message
         });
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+        }
       });
   }
 

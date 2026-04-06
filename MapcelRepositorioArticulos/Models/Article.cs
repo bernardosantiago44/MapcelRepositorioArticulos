@@ -4,43 +4,28 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace MapcelRepositorioArticulos.Models;
 
-public class Article
+public class Article(
+    Guid id,
+    Guid companyCode,
+    string title,
+    string description,
+    string externalLink,
+    string clientComments,
+    string status,
+    IReadOnlyList<string> tags,
+    DateOnly createdAt,
+    DateOnly updatedAt)
 {
-    public string Id { get; set; }
-    public Guid CompanyCode { get; set; }
-    public string Title { get; set; }
-    public string Description { get; set; }
-    public string ExternalLink { get; set; }
-    public string? ClientComments { get; set; }
-    public string Status { get; set; }
-    public IReadOnlyList<string> Tags { get; set; }
-    public DateOnly CreatedAt { get; set; }
-    public DateOnly UpdatedAt { get; set; }
-
-    public Article(
-        string id,
-        Guid companyCode,
-        string title,
-        string description,
-        string externalLink,
-        string clientComments,
-        string status,
-        IReadOnlyList<string> tags,
-        DateOnly createdAt,
-        DateOnly updatedAt 
-    )
-    {
-        Id = id;
-        CompanyCode = companyCode;
-        Title = title;
-        Description = description;
-        ExternalLink = externalLink;
-        ClientComments = clientComments;
-        Status = status;
-        Tags = tags;
-        CreatedAt = createdAt;
-        UpdatedAt = updatedAt;
-    }
+    public Guid Id { get; set; } = id;
+    public Guid CompanyCode { get; set; } = companyCode;
+    public string Title { get; set; } = title;
+    public string Description { get; set; } = description;
+    public string ExternalLink { get; set; } = externalLink;
+    public string? ClientComments { get; set; } = clientComments;
+    public string Status { get; set; } = status;
+    public IReadOnlyList<string> Tags { get; set; } = tags;
+    public DateOnly CreatedAt { get; set; } = createdAt;
+    public DateOnly UpdatedAt { get; set; } = updatedAt;
 }
 
 /// <summary>
@@ -90,10 +75,10 @@ public class UpdateArticleRequest : CreateArticleRequest
 
 public sealed class ArticleDetailsDto
 {
-    public required string Id { get; init; }
+    public required Guid Id { get; init; }
     public required Guid CompanyCode { get; init; }
     public required string CompanyName { get; init; }
-    public string Title { get; init; }
+    public required string Title { get; init; }
     public string? Description { get; init; }
     public string? ExternalLink { get; init; }
     public string? ClientComments { get; init; }
@@ -111,7 +96,7 @@ public sealed class ArticleDetailsDto
     }
 
     [SetsRequiredMembers]
-    public ArticleDetailsDto(Article article, string companyName, List<string> tagNames)
+    public ArticleDetailsDto(Article article, string companyName, List<string> tagNames, IReadOnlyList<string> fileIds)
     {
         Id = article.Id;
         CompanyCode = article.CompanyCode;
@@ -123,6 +108,7 @@ public sealed class ArticleDetailsDto
         Status = article.Status;
         Tags = article.Tags;
         TagNames = tagNames;
+        FileIds = fileIds;
         CreatedAt = article.CreatedAt;
         UpdatedAt = article.UpdatedAt;
     }

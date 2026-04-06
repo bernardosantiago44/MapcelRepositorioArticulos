@@ -1,7 +1,9 @@
 using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -9,9 +11,8 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("/api/articles/{companyCode:guid}")]
-public class ArticlesController(IArticlesService service) : ControllerBase
+public class ArticlesController(IArticlesService service, IArticlesService newService, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
 {
-
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
         [FromRoute] Guid companyCode,
@@ -35,13 +36,45 @@ public class ArticlesController(IArticlesService service) : ControllerBase
             Page = page,
             PageSize = pageSize
         };
-        var result = await service.GetAsync(query, cancellationToken);
-        return Ok(result);
+
+        try
+        {
+            var result = await newService.GetAsync(query, cancellationToken);
+            Log.Information("{count} articles found", result.Data.Count);
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (SqlException ex)
+        {
+            Log.Error(ex, "ArticlesController.GetAll failed for companyCode={CompanyCode}: {message}", 
+                companyCode, ex.Message);
+            return StatusCode(500, "Unexpected SQL error occurred.");
+        }
+        catch (InvalidCastException ex)
+        {
+            Log.Error(ex, "ArticlesController.GetAll failed for companyCode={CompanyCode}: {message}", 
+                companyCode, ex.Message);
+        }
+        catch (OperationCanceledException ex)
+        {
+            // Not really an error, can safely ignore
+            return StatusCode(200);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticlesController.GetAll failed for companyCode={CompanyCode}: {message}", 
+                companyCode,  ex.Message);
+            return StatusCode(500, "Unexpected exception occurred.");
+        }
+        return StatusCode(200);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     public async Task<ActionResult<ArticleDetailsDto>> GetById(
-        int id, 
+        [FromRoute] Guid id, 
         [FromRoute] Guid companyCode,
         [FromQuery] string? searchString = null,
         [FromQuery] string? status = null,
@@ -65,19 +98,21 @@ public class ArticlesController(IArticlesService service) : ControllerBase
             Page = page,
             PageSize = pageSize
         };
-        var result = await service.GetAsync(query, cancellationToken);
-        if (result.Data.Count == 0) return NotFound();
         try
         {
-            var article = result.Data.First();
+            var result = await newService.GetAsync(query, cancellationToken);
+            if (result.Data.Count == 0) return NotFound();
+            var article = result.Data[0];
             return Ok(article);
         }
-        catch (ArgumentNullException)
+        catch (ArgumentException ex)
         {
-            return NotFound();
+            Log.Error("ArticlesController.GetById failed for companyCode={CompanyCode}: {message}", companyCode, ex.Message);
+            return NotFound(ex.Message);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            Log.Error("ArticlesController.GetById failed for companyCode={CompanyCode}: {message}", companyCode, ex.Message);
             return NotFound();
         }
         catch (TaskCanceledException)
@@ -86,22 +121,34 @@ public class ArticlesController(IArticlesService service) : ControllerBase
         }
         catch (Exception e)
         {
-            Log.Error(e, "Error");
+            Log.Error("ArticlesController.GetById failed: {message}", e.Message);
             return StatusCode(500);
         }
     }
     
     [Authorize]
     [HttpPost]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(50L * 1024 * 1024 * 10)]
     public async Task<ActionResult<ArticleDetailsDto>> Create(
         [FromRoute] Guid companyCode,
-        [FromBody] CreateArticleRequest request,
+        [FromForm] CreateArticleRequest request,
+        [FromForm] MultipleFilesDto? uploads,
         CancellationToken cancellationToken)
     {
         try
         {
             var createdArticle = await service.CreateAsync(companyCode, request, cancellationToken);
+
+            if (uploads == null || uploads.Files.Count <= 0)
+                return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyCode }, createdArticle);
             
+            var files = uploads.ToUploads().Where(file => !file.IsImage).ToList();
+            var images = uploads.ToUploads().Where(file => file.IsImage).ToList();
+            await directoryBuilder.SaveArticleFiles(companyCode, createdArticle.Id, files, cancellationToken);
+            await directoryBuilder.SaveArticleImages(companyCode, createdArticle.Id, images, cancellationToken);
+            await filesService.SaveFileMetadataAsync(companyCode, createdArticle.Id, uploads, cancellationToken);
+
             return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyCode }, createdArticle);
         }
         catch (ArgumentException ex)
@@ -159,10 +206,10 @@ public class ArticlesController(IArticlesService service) : ControllerBase
 
     
     [Authorize]
-    [HttpPut("{id:int}")]
+    [HttpPut("{id:guid}")]
     public async Task<ActionResult<ArticleDetailsDto>> Update(
         [FromRoute] Guid companyCode,
-        [FromRoute] int id,
+        [FromRoute] Guid id,
         [FromBody] UpdateArticleRequest request,
         CancellationToken cancellationToken)
     {
@@ -184,9 +231,9 @@ public class ArticlesController(IArticlesService service) : ControllerBase
     }
 
     [Authorize]
-    [HttpDelete("{id:int}")]
+    [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
-        [FromRoute] int id,
+        [FromRoute] Guid id,
         [FromRoute] Guid companyCode,
         CancellationToken cancellationToken)
     {

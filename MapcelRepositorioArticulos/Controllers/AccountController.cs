@@ -21,7 +21,7 @@ public class AccountController : Controller
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid) return View(model);
-        if (!model.Username.Equals(model.Username) || !model.Password.Equals(Password))
+        if (!model.Username.Equals(Username) || !model.Password.Equals(Password))
         {
             ModelState.AddModelError("", "Incorrect username or password");
             return View(model);

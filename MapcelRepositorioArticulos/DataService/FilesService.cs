@@ -1,9 +1,12 @@
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Serilog.Core;
+using Constants = MapcelRepositorioArticulos.Utils.Constants;
 
 namespace MapcelRepositorioArticulos.DataService;
 
@@ -51,6 +54,8 @@ public interface IFilesService
     /// <exception cref="ArgumentNullException">If provided file is null, empty or invalid.</exception>
     Task<FileAsset> CreateAsync(Guid companyCode, FileUploadDto upload, CancellationToken cancellationToken);
     
+    Task SaveFileMetadataAsync(Guid companyCode, Guid articleId, MultipleFilesDto files, CancellationToken cancellationToken);
+    
     /// <summary>
     /// Updates all the fields of the provided fileId with the given request.
     /// </summary>
@@ -85,7 +90,7 @@ public interface IFilesService
     Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken);
 }
 
-public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
+public class FilesService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
     : BaseService(configuration), IFilesService
 {
     private string GetArchivosRootPath()
@@ -441,7 +446,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
     public async Task<FileAsset> CreateAsync(Guid companyCode, FileUploadDto upload, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(upload);
-        ValidateCompany(companyCode);
+        ValidateGuid(companyCode);
         ValidateFile(upload.File);
         upload.Validate();
 
@@ -560,10 +565,64 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
             throw;
         }
     }
-    
+
+    public async Task SaveFileMetadataAsync(Guid companyCode, Guid articleId, MultipleFilesDto upload,
+        CancellationToken cancellationToken)
+    {
+        ValidateGuid(companyCode);
+        ValidateGuid(articleId);
+        if (upload.Files.Count == 0) return;
+        
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        
+        await using var insertFileCommand = new SqlCommand(SqlInsertFile,  connection, (SqlTransaction)transaction);
+        insertFileCommand.CommandType = CommandType.Text;
+
+        insertFileCommand.Parameters.Add("@CompanyCode", SqlDbType.UniqueIdentifier);
+        insertFileCommand.Parameters.Add("@Name", SqlDbType.NVarChar, Constants.ArticleTitleCharacterLength);
+        insertFileCommand.Parameters.Add("@SizeBytes", SqlDbType.BigInt);
+        insertFileCommand.Parameters.Add("@Description", SqlDbType.NVarChar, -1);
+        insertFileCommand.Parameters.Add("@Width", SqlDbType.Int);
+        insertFileCommand.Parameters.Add("@Height", SqlDbType.Int);
+        insertFileCommand.Parameters.Add("@ThumbnailUrl", SqlDbType.NVarChar, -1);
+        insertFileCommand.Parameters.Add("@IsImage", SqlDbType.Bit);
+        insertFileCommand.Parameters.Add("@Extension", SqlDbType.VarChar, Constants.FileExtensionCharacterLength);
+
+        try
+        {
+            foreach (var file in upload.ToUploads())
+            {
+                var thumbnailUrl = file.IsImage ? 
+                    directoryBuilder.GetArticleImageFilePath(companyCode, articleId, file.File.FileName) : 
+                    null;
+                
+                insertFileCommand.Parameters["@CompanyCode"].Value = companyCode;
+                insertFileCommand.Parameters["@Name"].Value = file.File.FileName;
+                insertFileCommand.Parameters["@SizeBytes"].Value = file.File.Length;
+                insertFileCommand.Parameters["@Description"].Value = file.Description;
+                insertFileCommand.Parameters["@Width"].Value = (object?)file.Width ?? DBNull.Value;
+                insertFileCommand.Parameters["@Height"].Value = (object?)file.Height ?? DBNull.Value;
+                insertFileCommand.Parameters["@ThumbnailUrl"].Value = (object?)thumbnailUrl ?? DBNull.Value;
+                insertFileCommand.Parameters["@IsImage"].Value = file.IsImage;
+                insertFileCommand.Parameters["@Extension"].Value = Path.GetExtension(file.File.FileName);
+                
+                await insertFileCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+            transaction.Commit();
+        }
+        catch (Exception e)
+        {
+            transaction.Rollback();
+            Log.Error("FileService.SaveFileMetadataAsync: Transaction rolled back due to: {}", e.Message);
+            throw e;
+        }
+    }
+
     public async Task<FileDto?> UpdateAsync(int fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyCode);
+        ValidateGuid(companyCode);
         ValidateId(fileId);
         request.Validate();
 
@@ -611,7 +670,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
     
     public async Task<bool> DeleteAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyCode);
+        ValidateGuid(companyCode);
         ValidateId(fileId);
 
         var downloadInfo = await GetDownloadInfoAsync(fileId, companyCode, cancellationToken);
@@ -662,7 +721,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
     
     public async Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
     {
-        ValidateCompany(companyCode);
+        ValidateGuid(companyCode);
         ValidateId(fileId);
 
         await using var connection = new SqlConnection(ConnectionString);
@@ -698,7 +757,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env)
     /// </summary>
     /// <param name="companyCode">Guid</param>
     /// <exception cref="ArgumentException"></exception>
-    private static void ValidateCompany(Guid companyCode)
+    private static void ValidateGuid(Guid companyCode)
     {
         if (companyCode == Guid.Empty)
             throw new ArgumentException("companyCode is required and cannot be empty.", nameof(companyCode));

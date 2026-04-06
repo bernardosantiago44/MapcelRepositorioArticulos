@@ -331,7 +331,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         
         // Optional parameters
         command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.UniqueIdentifier) { Value = companyCode == null ? DBNull.Value : companyCode.Value });
-        command.Parameters.Add(new SqlParameter("@fileId", SqlDbType.Int) { Value = fileId == null ? DBNull.Value : fileId! });
+        command.Parameters.Add(new SqlParameter("@fileId", SqlDbType.UniqueIdentifier) { Value = fileId == null ? DBNull.Value : fileId! });
         command.Parameters.Add(new SqlParameter("@extensions", SqlDbType.VarChar, 2000) { Value = query.IsFilteringExtensions() ? query.GetFileExtensionsString() : DBNull.Value });
         command.Parameters.Add(new SqlParameter("@isImage", SqlDbType.Bit) { Value = query.ImagesOnly ? 1 : 0 });
         command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, 2000) { Value = string.IsNullOrEmpty(query.SearchTerm) ? DBNull.Value : query.SearchTerm! });
@@ -355,7 +355,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         {
             rows.Add(new FileDto
             {
-                Id = reader.GetInt32(idPos).ToString(),
+                Id = reader.GetGuid(idPos).ToString(),
                 Name = reader.GetString(namePos),
                 Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
                 Extension = reader.GetString(extensionsPos),

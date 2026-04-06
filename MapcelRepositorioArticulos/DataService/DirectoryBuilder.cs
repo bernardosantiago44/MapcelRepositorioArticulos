@@ -223,6 +223,16 @@ public class DirectoryBuilder(IWebHostEnvironment env)
             await imageUpload.File.CopyToAsync(fs, cancellationToken);
         }
     }
+
+    public void DeleteArticle(Guid companyCode, Guid articleId)
+    {
+        ValidateCompanyCode(companyCode);
+        ValidateArticleId(articleId);
+        
+        var articlePath = GetArticleDirectoryPath(companyCode, articleId);
+        if (!Directory.Exists(articlePath)) return;
+        Directory.Delete(articlePath, true);
+    }
     
     /// <summary>
     /// Validates the provided companyCode is not null or empty.

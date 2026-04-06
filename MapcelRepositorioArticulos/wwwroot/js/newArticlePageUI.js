@@ -2331,7 +2331,8 @@ var NewArticlePageUI = (function() {
   }
 
   function appendStagedUploadsToMultipart(formData) {
-    var uploads = pageState.stagedFiles.concat(pageState.stagedImages);
+    const uploads = pageState.stagedFiles.concat(pageState.stagedImages);
+    
     uploads.forEach(function(uploadData) {
       if (!uploadData || !uploadData.file) return;
       formData.append('uploads.Files', uploadData.file, uploadData.file.name);
@@ -2344,7 +2345,7 @@ var NewArticlePageUI = (function() {
   }
 
   function buildCreateArticleMultipartData(formDataValues) {
-    var multipartData = new FormData();
+    const multipartData = new FormData();
     multipartData.append('Title', formDataValues.title);
     multipartData.append('Description', formDataValues.description);
     multipartData.append('ExternalLink', formDataValues.externalLink);

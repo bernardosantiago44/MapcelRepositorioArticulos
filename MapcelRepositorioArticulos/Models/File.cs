@@ -130,18 +130,18 @@ public sealed class FileUploadDto
 
 public sealed class MultipleFilesDto
 {
-    public required IFormFileCollection Files { get; set; }
-    public required List<string?> Descriptions { get; init; }
+    public IFormFileCollection? Files { get; set; }
+    public List<string?>? Descriptions { get; init; }
 
     public List<FileUploadDto> ToUploads()
     {
-        if (Files.Count == 0) return [];
+        if (Files ==  null || Files.Count == 0) return [];
         List<FileUploadDto> files = [];
         
         for (var i = 0; i < Files.Count; i++)
         {
             var dimensions = GetImageDimensions(Files[i]);
-            var description = Descriptions.Count > i ? Descriptions.ElementAt(i) ?? string.Empty : string.Empty; 
+            var description = Descriptions != null && Descriptions.Count > i ? Descriptions.ElementAt(i) ?? string.Empty : string.Empty; 
             files.Add(new FileUploadDto
             {
                 File = Files[i],

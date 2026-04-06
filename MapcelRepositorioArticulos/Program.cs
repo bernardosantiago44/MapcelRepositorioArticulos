@@ -45,7 +45,7 @@ builder.Services.AddScoped<IArticlesService, ArticlesService>(); // TODO: Remove
 builder.Services.AddScoped<ITagsService, TagsService>();
 builder.Services.AddScoped<IFilesService, FilesService>();
 builder.Services.AddScoped<ICompaniesService, CompaniesService>();
-builder.Services.AddScoped<IArticlesService, IntegratedArticleService>();
+builder.Services.AddScoped<IntegratedArticleService>();
 
 var app = builder.Build();
 
@@ -53,11 +53,6 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
     app.UsePathBase("/nuevos/repositorioarticulos/produccion");
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "Articles")),
-        RequestPath = "/files"
-    });
 }
 else
 {

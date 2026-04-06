@@ -11,7 +11,7 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("/api/articles/{companyCode:guid}")]
-public class ArticlesController(IArticlesService service, IArticlesService newService, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
+public class ArticlesController(IArticlesService service, IntegratedArticleService newService, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
@@ -140,7 +140,7 @@ public class ArticlesController(IArticlesService service, IArticlesService newSe
         {
             var createdArticle = await service.CreateAsync(companyCode, request, cancellationToken);
 
-            if (uploads == null || uploads.Files.Count <= 0)
+            if (uploads?.Files is not { Count: > 0 })
                 return CreatedAtAction(nameof(GetById), new { id = createdArticle.Id, companyCode }, createdArticle);
             
             var files = uploads.ToUploads().Where(file => !file.IsImage).ToList();
@@ -166,7 +166,7 @@ public class ArticlesController(IArticlesService service, IArticlesService newSe
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
         [FromRoute] Guid companyCode,
-        [FromBody] BulkUpdateTagsRequest request,
+        [FromBody] BulkUpdateTagsRequest? request,
         CancellationToken cancellationToken)
     {
         try
@@ -239,6 +239,7 @@ public class ArticlesController(IArticlesService service, IArticlesService newSe
     {
         try
         {
+            directoryBuilder.DeleteArticle(companyCode, id);
             var deleted = await service.DeleteAsync(id, companyCode, cancellationToken);
             if (!deleted) return NotFound();
             return NoContent();

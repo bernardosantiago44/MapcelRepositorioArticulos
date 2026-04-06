@@ -2351,7 +2351,6 @@ var NewArticlePageUI = (function() {
     multipartData.append('ClientComments', formDataValues.clientComments);
     multipartData.append('Status', formDataValues.status);
     appendStringArray(multipartData, 'TagIds', formDataValues.tags);
-    appendStringArray(multipartData, 'FileIds', formDataValues.fileIds);
     appendStagedUploadsToMultipart(multipartData);
     return multipartData;
   }

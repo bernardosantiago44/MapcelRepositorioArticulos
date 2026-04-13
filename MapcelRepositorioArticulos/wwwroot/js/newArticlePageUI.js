@@ -622,7 +622,9 @@ const NewArticlePageUI = (function () {
                         return {default: result.file.url};
                     });
             },
-            abort: function () {}
+            abort: function () {
+                // Uploads are staged locally; there is no in-flight request to cancel at this point.
+            }
         };
     }
 
@@ -762,20 +764,32 @@ const NewArticlePageUI = (function () {
         var safeImageUrl = sanitizeUrl(imageUrl);
         if (!safeImageUrl) return;
 
-        pageState.editorInstance.model.change(function (writer) {
-            var imageElement = writer.createElement('imageBlock', {
-                src: safeImageUrl
+        try {
+            // Use imageBlock to create a standalone <figure><img/></figure> node in CKEditor output.
+            pageState.editorInstance.model.change(function (writer) {
+                var imageElement = writer.createElement('imageBlock', {
+                    src: safeImageUrl
+                });
+
+                pageState.editorInstance.model.insertContent(
+                    imageElement,
+                    pageState.editorInstance.model.document.selection
+                );
+
+                writer.setSelection(imageElement, 'after');
             });
+        } catch (error) {
+            console.error('No se pudo insertar la imagen en el editor:', error);
+            dhtmlx.message({
+                type: 'error',
+                text: 'No se pudo insertar la imagen en la descripción.'
+            });
+            return;
+        }
 
-            pageState.editorInstance.model.insertContent(
-                imageElement,
-                pageState.editorInstance.model.document.selection
-            );
-
-            writer.setSelection(imageElement, 'after');
-        });
-
-        pageState.editorInstance.editing.view.focus();
+        if (pageState.editorInstance && pageState.editorInstance.editing && pageState.editorInstance.editing.view) {
+            pageState.editorInstance.editing.view.focus();
+        }
         markFormDirty();
     }
 

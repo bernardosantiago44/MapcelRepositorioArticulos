@@ -66,9 +66,9 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyCode:guid}/images/{id:int}")]
+    [HttpGet("{companyCode:guid}/images/{id:guid}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetImageById(
-        [FromRoute] int id,
+        [FromRoute] Guid id,
         [FromRoute] Guid companyCode,
         [FromQuery] FileQuery query,
         CancellationToken cancellationToken = default)
@@ -79,9 +79,9 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
         return await ExecuteGetAllAsync(query, cancellationToken);
     }
 
-    [HttpGet("{companyCode:guid}/{id:int}")]
+    [HttpGet("{companyCode:guid}/{id:guid}")]
     public async Task<ActionResult<PagedResult<FileDto>>> GetFileById(
-        [FromRoute] int id,
+        [FromRoute] Guid id,
         [FromRoute] Guid companyCode,
         [FromQuery] FileQuery query,
         CancellationToken cancellationToken = default)

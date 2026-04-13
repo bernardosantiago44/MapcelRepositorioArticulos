@@ -6,7 +6,7 @@ namespace MapcelRepositorioArticulos.DataService;
 public class ArticleQuery
 {
     public required Guid CompanyCode { get; init; }
-    public int? ArticleId { get; init; }
+    public Guid? ArticleId { get; init; }
     public string? Search { get; init; } 
     public string? Status { get; init; } 
     public DateOnly? DateFrom  { get; init; }
@@ -37,6 +37,21 @@ public class ArticleQuery
             .Where(s => !string.IsNullOrWhiteSpace(s));
         return string.Join(",", clean);
     }
+
+    /// <summary>
+    /// Validates the given query object.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">If companyCode is null or empty</exception>
+    /// <exception cref="ArgumentOutOfRangeException">If page &lt;= 0 or if pageSize &lt;=0</exception>
+    public void ValidateQuery()
+    {
+        if (CompanyCode == Guid.Empty) 
+            throw new ArgumentNullException(nameof(CompanyCode));
+        if (Page <= 0)
+            throw new ArgumentOutOfRangeException(nameof(Page));
+        if (PageSize <= 0)
+            throw new ArgumentOutOfRangeException(nameof(PageSize));
+    }
 }
 
 /// <summary>
@@ -64,7 +79,7 @@ public class FileQuery
     public Guid? CompanyCode { get; set; }
     public string? SearchTerm { get; set; } = null;
     public bool ImagesOnly { get; set; } = false;
-    public int? Id { get; set; } = null;
+    public Guid? Id { get; set; } = null;
     public string[]? Extensions { get; set; } = null;
     public DateOnly? DateFrom { get; init; } = null;
     public DateOnly? DateTo { get; init; } = null;

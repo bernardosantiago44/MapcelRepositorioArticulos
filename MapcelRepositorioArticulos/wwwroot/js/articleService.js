@@ -29,16 +29,6 @@ const ArticleService = (function() {
   function getTagCache() {
     return tagCache;
   }
-
-  function clearCompaniesCache() {
-    companiesCache.clear();
-  }
-  
-  function getArticlesCache() {
-    return articlesCache;
-  }
-
-  
   /**
    * Get tags specific to a company from the new centralized tags array
    * @param {string} companyCode - The company code to filter tags by
@@ -57,9 +47,7 @@ const ArticleService = (function() {
       if (!res.ok) {
         throw new Error("Failed to load tags: " + res.status);
       }
-
-      const companyTags = res.json();
-      return companyTags;
+      return res.json();
     })
     .then(function (companyTags) {
       // Cache the tags for this company
@@ -327,6 +315,7 @@ const ArticleService = (function() {
    * Get multiple articles by their IDs (bulk fetch)
    * More efficient than calling getArticleById multiple times
    * @param {Array<string>} articleIds - Array of article IDs
+   * @param companyCode
    * @returns {Promise<Array<Article>>} Promise resolving to array of articles (with resolved tags)
    */
     function getArticlesByIds(articleIds, companyCode) {
@@ -377,27 +366,30 @@ const ArticleService = (function() {
   
   /**
    * Create a new article (POST equivalent)
-   * @param {Object} data - Article data object
+   * @param {Object|FormData} data - Article data object or multipart FormData
+   * @param companyCode
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the created article
    */
   function createArticle(data, companyCode) {
-    const headers = new Headers();
-    headers.append("Content-Type", "application/json");
-
-    const raw = JSON.stringify({
-      title: data.title,
-      description: data.description,
-      externalLink: data.externalLink,
-      status: data.status,
-      clientComments: data.clientComments,
-      tagIds: data.tags,
-      fileIds: data.fileIds
-    });
-
-    const requestOptions = {
+    const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const requestOptions = isMultipartPayload ? {
       method: "POST",
-      headers: headers,
-      body: raw,
+      body: data,
+      redirect: "follow"
+    } : {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        externalLink: data.externalLink,
+        status: data.status,
+        clientComments: data.clientComments,
+        tagIds: data.tags,
+        fileIds: data.fileIds
+      }),
       redirect: "follow"
     };
 
@@ -421,27 +413,31 @@ const ArticleService = (function() {
   /**
    * Update an existing article (PUT equivalent)
    * @param {string} id - Article ID to update
-   * @param {Object} data - Updated article data
+   * @param {Object|FormData} data - Updated article data or multipart FormData
+   * @param companyCode
    * @returns {Promise<{status: string, data: Article}>} Promise resolving to the updated article
    */
   function updateArticle(id, data, companyCode) {
-    const headers = new Headers();
-    headers.append("Content-Type", "application/json");
-
-    const raw = JSON.stringify({
-      title: data.title || null,
-      description: data.description || null,
-      externalLink: data.externalLink || null,
-      clientComments: data.clientComments || null,
-      status: data.status || null,
-      tagIds: data.tags || null,
-      fileIds: data.fileIds || null
-    });
-
-    const requestOptions = {
+    const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const requestOptions = isMultipartPayload ? {
       method: "PUT",
-      headers: headers,
-      body: raw,
+      body: data,
+      redirect: "follow"
+    } : {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: data.title || null,
+        description: data.description || null,
+        externalLink: data.externalLink || null,
+        clientComments: data.clientComments || null,
+        status: data.status || null,
+        tagIds: data.tags || null,
+        fileIds: data.fileIds || null,
+        removedFiles: data.removedFiles || null
+      }),
       redirect: "follow"
     };
 
@@ -465,10 +461,11 @@ const ArticleService = (function() {
   /**
    * Bulk update tags for multiple articles
    * This method handles both adding and removing tags from multiple articles at once.
-   * 
+   *
    * @param {Array<string>} articleIds - Array of article IDs to update
    * @param {string} tagId - The tag ID to add or remove
    * @param {('add'|'remove')} action - Whether to 'add' or 'remove' the tag
+   * @param companyCode
    * @returns {Promise<{status: string, updatedCount: number}>} Promise resolving to the result
    */
   function bulkUpdateTags(articleIds, tagId, action, companyCode) {

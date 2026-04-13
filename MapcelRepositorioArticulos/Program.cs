@@ -2,6 +2,7 @@ using MapcelRepositorioArticulos.DataService;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,10 +40,13 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 // Add all the needed services
-builder.Services.AddScoped<IArticlesService, ArticlesService>();
+builder.Services.AddSingleton<DirectoryBuilder>();
+builder.Services.AddScoped<IArticlesService, ArticlesService>(); // TODO: Remove when new service is finished
 builder.Services.AddScoped<ITagsService, TagsService>();
 builder.Services.AddScoped<IFilesService, FilesService>();
 builder.Services.AddScoped<ICompaniesService, CompaniesService>();
+builder.Services.AddScoped<IntegratedArticleService>();
+builder.Services.AddScoped<IArticleAggregateService, ArticleAggregateService>();
 
 var app = builder.Build();
 

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.AspNetCore.Http;
+using SixLabors.ImageSharp;
 
 namespace MapcelRepositorioArticulos.Models;
 
@@ -104,6 +105,7 @@ public sealed class FileUploadDto
     public int? Width { get; set; }
     public int? Height { get; set; }
     public string? ThumbnailUrl { get; set; }
+    public required bool IsImage { get; set; } = false;
 
     public void Validate()
     {
@@ -123,5 +125,88 @@ public sealed class FileUploadDto
 
         if (Height is < 0)
             throw new ArgumentOutOfRangeException(nameof(Height), "FileUploadDto: Height cannot be negative.");
+    }
+}
+
+public sealed class MultipleFilesDto
+{
+    public IFormFileCollection? Files { get; set; }
+    public List<string?>? Descriptions { get; init; }
+
+    public List<FileUploadDto> ToUploads()
+    {
+        if (Files ==  null || Files.Count == 0) return [];
+        List<FileUploadDto> files = [];
+        
+        for (var i = 0; i < Files.Count; i++)
+        {
+            var dimensions = GetImageDimensions(Files[i]);
+            var description = Descriptions != null && Descriptions.Count > i ? Descriptions.ElementAt(i) ?? string.Empty : string.Empty; 
+            files.Add(new FileUploadDto
+            {
+                File = Files[i],
+                Description = description,
+                Width = dimensions?.Width,
+                Height = dimensions?.Height,
+                IsImage = IsImage(Files[i])
+            });
+        }
+
+        return files;
+    }
+    
+    private static readonly Dictionary<string, byte[]> ImageSignatures = new()
+    {
+        { "jpg", [0xFF, 0xD8, 0xFF] },
+        { "png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A] },
+        { "gif", [0x47, 0x49, 0x46, 0x38] },
+        { "webp", [0x52, 0x49, 0x46, 0x46] } // "RIFF" header
+    };
+
+    private static bool IsImage(IFormFile? file)
+    {
+        // 1. Basic null and length check
+        if (file == null || file.Length == 0) return false;
+
+        // 2. MIME type check (The "Quick & Dirty" first pass)
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) 
+            return false;
+
+        // 3. Deep dive: Magic Byte Validation
+        using var stream = file.OpenReadStream();
+        using var reader = new BinaryReader(stream);
+        
+        // We only need the first few bytes to identify the format
+        byte[] headerBytes = reader.ReadBytes(8);
+
+        return ImageSignatures.Values.Any(signature => 
+            headerBytes.Take(signature.Length).SequenceEqual(signature));
+    }
+    
+    private static (int Width, int Height)? GetImageDimensions(IFormFile? file)
+    {
+        if (file == null || file.Length == 0) return null;
+        if (!IsImage(file)) return null;
+
+        try
+        {
+            using var stream = file.OpenReadStream();
+        
+            // Image.Identify reads the metadata (header) only.
+            // It's significantly faster and more memory-efficient than loading the image.
+            var info = Image.Identify(stream);
+
+            if (info != null)
+            {
+                return (info.Width, info.Height);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log the error: The file might be a "polyglot" or corrupted
+            Console.WriteLine($"Dimension extraction failed: {ex.Message}");
+        }
+
+        return null;
     }
 }

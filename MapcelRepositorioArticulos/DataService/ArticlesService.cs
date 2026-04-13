@@ -1,4 +1,5 @@
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
@@ -33,21 +34,21 @@ public interface IArticlesService
     /// the given company in the SQL Database,
     /// matching the given request.
     /// </summary>
-    /// <param name="articleId">int</param>
+    /// <param name="articleId"></param>
     /// <param name="companyCode">Guid</param>
     /// <param name="request">UpdateArticleRequest</param>
     /// <param name="cancellationToken"></param>
     /// <returns>ArticleDetailsDto?</returns>
-    public Task<ArticleDetailsDto?> UpdateAsync(int articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken);
+    public Task<ArticleDetailsDto?> UpdateAsync(Guid articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken);
     
     /// <summary>
     /// Deletes the specified article id within the given company code.
     /// </summary>
-    /// <param name="articleId">int</param>
+    /// <param name="articleId"></param>
     /// <param name="companyCode">Guid</param>
     /// <param name="cancellationToken"></param>
     /// <returns>True if the operation was successful, false otherwise.</returns>
-    public Task<bool> DeleteAsync(int articleId, Guid companyCode, CancellationToken cancellationToken);
+    public Task<bool> DeleteAsync(Guid articleId, Guid companyCode, CancellationToken cancellationToken);
     
     Task<int> BulkUpdateSingleTagAsync(
         Guid companyCode,
@@ -56,6 +57,9 @@ public interface IArticlesService
         string action,
         CancellationToken cancellationToken);
 
+    Task<ArticleDetailsDto> UpdateAggregateAsync(
+        UpdateArticleCommand command,
+        CancellationToken cancellationToken);
 
 }
 
@@ -64,7 +68,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     // -------------------
     // --- SQL Queries ---
     // -------------------
-    // TODO: Add date range filters
     private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
@@ -107,7 +110,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 WHERE at.article_id = a.article_id
             ) AS tag_data
             OUTER APPLY (
-                SELECT STRING_AGG(fa.file_id, ',') AS files
+                SELECT STRING_AGG(CAST(fa.file_id AS NVARCHAR(36)), ',') AS files
                 FROM [RepositorioArticulos].[dbo].[file_articles] fa
                 WHERE fa.article_id = a.article_id
             ) as file_data
@@ -153,7 +156,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             @Status
         );
     ";
-    private const string SqlUpdateArticle = @"
+    private const string SqlUpdateArticle = """
         UPDATE [RepositorioArticulos].[dbo].[articles]
         SET
             title = @Title,
@@ -164,14 +167,19 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             updated_at = SYSDATETIME()
         WHERE article_id = @ArticleId
           AND company_code = @CompanyCode;
-    ";
-    private const string SqlDeleteArticleTags = @"
+
+        SELECT updated_at
+        FROM [RepositorioArticulos].[dbo].[articles]
+        WHERE article_id = @ArticleId
+          AND company_code = @CompanyCode;
+    """;
+    private const string SqlDeleteArticleTags = """
         DELETE at
         FROM [RepositorioArticulos].[dbo].[article_tags] at
         INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = at.article_id
         WHERE at.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
-    ";
+    """;
     private const string SqlInsertArticleTagsFromCsv = @"
         INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (article_id, tag_id)
         SELECT
@@ -266,22 +274,52 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             ON f.file_id = TRY_CAST(s.value AS int)
            AND f.company_code = @CompanyCode;
     ";
-
+    private const string SqlEnsureArticleExists = @"
+            SELECT COUNT(1)
+            FROM [RepositorioArticulos].[dbo].[articles]
+            WHERE article_id = @ArticleId
+              AND company_code = @CompanyCode;
+        ";
+    private const string SqlLinkExistingFileToArticle = @"
+        INSERT INTO [RepositorioArticulos].[dbo].[file_articles]
+        (
+            file_id,
+            article_id
+        )
+        SELECT
+            f.file_id,
+            @ArticleId
+        FROM [RepositorioArticulos].[dbo].[files] f
+        WHERE f.file_id = @FileId
+          AND f.company_code = @CompanyCode
+          AND NOT EXISTS (
+              SELECT 1
+              FROM [RepositorioArticulos].[dbo].[file_articles] fa
+              WHERE fa.file_id = f.file_id
+                AND fa.article_id = @ArticleId
+          );
+    ";
+    private const string SqlUnlinkFileFromArticle = @"
+        DELETE fa
+        FROM [RepositorioArticulos].[dbo].[file_articles] fa
+        INNER JOIN [RepositorioArticulos].[dbo].[files] f
+            ON f.file_id = fa.file_id
+        WHERE fa.article_id = @ArticleId
+          AND fa.file_id = @FileId
+          AND f.company_code = @CompanyCode;
+    ";
     
     
     public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
     {
-        var rows = new List<ArticleDetailsDto>();
+        ArgumentNullException.ThrowIfNull(query);
+        query.ValidateQuery();
 
-        if (query is null) throw new ArgumentNullException(nameof(query));
-        if (query.Page <= 0) throw new ArgumentOutOfRangeException(nameof(query.Page));
-        if (query.PageSize <= 0) throw new ArgumentOutOfRangeException(nameof(query.PageSize));
+        var rows = new List<ArticleDetailsDto>();
 
         int offset = (query.Page - 1) * query.PageSize;
 
         var companyCode = query.CompanyCode;
-        if (companyCode == Guid.Empty)
-            throw new ArgumentException("CompanyCode is required.", nameof(query.CompanyCode));
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -298,9 +336,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
         command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, int.MaxValue) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
         command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
-        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
+        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.UniqueIdentifier) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
         
-        int total = 0;
+        var total = 0;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
             var idPos = reader.GetOrdinal("article_id");
@@ -320,7 +358,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
 
                 rows.Add(new ArticleDetailsDto
                 {
-                    Id = reader.GetInt32(idPos).ToString(),
+                    Id = reader.GetGuid(idPos),
                     CompanyCode = companyCode,
                     Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
                     Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
@@ -336,10 +374,9 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             }
 
             // Result set 2: total
-            if (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
-            {
-                if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
-            }
+            if (!await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                return new PagedResult<ArticleDetailsDto>(rows, total, query.Page, query.PageSize);
+            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
         }
         return new PagedResult<ArticleDetailsDto>(rows, total, query.Page, query.PageSize);
         
@@ -353,80 +390,85 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
-        try
+        // 1. Build the 'create new article' command  
+        await using var createArticleCommand = new SqlCommand(SqlInsertArticle, connection);
+        createArticleCommand.CommandType = CommandType.Text;
+
+        createArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+        createArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
+        createArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
+        createArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
+        createArticleCommand.Parameters.Add(new SqlParameter("@ClientComments", SqlDbType.NVarChar) { Value = (object?)request.ClientComments ?? DBNull.Value });
+        createArticleCommand.Parameters.Add(new SqlParameter("@Status", SqlDbType.VarChar, 50) { Value = request.Status.Trim() });
+        
+        // Execute the creation
+        var articleResult = await createArticleCommand.ExecuteScalarAsync(cancellationToken);
+        if (articleResult is null) throw new InvalidOperationException("ArticleService.CreateAsync(Guid:request:token): Failed to create article.");
+
+        if (articleResult == null || articleResult == DBNull.Value)
         {
-            // 1. Build the 'create new article' command  
-            await using var createArticleCommand = new SqlCommand(SqlInsertArticle, connection);
-            createArticleCommand.CommandType = CommandType.Text;
-
-            createArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-            createArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
-            createArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
-            createArticleCommand.Parameters.Add(new SqlParameter("@ExternalLink", SqlDbType.NVarChar, 500) { Value = (object?)request.ExternalLink ?? DBNull.Value });
-            createArticleCommand.Parameters.Add(new SqlParameter("@ClientComments", SqlDbType.NVarChar) { Value = (object?)request.ClientComments ?? DBNull.Value });
-            createArticleCommand.Parameters.Add(new SqlParameter("@Status", SqlDbType.VarChar, 50) { Value = request.Status.Trim() });
-            
-            // Execute the creation
-            var articleResult = await createArticleCommand.ExecuteScalarAsync(cancellationToken);
-            if (articleResult is null) throw new InvalidOperationException("ArticleService.CreateAsync(Guid:request:token): Failed to create article.");
-            var newArticleId = Convert.ToInt32(articleResult);
-            
-            // If the request carries tags, insert each tag into the article_tags table
-            if (request.TagIds is { Length: > 0 }) // TagIds may be null
-            {
-                // 1.1 Build the 'insert article tags' command
-                var csv = string.Join(",", request.TagIds);
-                await using var insertArticleTagsCommand = new SqlCommand(SqlInsertArticleTagsFromCsv, connection);
-                insertArticleTagsCommand.CommandType = CommandType.Text;
-                
-                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
-                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-                insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
-
-                await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
-            }
-            
-            // If the request carries files, insert each file link into the file_articles table
-            if (request.FileIds is { Length: > 0 }) // FileIds may be null
-            {
-                var csv = string.Join(",", request.FileIds);
-
-                await using var insertFileArticlesCommand = new SqlCommand(SqlInsertFileArticlesFromCsv, connection);
-                insertFileArticlesCommand.CommandType = CommandType.Text;
-
-                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = newArticleId });
-                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-                insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
-
-                await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            var created = new ArticleDetailsDto
-            {
-                Id = newArticleId.ToString(),
-                CompanyCode = companyCode,
-                Title = request.Title,
-                Description = request.Description,
-                ClientComments = request.ClientComments,
-                Status = request.Status,
-                CompanyName = "",
-                CreatedAt = new DateOnly(),
-                UpdatedAt = new DateOnly(),
-                ExternalLink = request.ExternalLink,
-                Tags = request.TagIds ?? [],
-                TagNames = [],
-                FileIds = request.FileIds?.Select(x => x.ToString()).ToArray() ?? Array.Empty<string>()
-            };
-            return created;
+            throw new InvalidOperationException("Insert did not return an ID.");
         }
-        catch (Exception ex)
+
+        var insertedId = articleResult switch
         {
-            Log.Error(ex, "ArticleService.CreateAsync(Guid:request:token) failed for companyCode={CompanyCode}", companyCode);
-            throw;
+            Guid g => g,
+            string s when Guid.TryParse(s, out var parsed) => parsed,
+            _ => throw new InvalidCastException(
+                $"Expected Guid result, but got {articleResult.GetType().FullName}."
+            )
+        };
+        
+        // If the request carries tags, insert each tag into the article_tags table
+        if (request.TagIds is { Length: > 0 }) // TagIds may be null
+        {
+            // 1.1 Build the 'insert article tags' command
+            var csv = string.Join(",", request.TagIds);
+            await using var insertArticleTagsCommand = new SqlCommand(SqlInsertArticleTagsFromCsv, connection);
+            insertArticleTagsCommand.CommandType = CommandType.Text;
+            
+            insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = insertedId });
+            insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+            insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+            await insertArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
         }
+        
+        // If the request carries files, insert each file link into the file_articles table
+        if (request.FileIds is { Length: > 0 }) // FileIds may be null
+        {
+            var csv = string.Join(",", request.FileIds);
+
+            await using var insertFileArticlesCommand = new SqlCommand(SqlInsertFileArticlesFromCsv, connection);
+            insertFileArticlesCommand.CommandType = CommandType.Text;
+
+            insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = insertedId });
+            insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+            insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+            await insertFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var created = new ArticleDetailsDto
+        {
+            Id = insertedId,
+            CompanyCode = companyCode,
+            Title = request.Title,
+            Description = request.Description,
+            ClientComments = request.ClientComments,
+            Status = request.Status,
+            CompanyName = "",
+            CreatedAt = new DateOnly(),
+            UpdatedAt = new DateOnly(),
+            ExternalLink = request.ExternalLink,
+            Tags = request.TagIds ?? [],
+            TagNames = [],
+            FileIds = request.FileIds?.Select(x => x.ToString()).ToArray() ?? Array.Empty<string>()
+        };
+        return created;
     }
     
-    public async Task<ArticleDetailsDto?> UpdateAsync(int articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken)
+    public async Task<ArticleDetailsDto?> UpdateAsync(Guid articleId, Guid companyCode, UpdateArticleRequest request, CancellationToken cancellationToken)
     {
         ValidateCompany(companyCode);
         ValidateId(articleId);
@@ -441,7 +483,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var updateArticleCommand = new SqlCommand(SqlUpdateArticle, connection);
             updateArticleCommand.CommandType = CommandType.Text;
 
-            updateArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            updateArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             updateArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             updateArticleCommand.Parameters.Add(new SqlParameter("@Title", SqlDbType.NVarChar, 250) { Value = request.Title.Trim() });
             updateArticleCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar) { Value = (object?)request.Description ?? DBNull.Value });
@@ -462,7 +504,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
                 deleteArticleTagsCommand.CommandType = CommandType.Text;
 
-                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
                 deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -475,7 +517,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     await using var insertArticleTagsCommand = new SqlCommand(SqlInsertArticleTagsFromCsv, connection);
                     insertArticleTagsCommand.CommandType = CommandType.Text;
 
-                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                    insertArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
                     insertArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                     insertArticleTagsCommand.Parameters.Add(new SqlParameter("@TagIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
@@ -486,14 +528,14 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             // 3. If FileIds is provided:
             //    - null => keep existing file links
             //    - []   => clear all file links
-            //    - [..] => replace file links
+            //    - [...] => replace file links
             if (request.FileIds is not null)
             {
                 // 3.1 Delete existing file links (tenant-safe via join to articles)
                 await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
                 deleteFileArticlesCommand.CommandType = CommandType.Text;
 
-                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
                 deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
                 await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -506,7 +548,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                     await using var insertFileArticlesCommand = new SqlCommand(SqlInsertFileArticlesFromCsv, connection);
                     insertFileArticlesCommand.CommandType = CommandType.Text;
 
-                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+                    insertFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
                     insertFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
                     insertFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
 
@@ -516,7 +558,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             
             var updated = new ArticleDetailsDto
             {
-                Id = articleId.ToString(),
+                Id = articleId,
                 CompanyCode = companyCode,
                 Title = request.Title,
                 Description = request.Description,
@@ -539,7 +581,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         }
     }
     
-    public async Task<bool> DeleteAsync(int articleId, Guid companyCode, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(Guid articleId, Guid companyCode, CancellationToken cancellationToken)
     {
         ValidateCompany(companyCode);
         ValidateId(articleId);
@@ -553,7 +595,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
             deleteFileArticlesCommand.CommandType = CommandType.Text;
 
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -562,7 +604,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
             deleteArticleTagsCommand.CommandType = CommandType.Text;
 
-            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -571,7 +613,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             await using var deleteArticleCommand = new SqlCommand(SqlDeleteArticle, connection);
             deleteArticleCommand.CommandType = CommandType.Text;
 
-            deleteArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.Int) { Value = articleId });
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             deleteArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             var deleted = await deleteArticleCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -579,7 +621,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "ArticleService.DeleteAsync(int:Guid:token) failed for articleId={ArticleId}, companyCode={CompanyCode}", articleId, companyCode);
+            Log.Error(ex, "ArticleService.DeleteAsync(int:Guid:token) failed for articleId={ArticleId}, companyCode={CompanyCode}: {message}", articleId, companyCode, ex.Message);
             throw;
         }
     }
@@ -621,10 +663,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             var updatedCount = Convert.ToInt32(result);
 
             // -1 indicates the tag does not exist for this tenant
-            if (updatedCount == -1)
-                throw new KeyNotFoundException("Tag was not found for the provided companyCode.");
-
-            return updatedCount;
+            return updatedCount == -1 ? throw new KeyNotFoundException("Tag was not found for the provided companyCode.") : updatedCount;
         }
         catch (Exception ex)
         {
@@ -632,7 +671,13 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             throw;
         }
     }
-    
+
+    public async Task<ArticleDetailsDto> UpdateAggregateAsync(UpdateArticleCommand command, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+
     // ----------- Helper Validation Functions -----------
     private static void ValidateCompany(Guid companyCode)
     {
@@ -640,8 +685,12 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             throw new ArgumentException("companyCode is required and cannot be empty.", nameof(companyCode));
     }
 
-    private static void ValidateId(int articleId)
+    private static void ValidateId(Guid articleId)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(articleId, nameof(articleId));
+        if  (articleId == Guid.Empty)
+            throw new ArgumentException("articleId is required.", nameof(articleId));
     }
+    
+    // ----------- Directories -----------
+    
 }

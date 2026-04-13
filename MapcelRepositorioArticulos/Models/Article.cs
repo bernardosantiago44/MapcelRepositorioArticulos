@@ -79,7 +79,7 @@ public sealed class ArticleDetailsDto
     public required Guid CompanyCode { get; init; }
     public required string CompanyName { get; init; }
     public required string Title { get; init; }
-    public string? Description { get; init; }
+    public string? Description { get; set; }
     public string? ExternalLink { get; init; }
     public string? ClientComments { get; init; }
     public required string Status { get; init; }

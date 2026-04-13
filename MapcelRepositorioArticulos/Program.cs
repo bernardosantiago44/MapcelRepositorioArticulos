@@ -46,6 +46,7 @@ builder.Services.AddScoped<ITagsService, TagsService>();
 builder.Services.AddScoped<IFilesService, FilesService>();
 builder.Services.AddScoped<ICompaniesService, CompaniesService>();
 builder.Services.AddScoped<IntegratedArticleService>();
+builder.Services.AddScoped<IArticleAggregateService, ArticleAggregateService>();
 
 var app = builder.Build();
 

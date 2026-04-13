@@ -2,7 +2,7 @@
  * New Article Page UI Module
  * Provides a dedicated page for creating and editing articles with a two-column layout
  * Uses HTML + Tailwind CSS within the main DHTMLX Layout Cell
- * 
+ *
  * Features:
  * - Breadcrumb navigation with dirty form confirmation
  * - Two-column layout (Core Data | Categorization & Assets)
@@ -11,7 +11,7 @@
  * - File and image upload with staged file management
  * - Role-based permission checks
  * - Edit mode support: hydrates Editor.js from existing HTML content
- * 
+ *
  * Dependencies:
  * - dataModels.js (for status configuration)
  * - articleService.js (for CRUD operations)
@@ -24,177 +24,169 @@
  * - editorjs-html (CDN: editorjs-html@4.0.0 for JSON-to-HTML conversion)
  * - DOMPurify (for HTML sanitization)
  */
+const NewArticlePageUI = (function () {
+    'use strict';
 
-var NewArticlePageUI = (function() {
-  'use strict';
+    // Page state management
+    const pageState = {
+        companyCode: null,
+        companyName: '',
+        layoutCell: null,
+        onNavigateBack: null,
+        selectedTags: [],
+        allImages: [],             // All available images for the company
+        allFiles: [],              // All available files for the company
+        attachedImages: [],        // Already attached image IDs
+        attachedFiles: [],         // Already attached file IDs
+        imageSearchQuery: '',      // Search query for image library
+        fileSearchQuery: '',       // Search query for file library
+        stagedFiles: [],         // Files selected for upload (not yet saved)
+        stagedImages: [],        // Images selected for upload (not yet saved)
+        isFormDirty: false,
+        allTags: [],
+        canUserUpload: true,     // Determined by CompanySettings
+        editorInstance: null,    // Editor.js instance
+        editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
+        imagePasteHandler: null, // Paste handler reference for cleanup
+        editMode: false,         // true when editing an existing article
+        articleId: null,         // Article ID when in edit mode
+        originalArticleData: null, // Original article data for edit mode
+        isCurrentlyUploading: false
+    };
 
-  // Page state management
-  var pageState = {
-    companyCode: null,
-    companyName: '',
-    layoutCell: null,
-    onNavigateBack: null,
-    selectedTags: [],
-    allImages: [],             // All available images for the company
-    allFiles: [],              // All available files for the company
-    attachedImages: [],        // Already attached image IDs
-    attachedFiles: [],         // Already attached file IDs
-    imageSearchQuery: '',      // Search query for image library
-    fileSearchQuery: '',       // Search query for file library
-    stagedFiles: [],         // Files selected for upload (not yet saved)
-    stagedImages: [],        // Images selected for upload (not yet saved)
-    isFormDirty: false,
-    allTags: [],
-    canUserUpload: true,     // Determined by CompanySettings
-    editorInstance: null,    // Editor.js instance
-    editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
-    imagePasteHandler: null, // Paste handler reference for cleanup
-    editMode: false,         // true when editing an existing article
-    articleId: null,         // Article ID when in edit mode
-    originalArticleData: null, // Original article data for edit mode
-    isCurrentlyUploading: false
-  };
+    // Constants
+    const MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 
-  // Constants
-  var FORM_FIELDS_INITIAL = {
-    title: '',
-    description: '',
-    status: 'Borrador',
-    externalLink: '',
-    clientComments: ''
-  };
-  var MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
-
-  /**
-   * Get status options from articleStatusConfiguration
-   * @returns {Array} Array of status options
-   */
-  function getStatusOptions() {
-    if (typeof articleStatusConfiguration !== 'undefined') {
-      return Object.keys(articleStatusConfiguration).map(function(key) {
-        return {
-          value: key,
-          text: articleStatusConfiguration[key].label,
-          color: articleStatusConfiguration[key].color
-        };
-      });
-    }
-    return [
-      { value: 'Producción', text: 'Producción', color: '#52c41a' },
-      { value: 'Borrador', text: 'Borrador', color: '#1890ff' },
-      { value: 'Cerrado', text: 'Cerrado', color: '#8c8c8c' }
-    ];
-  }
-
-  /**
-   * Get today's date formatted for display
-   * @returns {string} Formatted date string
-   */
-  function getTodayFormatted() {
-    var today = new Date();
-    var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    return today.getDate() + ' ' + months[today.getMonth()] + ' ' + today.getFullYear();
-  }
-
-  /**
-   * Escape HTML to prevent XSS
-   * @param {string} str - String to escape
-   * @returns {string} Escaped string
-   */
-  function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    var div = document.createElement('div');
-    div.textContent = String(str);
-    return div.innerHTML;
-  }
-
-  /**
-   * Mark form as dirty when user makes changes
-   */
-  function markFormDirty() {
-    pageState.isFormDirty = true;
-  }
-
-  /**
-   * Check if form has unsaved changes
-   * @returns {boolean} True if form is dirty
-   */
-  function isFormDirty() {
-    var titleInput = document.getElementById('new-article-title');
-    var externalLinkInput = document.getElementById('new-article-external-link');
-    var clientCommentsInput = document.getElementById('new-article-client-comments');
-
-    var hasTextChanges = (titleInput && titleInput.value.trim() !== '') ||
-                         (externalLinkInput && externalLinkInput.value.trim() !== '') ||
-                         (clientCommentsInput && clientCommentsInput.value.trim() !== '');
-
-    var hasTagChanges = pageState.selectedTags.length > 0;
-    var hasFileChanges = pageState.stagedFiles.length > 0 || pageState.stagedImages.length > 0;
-
-    return pageState.isFormDirty || hasTextChanges || hasTagChanges || hasFileChanges;
-  }
-
-  /**
-   * Confirm navigation if form is dirty
-   * @param {Function} onConfirm - Callback if user confirms navigation
-   */
-  function confirmNavigation(onConfirm) {
-    if (isFormDirty()) {
-      dhtmlx.confirm({
-        title: 'Cambios sin guardar',
-        text: '¿Estás seguro de que deseas salir? Los cambios no guardados se perderán.',
-        ok: 'Sí, salir',
-        cancel: 'Permanecer',
-        callback: function(result) {
-          if (result) {
-            onConfirm();
-          }
+    /**
+     * Get status options from articleStatusConfiguration
+     * @returns {Array} Array of status options
+     */
+    function getStatusOptions() {
+        if (typeof articleStatusConfiguration !== 'undefined') {
+            return Object.keys(articleStatusConfiguration).map(function (key) {
+                return {
+                    value: key,
+                    text: articleStatusConfiguration[key].label,
+                    color: articleStatusConfiguration[key].color
+                };
+            });
         }
-      });
-    } else {
-      onConfirm();
+        return [
+            {value: 'Producción', text: 'Producción', color: '#52c41a'},
+            {value: 'Borrador', text: 'Borrador', color: '#1890ff'},
+            {value: 'Cerrado', text: 'Cerrado', color: '#8c8c8c'}
+        ];
     }
-  }
 
-  /**
-   * Navigate back to the articles grid
-   */
-  function navigateToGrid() {
-    if (pageState.onNavigateBack) {
-      confirmNavigation(function() {
-        resetPageState();
-        pageState.onNavigateBack();
-      });
+    /**
+     * Get today's date formatted for display
+     * @returns {string} Formatted date string
+     */
+    function getTodayFormatted() {
+        const today = new Date();
+        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        return today.getDate() + ' ' + months[today.getMonth()] + ' ' + today.getFullYear();
     }
-  }
 
-  /**
-   * Reset page state to initial values
-   */
-  function resetPageState() {
-    pageState.selectedTags = [];
-    pageState.allImages = [];
-    pageState.allFiles = [];
-    pageState.attachedImages = [];
-    pageState.attachedFiles = [];
-    pageState.imageSearchQuery = '';
-    pageState.fileSearchQuery = '';
-    pageState.stagedFiles = [];
-    pageState.stagedImages = [];
-    pageState.isFormDirty = false;
-    pageState.editMode = false;
-    pageState.articleId = null;
-    pageState.originalArticleData = null;
-    pageState.isCurrentlyUploading = false;
-  }
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} str - String to escape
+     * @returns {string} Escaped string
+     */
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
 
-  /**
-   * Render the breadcrumb navigation
-   * @returns {string} HTML string for breadcrumb
-   */
-  function renderBreadcrumb() {
-    var breadcrumbLabel = pageState.editMode ? 'Editando Artículo' : 'Nuevo Artículo';
-    return `
+    /**
+     * Mark form as dirty when user makes changes
+     */
+    function markFormDirty() {
+        pageState.isFormDirty = true;
+    }
+
+    /**
+     * Check if form has unsaved changes
+     * @returns {boolean} True if form is dirty
+     */
+    function isFormDirty() {
+        const titleInput = document.getElementById('new-article-title');
+        const externalLinkInput = document.getElementById('new-article-external-link');
+        const clientCommentsInput = document.getElementById('new-article-client-comments');
+
+        const hasTextChanges = (titleInput && titleInput.value.trim() !== '') ||
+            (externalLinkInput && externalLinkInput.value.trim() !== '') ||
+            (clientCommentsInput && clientCommentsInput.value.trim() !== '');
+
+        const hasTagChanges = pageState.selectedTags.length > 0;
+        const hasFileChanges = pageState.stagedFiles.length > 0 || pageState.stagedImages.length > 0;
+
+        return pageState.isFormDirty || hasTextChanges || hasTagChanges || hasFileChanges;
+    }
+
+    /**
+     * Confirm navigation if form is dirty
+     * @param {Function} onConfirm - Callback if user confirms navigation
+     */
+    function confirmNavigation(onConfirm) {
+        if (isFormDirty()) {
+            dhtmlx.confirm({
+                title: 'Cambios sin guardar',
+                text: '¿Estás seguro de que deseas salir? Los cambios no guardados se perderán.',
+                ok: 'Sí, salir',
+                cancel: 'Permanecer',
+                callback: function (result) {
+                    if (result) {
+                        onConfirm();
+                    }
+                }
+            });
+        } else {
+            onConfirm();
+        }
+    }
+
+    /**
+     * Navigate back to the articles grid
+     */
+    function navigateToGrid() {
+        if (pageState.onNavigateBack) {
+            confirmNavigation(function () {
+                resetPageState();
+                pageState.onNavigateBack();
+            });
+        }
+    }
+
+    /**
+     * Reset page state to initial values
+     */
+    function resetPageState() {
+        pageState.selectedTags = [];
+        pageState.allImages = [];
+        pageState.allFiles = [];
+        pageState.attachedImages = [];
+        pageState.attachedFiles = [];
+        pageState.imageSearchQuery = '';
+        pageState.fileSearchQuery = '';
+        pageState.stagedFiles = [];
+        pageState.stagedImages = [];
+        pageState.isFormDirty = false;
+        pageState.editMode = false;
+        pageState.articleId = null;
+        pageState.originalArticleData = null;
+        pageState.isCurrentlyUploading = false;
+    }
+
+    /**
+     * Render the breadcrumb navigation
+     * @returns {string} HTML string for breadcrumb
+     */
+    function renderBreadcrumb() {
+        const breadcrumbLabel = pageState.editMode ? 'Editando Artículo' : 'Nuevo Artículo';
+        return `
       <nav class="flex items-center space-x-2 text-sm mb-6">
         <button 
           id="breadcrumb-articles-link"
@@ -211,14 +203,14 @@ var NewArticlePageUI = (function() {
         <span class="text-gray-600 font-medium">${breadcrumbLabel}</span>
       </nav>
     `;
-  }
+    }
 
-  /**
-   * Render the metadata header
-   * @returns {string} HTML string for metadata header
-   */
-  function renderMetadataHeader() {
-    return `
+    /**
+     * Render the metadata header
+     * @returns {string} HTML string for metadata header
+     */
+    function renderMetadataHeader() {
+        return `
       <div class="flex flex-wrap items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div class="flex items-center gap-2">
           <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,16 +228,16 @@ var NewArticlePageUI = (function() {
         </div>
       </div>
     `;
-  }
+    }
 
-  /**
-   * Render the left column (Core Data)
-   * @returns {string} HTML string for left column
-   */
-  function renderLeftColumn() {
-    var statusOptions = getStatusOptions();
+    /**
+     * Render the left column (Core Data)
+     * @returns {string} HTML string for left column
+     */
+    function renderLeftColumn() {
+        const statusOptions = getStatusOptions();
 
-    return `
+        return `
       <div class="space-y-6">
         <!-- Title Field -->
         <div>
@@ -269,10 +261,10 @@ var NewArticlePageUI = (function() {
             id="new-article-status"
             class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-base"
           >
-            ${statusOptions.map(function(opt) {
-              var selected = opt.value === 'Borrador' ? ' selected' : '';
-              return '<option value="' + escapeHtml(opt.value) + '"' + selected + '>' + escapeHtml(opt.text) + '</option>';
-            }).join('')}
+            ${statusOptions.map(function (opt) {
+            const selected = opt.value === 'Borrador' ? ' selected' : '';
+            return '<option value="' + escapeHtml(opt.value) + '"' + selected + '>' + escapeHtml(opt.text) + '</option>';
+        }).join('')}
           </select>
         </div>
 
@@ -366,17 +358,17 @@ var NewArticlePageUI = (function() {
         </div>
       </div>
     `;
-  }
+    }
 
-  /**
-   * Render the right column (Categorization & Assets)
-   * @returns {string} HTML string for right column
-   */
-  function renderRightColumn() {
-    var uploadDisabledClass = pageState.canUserUpload ? '' : 'opacity-50 cursor-not-allowed';
-    var uploadDisabledAttr = pageState.canUserUpload ? '' : 'disabled';
+    /**
+     * Render the right column (Categorization & Assets)
+     * @returns {string} HTML string for right column
+     */
+    function renderRightColumn() {
+        const uploadDisabledClass = pageState.canUserUpload ? '' : 'opacity-50 cursor-not-allowed';
+        const uploadDisabledAttr = pageState.canUserUpload ? '' : 'disabled';
 
-    return `
+        return `
       <div class="space-y-6">
         <!-- Tag Picker Section -->
         <div class="bg-white border border-gray-200 rounded-lg p-4">
@@ -487,15 +479,15 @@ var NewArticlePageUI = (function() {
         </div>
       </div>
     `;
-  }
+    }
 
-  /**
-   * Render the action bar (footer)
-   * @returns {string} HTML string for action bar
-   */
-  function renderActionBar() {
-    var submitLabel = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
-    var deleteButtonHtml = pageState.editMode ? `
+    /**
+     * Render the action bar (footer)
+     * @returns {string} HTML string for action bar
+     */
+    function renderActionBar() {
+        const submitLabel = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+        const deleteButtonHtml = pageState.editMode ? `
         <button 
           id="new-article-delete-btn"
           type="button"
@@ -505,7 +497,7 @@ var NewArticlePageUI = (function() {
         </button>
     ` : '';
 
-    return `
+        return `
       <div class="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between shadow-lg">
         <div class="flex items-center">
           ${deleteButtonHtml}
@@ -528,14 +520,14 @@ var NewArticlePageUI = (function() {
         </div>
       </div>
     `;
-  }
+    }
 
-  /**
-   * Render the complete page HTML
-   * @returns {string} Complete HTML for the page
-   */
-  function renderPageHtml() {
-    return `
+    /**
+     * Render the complete page HTML
+     * @returns {string} Complete HTML for the page
+     */
+    function renderPageHtml() {
+        return `
       <div class="h-full flex flex-col bg-gray-100">
         <!-- Main Content Area -->
         <div class="flex-1 overflow-y-auto p-6">
@@ -563,865 +555,883 @@ var NewArticlePageUI = (function() {
         ${renderActionBar()}
       </div>
     `;
-  }
-
-  /**
-   * Attach event handlers to page elements
-   */
-  function attachEventHandlers() {
-    // Breadcrumb navigation
-    var breadcrumbLink = document.getElementById('breadcrumb-articles-link');
-    if (breadcrumbLink) {
-      breadcrumbLink.addEventListener('click', navigateToGrid);
     }
-
-    // Cancel button
-    var cancelBtn = document.getElementById('new-article-cancel-btn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', navigateToGrid);
-    }
-
-    // Submit button
-    var submitBtn = document.getElementById('new-article-submit-btn');
-    if (submitBtn) {
-      submitBtn.addEventListener('click', handleSubmit);
-    }
-
-    // Delete button (edit mode only)
-    var deleteBtn = document.getElementById('new-article-delete-btn');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', handleDeleteArticle);
-    }
-
-    // Tags container click
-    var tagsContainer = document.getElementById('new-article-tags-container');
-    if (tagsContainer) {
-      tagsContainer.addEventListener('click', openTagPicker);
-    }
-
-    // Form input change detection (non-editor fields)
-    var inputs = document.querySelectorAll('#new-article-title, #new-article-external-link, #new-article-client-comments');
-    inputs.forEach(function(input) {
-      input.addEventListener('input', markFormDirty);
-    });
-
-    // File upload handlers
-    setupFileUploadHandlers();
-    setupImageUploadHandlers();
-    setupMediaLibraryHandlers();
-  }
-
-  // =========================================================================
-  // Editor.js Integration
-  // =========================================================================
-
-  /**
-   * Initialize the Editor.js instance
-   * Must be called after the DOM container #new-article-editorjs is rendered
-   */
-  function initializeEditor() {
-    if (pageState.editorInstance) {
-      pageState.editorInstance.destroy();
-      pageState.editorInstance = null;
-    }
-
-    var editorHolder = document.getElementById('new-article-editorjs');
-    if (!editorHolder) {
-      console.error('Editor.js holder element not found');
-      return;
-    }
-
-    var hasImageTool = typeof ImageTool !== 'undefined';
-    var hasSimpleImage = typeof SimpleImage !== 'undefined';
-    var imageToolConfig = null;
-
-    if (hasImageTool) {
-      imageToolConfig = {
-        class: ImageTool,
-        config: {
-          uploader: {
-            uploadByFile: imageUploadProcess,
-            uploadByUrl: uploadEditorImageByUrl
-          }
-        }
-      };
-      pageState.editorUsesSimpleImage = false;
-    } else if (hasSimpleImage) {
-      imageToolConfig = {
-        class: SimpleImage
-      };
-      pageState.editorUsesSimpleImage = true;
-    } else {
-      console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
-      pageState.editorUsesSimpleImage = false;
-    }
-
-    pageState.editorInstance = new EditorJS({
-      holder: 'new-article-editorjs',
-      placeholder: 'Describe el artículo en detalle...',
-      minHeight: 360,
-      tools: {
-        header: {
-          class: Header,
-          config: {
-            levels: [1, 2, 3, 4, 5, 6],
-            defaultLevel: 2
-          }
-        },
-        list: {
-          class: typeof EditorjsList !== 'undefined' ? EditorjsList
-               : typeof NestedList !== 'undefined' ? NestedList
-               : List,
-          inlineToolbar: true
-        },
-        table: {
-          class: Table,
-          inlineToolbar: true
-        },
-        code: {
-          class: CodeTool
-        },
-
-        delimiter: {
-          class: Delimiter
-        },
-        image: imageToolConfig,
-        ColorPicker: {
-          class: ColorPicker.default,
-        },
-      },
-      onReady: function() {
-        attachImageUrlPasteHandler();
-      },
-      onChange: function() {
-        markFormDirty();
-      }
-    });
-  }
-
-  /**
-   * Detect image URLs and insert a SimpleImage block on paste.
-   */
-  function attachImageUrlPasteHandler() {
-    var editorHolder = document.getElementById('new-article-editorjs');
-    if (!editorHolder || !pageState.editorInstance) return;
-
-    if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
-
-    if (pageState.imagePasteHandler) {
-      document.removeEventListener('paste', pageState.imagePasteHandler);
-    }
-
-    pageState.imagePasteHandler = function(event) {
-      var target = event.target;
-      if (!editorHolder.contains(target)) return;
-
-      var clipboard = event.clipboardData || window.clipboardData;
-      if (!clipboard) return;
-
-      var text = (clipboard.getData && clipboard.getData('text/plain')) || '';
-      var url = (text || '').trim();
-      if (!isLikelyImageUrl(url)) return;
-
-      event.preventDefault();
-
-      try {
-        var index = pageState.editorInstance.blocks.getCurrentBlockIndex();
-        pageState.editorInstance.blocks.insert('image', { url: url }, {}, index + 1, true);
-        markFormDirty();
-      } catch (error) {
-        console.warn('Failed to insert image block from pasted URL:', error);
-      }
-    };
-
-    document.addEventListener('paste', pageState.imagePasteHandler);
-  }
-
-  function getImageDimensions(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const dimensions = { width: img.width, height: img.height };
-        URL.revokeObjectURL(img.src);
-        resolve(dimensions);
-      };
-      // Handle potential load errors
-      img.onerror = () => resolve({ width: 0, height: 0 });
-    });
-  }
-  
-  function imageUploadProcess(file) {
-    return getImageDimensions(file).then(function(dimensions) {
-      return promptAndInsertEditorImage(file, dimensions);
-    }).catch(function(error) {
-      return { success: 0, file: '' }
-    });
-  }
-  
-  /**
-   * Prompt for metadata and upload before inserting into Editor.js
-   * @param {File} file
-   * @param {{width: number, height: number}} dimensions
-   */
-  function promptAndInsertEditorImage(file, dimensions) {
-    if (pageState.isCurrentlyUploading) {
-      return Promise.reject("Otra imagen está en proceso de subida.");
-    }
-    
-    pageState.isCurrentlyUploading = true;
-    
-    const defaultMetadata = {
-      description: file && file.name ? file.name : '',
-      desiredFileName: file && file.name ? file.name : '',
-      dimensions: dimensions ? dimensions : {},
-    };
-    
-    return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
-      // Load image preview
-      .then(function(metadata) {
-        if (!metadata) {
-          dhtmlx.message({ type: 'info', text: 'Carga de imagen cancelada' });
-          return null;
-        }
-        
-        return uploadEditorImageByFile(file, metadata)
-          .then(function(result) {
-            if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
-            
-            var currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-            var blockData = pageState.editorUsesSimpleImage
-              ? { url: result.file.url, caption: metadata.description || '' }
-              : { file: { url: result.file.url }, caption: metadata.description || '' };
-            
-            markFormDirty();
-            return result;
-          });
-      })
-      .catch(function(error) {
-        console.error('Error al subir imagen arrastrada:', error);
-        dhtmlx.message({
-          type: 'error',
-          text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
-        });
-        return null;
-      }).finally(function() { pageState.isCurrentlyUploading = false; });
-  }
-
-  /**
-   * Insert a block into the editor after the current selection.
-   * If the current block is empty, it replaces it.
-   * If the current block has content, it inserts after it.
-   * @param {string} blockType
-   * @param {Object} blockData
-   */
-  async function insertEditorBlock(blockType, blockData) {
-    if (!pageState.editorInstance) return;
-
-    try {
-      await pageState.editorInstance.isReady;
-
-      const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-      let shouldReplace = false;
-      let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
-
-      // Check if the current block is empty
-      if (typeof currentIndex === 'number' && currentIndex >= 0) {
-        const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
-        const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
-
-        // If it's an empty paragraph, we mark it for replacement
-        if (isCurrentBlockEmpty) {
-          shouldReplace = true;
-          targetIndex = currentIndex; // Insert at the same position
-        }
-      }
-
-      // 2. If replacing, delete the empty block first
-      if (shouldReplace) {
-        pageState.editorInstance.blocks.delete(currentIndex);
-      }
-
-      // 3. Insert the new block
-      pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
-
-      // 4. Move Caret to the new block
-      // We use a small timeout to ensure the DOM has rendered the new block before focusing
-      setTimeout(() => {
-        const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
-        if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
-          pageState.editorInstance.caret.setToBlock(finalIndex);
-        }
-      }, 10);
-
-      markFormDirty();
-    } catch (error) {
-      console.warn('Unable to insert block:', error);
-    }
-  }
-
-  /**
-   * Handle quick action toolbar clicks.
-   * @param {string} action
-   */
-  function handleEditorToolbarAction(action) {
-    switch (action) {
-      case 'paragraph':
-        insertEditorBlock('paragraph', { text: '' });
-        break;
-      case 'heading':
-        insertEditorBlock('header', { text: '', level: 2 });
-        break;
-      case 'list':
-        insertEditorBlock('list', { style: 'unordered', items: [{ content: '', items: [] }] });
-        break;
-      case 'ordered-list':
-        insertEditorBlock('list', { style: 'ordered', items: [{ content: '', items: [] }] });
-        break;
-      case 'table':
-        insertEditorBlock('table', { withHeadings: false, content: [['', ''], ['', '']] });
-        break;
-      case 'image':
-        insertEditorBlock('image', pageState.editorUsesSimpleImage ? { url: '', caption: 'Haz clic para editar la imagen' } : { file: { url: '' }, caption: 'Selecciona o pega una imagen' });
-        break;
-      default:
-        break;
-    }
-  }
-
-  /**
-   * Attach click handlers to the persistent editor toolbar.
-   */
-  function attachEditorToolbarHandlers() {
-    var toolbar = document.getElementById('new-article-editor-toolbar');
-    if (!toolbar) return;
-
-    toolbar.addEventListener('click', function(event) {
-      var button = event.target.closest('[data-editor-action]');
-      if (!button) return;
-      var action = button.getAttribute('data-editor-action');
-      handleEditorToolbarAction(action);
-    });
-  }
-
-  /**
-   * Build the public file URL used by Editor.js image blocks
-   * @param {string} companyCode - Company identifier
-   * @param {string|number} fileId - Uploaded file identifier with extension
-   * @returns {string} Image retrieval URL
-   */
-  function buildEditorImageUrl(companyCode, fileId) {
-    return WEBSITE_BASE_URL + API_FILES_URL + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId);
-  }
-
-  /**
-   * Convert API errors to a readable string
-   * @param {Response} response - Fetch response object
-   * @returns {Promise<string>} Error message
-   */
-  function parseUploadErrorMessage(response) {
-    return response.text()
-      .then(function(responseText) {
-        if (!responseText) {
-          return 'Error al subir la imagen (' + response.status + ')';
-        }
-        return responseText;
-      })
-      .catch(function() {
-        return 'Error al subir la imagen (' + response.status + ')';
-      });
-  }
-
-  /**
-   * Upload an image file to FilesController for Editor.js Image Tool
-   * @param {File} file - Local file selected in Editor.js
-   * @param {{description: string, desiredFileName: string, dimensions: [number, number]}} metadata
-   * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
-   */
-  function uploadEditorImageByFile(file, metadata) {
-    if (!file) {
-      var emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
-      dhtmlx.message({ type: 'error', text: emptyFileError.message });
-      return Promise.reject(emptyFileError);
-    }
-
-    if (!pageState.canUserUpload) {
-      var permissionError = new Error('No tienes permisos para subir imágenes.');
-      dhtmlx.message({ type: 'error', text: permissionError.message });
-      return Promise.reject(permissionError);
-    }
-
-    if (!file.type || file.type.indexOf('image/') !== 0) {
-      var typeError = new Error('El archivo "' + file.name + '" no es una imagen válida.');
-      dhtmlx.message({ type: 'error', text: typeError.message });
-      return Promise.reject(typeError);
-    }
-
-    if (file.size > MAX_EDITOR_IMAGE_UPLOAD_SIZE) {
-      var sizeError = new Error('La imagen "' + file.name + '" excede el límite de 10MB.');
-      dhtmlx.message({ type: 'error', text: sizeError.message });
-      return Promise.reject(sizeError);
-    }
-
-    var formData = new FormData();
-    formData.append('file', file);
-    var descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
-    var desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
-    if (descriptionValue) {
-      formData.append('Description', descriptionValue);
-    }
-    if (desiredFileName) {
-      formData.append('Name', desiredFileName);
-    }
-
-    // return fetch(API_BASE_URL + '/files/' + encodeURIComponent(pageState.companyCode), {
-    //   method: 'POST',
-    //   body: formData
-    // })
-      return ImageService.uploadImages([file], [metadata.dimensions], descriptionValue, appState.selectedCompanyCode, [metadata])
-      .then(function(uploadResult) {
-        var uploadedFile = uploadResult[0] && uploadResult[0].file ? uploadResult[0].file : uploadResult[0];
-        if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null || uploadedFile.extension === null) {
-          throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
-        }
-        var imageIdAndExtension = escapeHtmlAttribute(uploadedFile.id + uploadedFile.extension);
-
-        markFormDirty();
-        ImagesTabManager.refreshImagesList();
-        loadMediaData();
-
-        return {
-          success: 1,
-          file: {
-            id: uploadedFile.id,
-            url: buildEditorImageUrl(pageState.companyCode, imageIdAndExtension)
-          }
-        };
-      })
-      .catch(function(error) {
-        dhtmlx.message({
-          type: 'error',
-          text: error && error.message ? error.message : 'No se pudo subir la imagen.'
-        });
-        throw error;
-      });
-  }
-
-  /**
-  * Edits the name and description fields for an existing image.
-  * Use this for editing, since uploadEditorImageByFile creates 
-  * a new image.
-  * 
-  * @param {integer} fileId - File id
-  * @param {{Name: string, Description: string}} metadata
-  */
-  function editImageFields(fileId, metadata) {
-    if (!fileId || !metadata) {
-      var emptyParameterError = new Error('Los campos id, nombre y descripción son obligatorios');
-      dhtmlx.message({ type: 'error', text: emptyParameterError.message });
-      return Promise.reject(emptyParameterError);
-    }
-
-    if (!pageState.canUserUpload) {
-      var permissionError = new Error('No tienes permisos para subir imágenes.');
-      dhtmlx.message({ type: 'error', text: permissionError.message });
-      return Promise.reject(permissionError);
-    }
-    
-    // Check that the image was successfully uploaded 
-  }
-  
-  /**
-   * Keep URL-based image insertion available in Image Tool.
-   * @param {string} imageUrl - URL entered in Editor.js
-   * @returns {Promise<{success: number, file: {url: string}}>}
-   */
-  function uploadEditorImageByUrl(imageUrl) {
-    if (!imageUrl || !imageUrl.trim()) {
-      var urlError = new Error('Debes indicar una URL de imagen válida.');
-      dhtmlx.message({ type: 'error', text: urlError.message });
-      return Promise.reject(urlError);
-    }
-
-    return Promise.resolve({
-      success: 1,
-      file: {
-        url: imageUrl.trim()
-      }
-    });
-  }
-
-  /**
-   * Check if the pasted URL is likely an image URL.
-   * @param {string} url
-   * @returns {boolean}
-   */
-  function isLikelyImageUrl(url) {
-    if (!url) return false;
-    if (!/^https?:\/\//i.test(url)) return false;
-    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
-  }
-
-  /**
-   * Destroy the Editor.js instance and clean up
-   */
-  function destroyEditor() {
-    if (pageState.editorInstance) {
-      pageState.editorInstance.destroy();
-      pageState.editorInstance = null;
-    }
-    if (pageState.imagePasteHandler) {
-      document.removeEventListener('paste', pageState.imagePasteHandler);
-      pageState.imagePasteHandler = null;
-    }
-  }
-
-  var EDITOR_HTML_SANITIZE_CONFIG = {
-    USE_PROFILES: { html: true },
-    ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-    ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class']
-  };
-
-  /**
-   * Sanitize HTML fragments while allowing rich content inside table cells.
-   * @param {string} htmlString
-   * @returns {string}
-   */
-  function sanitizeEditorHtml(htmlString) {
-    if (typeof DOMPurify === 'undefined') {
-      return htmlString;
-    }
-    return DOMPurify.sanitize(htmlString, EDITOR_HTML_SANITIZE_CONFIG);
-  }
-
-  /**
-   * Sanitize table cell HTML content, preserving headings, images, and inline styles.
-   * @param {string} cellHtml
-   * @returns {string}
-   */
-  function sanitizeEditorTableCellHtml(cellHtml) {
-    return sanitizeEditorHtml(cellHtml || '');
-  }
-
-  /**
-   * Render list items recursively for editorjs-html custom parser
-   * Handles both simple string items and nested object-based items (list v2.0+)
-   * @param {Array} items - List items from Editor.js block data
-   * @param {string} listTag - 'ol' or 'ul'
-   * @returns {string} HTML string of list items
-   */
-  function renderListItemsToHtml(items, listTag) {
-    return items.map(function(item) {
-      var content = typeof item === 'string' ? item : (item.content || '');
-      var nestedHtml = '';
-      if (item.items && item.items.length > 0) {
-        nestedHtml = '<' + listTag + '>' + renderListItemsToHtml(item.items, listTag) + '</' + listTag + '>';
-      }
-      return '<li>' + content + nestedHtml + '</li>';
-    }).join('');
-  }
-
-  /**
-   * Convert Editor.js saved data (JSON) to a standard HTML string
-   * Uses editorjs-html with custom parsers for list and table blocks
-   * @param {Object} editorData - The saved data from editor.save()
-   * @returns {string} HTML string
-   */
-  function convertEditorDataToHtml(editorData) {
-    if (!editorData || !editorData.blocks || editorData.blocks.length === 0) {
-      return '';
-    }
-
-    var customParsers = {
-      list: function(block) {
-        var listTag = block.data.style === 'ordered' ? 'ol' : 'ul';
-        var itemsHtml = renderListItemsToHtml(block.data.items, listTag);
-        return '<' + listTag + '>' + itemsHtml + '</' + listTag + '>';
-      },
-      table: function(block) {
-        var rows = block.data.content || [];
-        var withHeadings = block.data.withHeadings;
-        var tableHtml = '<table>';
-        rows.forEach(function(row, rowIndex) {
-          tableHtml += '<tr>';
-          row.forEach(function(cell) {
-            var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
-            var safeCellHtml = sanitizeEditorTableCellHtml(cell);
-            tableHtml += '<' + cellTag + '>' + safeCellHtml + '</' + cellTag + '>';
-          });
-          tableHtml += '</tr>';
-        });
-        tableHtml += '</table>';
-        return tableHtml;
-      },
-      image: function(block) {
-        var imageUrl = '';
-        var caption = '';
-        var isStretched = false;
-
-        if (block && block.data) {
-          imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
-          caption = block.data.caption || '';
-          isStretched = !!block.data.stretched;
-        }
-
-        if (!imageUrl) return '';
-
-        var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
-        var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
-        return '<figure class="' + figureClass + '"><img src="' + escapeHtml(imageUrl) + '" alt=""/>' + captionHtml + '</figure>';
-      }
-    };
-
-    var parser = edjsHTML(customParsers);
-    var htmlArray = parser.parse(editorData);
-    return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
-  }
-
-  /**
-   * Convert an HTML string into Editor.js block data for hydration in edit mode
-   * Parses HTML elements into block objects compatible with Editor.js blocks.render()
-   * @param {string} htmlString - The HTML string to convert
-   * @returns {Object} Editor.js data object with blocks array
-   */
-  function htmlToEditorJsBlocks(htmlString) {
-    var tempParser = new DOMParser();
-    var doc = tempParser.parseFromString(htmlString, 'text/html');
-    var blocks = [];
 
     /**
-     * Parse <li> children of a list element into Editor.js list items
-     * @param {HTMLElement} listElement - The <ul> or <ol> element
-     * @returns {Array} Array of list item objects
+     * Attach event handlers to page elements
      */
-    function parseListChildren(listElement) {
-      var listItems = [];
-      var children = listElement.querySelectorAll(':scope > li');
-      children.forEach(function(li) {
-        var itemContent = '';
-        var nestedItems = [];
-        li.childNodes.forEach(function(child) {
-          if (child.nodeType === Node.ELEMENT_NODE &&
-              (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
-            nestedItems = parseListChildren(child);
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            itemContent += child.outerHTML;
-          } else if (child.nodeType === Node.TEXT_NODE) {
-            itemContent += child.textContent;
-          }
+    function attachEventHandlers() {
+        // Breadcrumb navigation
+        const breadcrumbLink = document.getElementById('breadcrumb-articles-link');
+        if (breadcrumbLink) {
+            breadcrumbLink.addEventListener('click', navigateToGrid);
+        }
+
+        // Cancel button
+        const cancelBtn = document.getElementById('new-article-cancel-btn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', navigateToGrid);
+        }
+
+        // Submit button
+        const submitBtn = document.getElementById('new-article-submit-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', handleSubmit);
+        }
+
+        // Delete button (edit mode only)
+        const deleteBtn = document.getElementById('new-article-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', handleDeleteArticle);
+        }
+
+        // Tags container click
+        const tagsContainer = document.getElementById('new-article-tags-container');
+        if (tagsContainer) {
+            tagsContainer.addEventListener('click', openTagPicker);
+        }
+
+        // Form input change detection (non-editor fields)
+        const inputs = document.querySelectorAll('#new-article-title, #new-article-external-link, #new-article-client-comments');
+        inputs.forEach(function (input) {
+            input.addEventListener('input', markFormDirty);
         });
-        listItems.push({ content: itemContent.trim(), items: nestedItems });
-      });
-      return listItems;
+
+        // File upload handlers
+        setupFileUploadHandlers();
+        setupMediaLibraryHandlers();
     }
 
-    doc.body.childNodes.forEach(function(node) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        var tag = node.tagName.toLowerCase();
+    // =========================================================================
+    // Editor.js Integration
+    // =========================================================================
 
-        if (/^h[1-6]$/.test(tag)) {
-          blocks.push({
-            type: 'header',
-            data: { text: node.innerHTML, level: parseInt(tag[1], 10) }
-          });
-        } else if (tag === 'p') {
-          if (node.innerHTML.trim()) {
-            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
-          }
-        } else if (tag === 'ul' || tag === 'ol') {
-          blocks.push({
-            type: 'list',
-            data: {
-              style: tag === 'ol' ? 'ordered' : 'unordered',
-              items: parseListChildren(node)
-            }
-          });
-        } else if (tag === 'table') {
-          var tableContent = [];
-          var hasHeadings = node.querySelector('th') !== null;
-          node.querySelectorAll('tr').forEach(function(tr) {
-            var row = [];
-            tr.querySelectorAll('td, th').forEach(function(cell) {
-              row.push(cell.innerHTML);
-            });
-            if (row.length > 0) tableContent.push(row);
-          });
-          blocks.push({
-            type: 'table',
-            data: { withHeadings: hasHeadings, content: tableContent }
-          });
-        } else if (tag === 'figure' && node.querySelector('img')) {
-          var figureImage = node.querySelector('img');
-          var figureCaption = node.querySelector('figcaption');
-          blocks.push({
-            type: 'image',
-            data: {
-              file: { url: figureImage.getAttribute('src') || '' },
-              caption: figureCaption ? figureCaption.textContent : '',
-              stretched: node.classList.contains('cdx-image--stretched')
-            }
-          });
-        } else if (tag === 'img') {
-          blocks.push({
-            type: 'image',
-            data: {
-              file: { url: node.getAttribute('src') || '' },
-              caption: ''
-            }
-          });
+    /**
+     * Initialize the Editor.js instance
+     * Must be called after the DOM container #new-article-editorjs is rendered
+     */
+    function initializeEditor() {
+        if (pageState.editorInstance) {
+            pageState.editorInstance.destroy();
+            pageState.editorInstance = null;
+        }
+
+      const editorHolder = document.getElementById('new-article-editorjs');
+      if (!editorHolder) {
+            console.error('Editor.js holder element not found');
+            return;
+      }
+
+      const hasImageTool = typeof ImageTool !== 'undefined';
+      const hasSimpleImage = typeof SimpleImage !== 'undefined';
+      let imageToolConfig = null;
+
+      if (hasImageTool) {
+            imageToolConfig = {
+                class: ImageTool,
+                config: {
+                    uploader: {
+                        uploadByFile: imageUploadProcess,
+                        uploadByUrl: uploadEditorImageByUrl
+                    }
+                }
+            };
+            pageState.editorUsesSimpleImage = false;
+        } else if (hasSimpleImage) {
+            imageToolConfig = {
+                class: SimpleImage
+            };
+            pageState.editorUsesSimpleImage = true;
         } else {
-          // Treat unknown block-level elements as paragraphs
-          if (node.textContent.trim()) {
-            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
-          }
+            console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
+            pageState.editorUsesSimpleImage = false;
         }
-      } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-        blocks.push({ type: 'paragraph', data: { text: node.textContent } });
-      }
-    });
 
-    return { blocks: blocks };
-  }
+        pageState.editorInstance = new EditorJS({
+            holder: 'new-article-editorjs',
+            placeholder: 'Describe el artículo en detalle...',
+            minHeight: 360,
+            tools: {
+                header: {
+                    class: Header,
+                    config: {
+                        levels: [1, 2, 3, 4, 5, 6],
+                        defaultLevel: 2
+                    }
+                },
+                list: {
+                    class: typeof EditorjsList !== 'undefined' ? EditorjsList
+                        : typeof NestedList !== 'undefined' ? NestedList
+                            : List,
+                    inlineToolbar: true
+                },
+                table: {
+                    class: Table,
+                    inlineToolbar: true
+                },
+                code: {
+                    class: CodeTool
+                },
 
-  /**
-   * Hydrate the Editor.js instance with existing HTML content (for edit mode)
-   * Tries editor.blocks.renderFromHTML first, falls back to manual block parsing
-   * @param {Object} editor - The Editor.js instance
-   * @param {string} htmlString - The HTML content to load
-   */
-  function hydrateEditorFromHtml(editor, htmlString) {
-    var sanitizedHtml = sanitizeEditorHtml(htmlString);
-    if (typeof DOMPurify === 'undefined') {
-      console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration');
-    }
-
-    editor.isReady.then(function() {
-      if (typeof editor.blocks.renderFromHTML === 'function') {
-        editor.blocks.renderFromHTML(sanitizedHtml);
-      } else {
-        // Fallback: parse HTML to Editor.js blocks manually
-        var blocksData = htmlToEditorJsBlocks(sanitizedHtml);
-        if (blocksData.blocks.length > 0) {
-          editor.blocks.render(blocksData);
-        }
-      }
-    }).catch(function(error) {
-      console.error('Error hydrating editor from HTML:', error);
-    });
-  }
-
-  /**
-   * Populate form fields with existing article data (edit mode)
-   */
-  function populateFormForEditMode() {
-    var article = pageState.originalArticleData;
-    if (!article) return;
-
-    var titleInput = document.getElementById('new-article-title');
-    if (titleInput) titleInput.value = article.title || '';
-
-    var statusSelect = document.getElementById('new-article-status');
-    if (statusSelect && article.status) statusSelect.value = article.status;
-
-    var externalLinkInput = document.getElementById('new-article-external-link');
-    if (externalLinkInput) externalLinkInput.value = article.externalLink || '';
-
-    var clientCommentsInput = document.getElementById('new-article-client-comments');
-    if (clientCommentsInput) clientCommentsInput.value = article.clientComments || '';
-
-    // Update tags display
-    updateSelectedTagsDisplay();
-
-    // Hydrate editor with article description HTML
-    if (article.description && pageState.editorInstance) {
-      hydrateEditorFromHtml(pageState.editorInstance, article.description);
-    }
-  }
-
-  /**
-   * Setup file upload handlers
-   */
-  function setupFileUploadHandlers() {
-    var dropzone = document.getElementById('new-article-file-dropzone');
-    var fileInput = document.getElementById('new-article-file-input');
-
-    if (!dropzone || !fileInput || !pageState.canUserUpload) return;
-
-    dropzone.addEventListener('click', function() {
-      fileInput.click();
-    });
-
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.classList.add('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('dragleave', function() {
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-    });
-
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.classList.remove('border-blue-500', 'bg-blue-50');
-      handleFileSelect(e.dataTransfer.files);
-    });
-
-    fileInput.addEventListener('change', function(e) {
-      handleFileSelect(e.target.files);
-      fileInput.value = ''; // Reset to allow re-selecting same file
-    });
-  }
-
-  /**
-   * Handle file selection
-   * @param {FileList} files - Selected files
-   */
-  function handleFileSelect(files) {
-    var maxSize = 50 * 1024 * 1024; // 50MB
-
-    for (var i = 0; i < files.length; i++) {
-      var file = files[i];
-      if (file.size > maxSize) {
-        dhtmlx.message({
-          type: 'error',
-          text: 'El archivo "' + file.name + '" excede el límite de 50MB'
+                delimiter: {
+                    class: Delimiter
+                },
+                image: imageToolConfig,
+                ColorPicker: {
+                    class: ColorPicker.default,
+                },
+            },
+            onReady: function () {
+                attachImageUrlPasteHandler();
+            },
+            onChange: function () {
+                markFormDirty();
+            }
         });
-        continue;
-      }
-
-      // Add to staged files with unique ID (Date.now + random to avoid collisions)
-      pageState.stagedFiles.push({
-        id: 'staged-file-' + Date.now() + '-' + Math.floor(Math.random() * 10000) + '-' + i,
-        file: file,
-        name: file.name,
-        size: file.size
-      });
     }
 
-    updateStagedFilesDisplay();
-    markFormDirty();
-  }
+    /**
+     * Detect image URLs and insert a SimpleImage block on paste.
+     */
+    function attachImageUrlPasteHandler() {
+        const editorHolder = document.getElementById('new-article-editorjs');
+        if (!editorHolder || !pageState.editorInstance) return;
 
-  /**
-   * Update staged files display
-   */
-  function updateStagedFilesDisplay() {
-    var container = document.getElementById('new-article-staged-files');
-    
-    if (!container) return;
+        if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
 
-    updateMediaCounts();
+        if (pageState.imagePasteHandler) {
+            document.removeEventListener('paste', pageState.imagePasteHandler);
+        }
 
-    if (pageState.stagedFiles.length === 0) {
-      container.innerHTML = '';
-      return;
+        pageState.imagePasteHandler = function (event) {
+          const target = event.target;
+          if (!editorHolder.contains(target)) return;
+
+          const clipboard = event.clipboardData || window.clipboardData;
+          if (!clipboard) return;
+
+          const text = (clipboard.getData && clipboard.getData('text/plain')) || '';
+          const url = (text || '').trim();
+          if (!isLikelyImageUrl(url)) return;
+
+            event.preventDefault();
+
+            try {
+              const index = pageState.editorInstance.blocks.getCurrentBlockIndex();
+              pageState.editorInstance.blocks.insert('image', {url: url}, {}, index + 1, true);
+                markFormDirty();
+            } catch (error) {
+                console.warn('Failed to insert image block from pasted URL:', error);
+            }
+        };
+
+        document.addEventListener('paste', pageState.imagePasteHandler);
     }
 
-    container.innerHTML = pageState.stagedFiles.map(function(fileData) {
-      var sizeKB = Math.round(fileData.size / 1024);
-      var sizeDisplay = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
-      
-      return `
+    function getImageDimensions(file) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const dimensions = {width: img.width, height: img.height};
+                URL.revokeObjectURL(img.src);
+                resolve(dimensions);
+            };
+            // Handle potential load errors
+            img.onerror = () => resolve({width: 0, height: 0});
+        });
+    }
+
+    function imageUploadProcess(file) {
+        return getImageDimensions(file).then(function (dimensions) {
+            return promptAndInsertEditorImage(file, dimensions);
+        }).catch(function () {
+            return {success: 0, file: ''}
+        });
+    }
+
+    /**
+     * Prompt for metadata and upload before inserting into Editor.js
+     * @param {File} file
+     * @param {{width: number, height: number}} dimensions
+     */
+    function promptAndInsertEditorImage(file, dimensions) {
+        if (pageState.isCurrentlyUploading) {
+            return Promise.reject("Otra imagen está en proceso de subida.");
+        }
+
+        pageState.isCurrentlyUploading = true;
+
+        const defaultMetadata = {
+            description: file && file.name ? file.name : '',
+            desiredFileName: file && file.name ? file.name : '',
+            dimensions: dimensions ? dimensions : {},
+        };
+
+        return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
+            // Load image preview
+            .then(function (metadata) {
+                if (!metadata) {
+                    dhtmlx.message({type: 'info', text: 'Carga de imagen cancelada'});
+                    return null;
+                }
+
+                return uploadEditorImageByFile(file, metadata)
+                    .then(function (result) {
+                        if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
+                        markFormDirty();
+                        return result;
+                    });
+            })
+            .catch(function (error) {
+                console.error('Error al subir imagen arrastrada:', error);
+                dhtmlx.message({
+                    type: 'error',
+                    text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
+                });
+                return null;
+            }).finally(function () {
+                pageState.isCurrentlyUploading = false;
+            });
+    }
+
+    /**
+     * Insert a block into the editor after the current selection.
+     * If the current block is empty, it replaces it.
+     * If the current block has content, it inserts after it.
+     * @param {string} blockType
+     * @param {Object} blockData
+     */
+    async function insertEditorBlock(blockType, blockData) {
+        if (!pageState.editorInstance) return;
+
+        try {
+            await pageState.editorInstance.isReady;
+
+            const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
+            let shouldReplace = false;
+            let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
+
+            // Check if the current block is empty
+            if (typeof currentIndex === 'number' && currentIndex >= 0) {
+                const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
+                const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
+
+                // If it's an empty paragraph, we mark it for replacement
+                if (isCurrentBlockEmpty) {
+                    shouldReplace = true;
+                    targetIndex = currentIndex; // Insert at the same position
+                }
+            }
+
+            // 2. If replacing, delete the empty block first
+            if (shouldReplace) {
+                pageState.editorInstance.blocks.delete(currentIndex);
+            }
+
+            // 3. Insert the new block
+            pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
+
+            // 4. Move Caret to the new block
+            // We use a small timeout to ensure the DOM has rendered the new block before focusing
+            setTimeout(() => {
+                const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
+                if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
+                    pageState.editorInstance.caret.setToBlock(finalIndex);
+                }
+            }, 10);
+
+            markFormDirty();
+        } catch (error) {
+            console.warn('Unable to insert block:', error);
+        }
+    }
+
+    /**
+     * Handle quick action toolbar clicks.
+     * @param {string} action
+     */
+    function handleEditorToolbarAction(action) {
+        switch (action) {
+            case 'paragraph':
+                insertEditorBlock('paragraph', {text: ''}).then(() => {});
+                break;
+            case 'heading':
+                insertEditorBlock('header', {text: '', level: 2}).then(() => {});
+                break;
+            case 'list':
+                insertEditorBlock('list', {style: 'unordered', items: [{content: '', items: []}]}).then(() => {});
+                break;
+            case 'ordered-list':
+                insertEditorBlock('list', {style: 'ordered', items: [{content: '', items: []}]}).then(() => {});
+                break;
+            case 'table':
+                insertEditorBlock('table', {withHeadings: false, content: [['', ''], ['', '']]}).then(() => {});
+                break;
+            case 'image':
+                insertEditorBlock('image', pageState.editorUsesSimpleImage ? {
+                    url: '',
+                    caption: 'Haz clic para editar la imagen'
+                } : {file: {url: ''}, caption: 'Selecciona o pega una imagen'}).then(() => {});
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Attach click handlers to the persistent editor toolbar.
+     */
+    function attachEditorToolbarHandlers() {
+        var toolbar = document.getElementById('new-article-editor-toolbar');
+        if (!toolbar) return;
+
+        toolbar.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-editor-action]');
+            if (!button) return;
+            var action = button.getAttribute('data-editor-action');
+            handleEditorToolbarAction(action);
+        });
+    }
+
+    /**
+     * Build the public file URL used by Editor.js image blocks
+     * @param {string} companyCode - Company identifier
+     * @param {string|number} fileId - Uploaded file identifier with extension
+     * @returns {string} Image retrieval URL
+     */
+    function buildEditorImageUrl(companyCode, fileId) {
+        return WEBSITE_BASE_URL + API_FILES_URL + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId);
+    }
+
+    /**
+     * Upload an image file to FilesController for Editor.js Image Tool
+     * @param {File} file - Local file selected in Editor.js
+     * @param {{description: string, desiredFileName: string}} metadata
+     * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
+     */
+    function uploadEditorImageByFile(file, metadata) {
+        if (!file) {
+            const emptyFileError = new Error('No se seleccionó ningún archivo de imagen.');
+            dhtmlx.message({ type: 'error', text: emptyFileError.message });
+            return Promise.reject(emptyFileError);
+        }
+
+        if (!pageState.canUserUpload) {
+            const permissionError = new Error('No tienes permisos para subir imágenes.');
+            dhtmlx.message({ type: 'error', text: permissionError.message });
+            return Promise.reject(permissionError);
+        }
+
+        if (!file.type || file.type.indexOf('image/') !== 0) {
+            const typeError = new Error('El archivo "' + file.name + '" no es una imagen válida.');
+            dhtmlx.message({ type: 'error', text: typeError.message });
+            return Promise.reject(typeError);
+        }
+
+        if (file.size > MAX_EDITOR_IMAGE_UPLOAD_SIZE) {
+            const sizeError = new Error('La imagen "' + file.name + '" excede el límite de 10MB.');
+            dhtmlx.message({ type: 'error', text: sizeError.message });
+            return Promise.reject(sizeError);
+        }
+
+        const descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
+        const desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
+        const stagedFile = renameBrowserFile(file, desiredFileName);
+        const previewUrl = URL.createObjectURL(stagedFile);
+        const clientTempId = previewUrl.split('/').pop();
+
+        pageState.stagedImages = pageState.stagedImages || [];
+        pageState.stagedImages.push({
+            id: previewUrl,
+            file: stagedFile,
+            name: stagedFile.name,
+            size: stagedFile.size,
+            description: descriptionValue,
+            previewUrl: previewUrl
+        });
+
+        markFormDirty();
+
+        return Promise.resolve({
+            success: 1,
+            file: {
+                url: previewUrl,
+                id: clientTempId,
+            }
+        });
+    }
+
+    /**
+     * Keep URL-based image insertion available in Image Tool.
+     * @param {string} imageUrl - URL entered in Editor.js
+     * @returns {Promise<{success: number, file: {url: string}}>}
+     */
+    function uploadEditorImageByUrl(imageUrl) {
+        if (!imageUrl || !imageUrl.trim()) {
+            const urlError = new Error('Debes indicar una URL de imagen válida.');
+            dhtmlx.message({type: 'error', text: urlError.message});
+            return Promise.reject(urlError);
+        }
+
+        return Promise.resolve({
+            success: 1,
+            file: {
+                url: imageUrl.trim()
+            }
+        });
+    }
+
+    /**
+     * Check if the pasted URL is likely an image URL.
+     * @param {string} url
+     * @returns {boolean}
+     */
+    function isLikelyImageUrl(url) {
+        if (!url) return false;
+        if (!/^https?:\/\//i.test(url)) return false;
+        return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
+    }
+
+    /**
+     * Destroy the Editor.js instance and clean up
+     */
+    function destroyEditor() {
+        if (pageState.editorInstance) {
+            pageState.editorInstance.destroy();
+            pageState.editorInstance = null;
+        }
+        if (pageState.imagePasteHandler) {
+            document.removeEventListener('paste', pageState.imagePasteHandler);
+            pageState.imagePasteHandler = null;
+        }
+    }
+
+    var EDITOR_HTML_SANITIZE_CONFIG = {
+        USE_PROFILES: {html: true},
+        ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class']
+    };
+
+    /**
+     * Sanitize HTML fragments while allowing rich content inside table cells.
+     * @param {string} htmlString
+     * @returns {string}
+     */
+    function sanitizeEditorHtml(htmlString) {
+        if (typeof DOMPurify === 'undefined') {
+            return htmlString;
+        }
+        return DOMPurify.sanitize(htmlString, EDITOR_HTML_SANITIZE_CONFIG);
+    }
+
+    /**
+     * Sanitize table cell HTML content, preserving headings, images, and inline styles.
+     * @param {string} cellHtml
+     * @returns {string}
+     */
+    function sanitizeEditorTableCellHtml(cellHtml) {
+        return sanitizeEditorHtml(cellHtml || '');
+    }
+
+    /**
+     * Render list items recursively for editorjs-html custom parser
+     * Handles both simple string items and nested object-based items (list v2.0+)
+     * @param {Array} items - List items from Editor.js block data
+     * @param {string} listTag - 'ol' or 'ul'
+     * @returns {string} HTML string of list items
+     */
+    function renderListItemsToHtml(items, listTag) {
+        return items.map(function (item) {
+            var content = typeof item === 'string' ? item : (item.content || '');
+            var nestedHtml = '';
+            if (item.items && item.items.length > 0) {
+                nestedHtml = '<' + listTag + '>' + renderListItemsToHtml(item.items, listTag) + '</' + listTag + '>';
+            }
+            return '<li>' + content + nestedHtml + '</li>';
+        }).join('');
+    }
+
+    /**
+     * Convert Editor.js saved data (JSON) to a standard HTML string
+     * Uses editorjs-html with custom parsers for list and table blocks
+     * @param {Object} editorData - The saved data from editor.save()
+     * @returns {string} HTML string
+     */
+    function convertEditorDataToHtml(editorData) {
+        if (!editorData || !editorData.blocks || editorData.blocks.length === 0) {
+            return '';
+        }
+
+        var customParsers = {
+            list: function (block) {
+                var listTag = block.data.style === 'ordered' ? 'ol' : 'ul';
+                var itemsHtml = renderListItemsToHtml(block.data.items, listTag);
+                return '<' + listTag + '>' + itemsHtml + '</' + listTag + '>';
+            },
+            table: function (block) {
+                var rows = block.data.content || [];
+                var withHeadings = block.data.withHeadings;
+                var tableHtml = '<table>';
+                rows.forEach(function (row, rowIndex) {
+                    tableHtml += '<tr>';
+                    row.forEach(function (cell) {
+                        var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
+                        var safeCellHtml = sanitizeEditorTableCellHtml(cell);
+                        tableHtml += '<' + cellTag + '>' + safeCellHtml + '</' + cellTag + '>';
+                    });
+                    tableHtml += '</tr>';
+                });
+                tableHtml += '</table>';
+                return tableHtml;
+            },
+            image: function (block) {
+                var imageUrl = '';
+                var caption = '';
+                var isStretched = false;
+
+                if (block && block.data) {
+                    imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
+                    caption = block.data.caption || '';
+                    isStretched = !!block.data.stretched;
+                }
+
+                if (!imageUrl) return '';
+
+                var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
+                var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
+                return `
+                  <figure class="${figureClass}">
+                    <img 
+                      src="${imageUrl}" 
+                      mapcel-temp-id="${imageUrl}" 
+                      alt="User uploaded content" 
+                    />
+                    ${captionHtml}
+                  </figure>
+                `.trim();
+            }
+        };
+
+        var parser = edjsHTML(customParsers);
+        var htmlArray = parser.parse(editorData);
+        return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
+    }
+
+    /**
+     * Convert an HTML string into Editor.js block data for hydration in edit mode
+     * Parses HTML elements into block objects compatible with Editor.js blocks.render()
+     * @param {string} htmlString - The HTML string to convert
+     * @returns {Object} Editor.js data object with blocks array
+     */
+    function htmlToEditorJsBlocks(htmlString) {
+        var tempParser = new DOMParser();
+        var doc = tempParser.parseFromString(htmlString, 'text/html');
+        var blocks = [];
+
+        /**
+         * Parse <li> children of a list element into Editor.js list items
+         * @param {HTMLElement} listElement - The <ul> or <ol> element
+         * @returns {Array} Array of list item objects
+         */
+        function parseListChildren(listElement) {
+            var listItems = [];
+            var children = listElement.querySelectorAll(':scope > li');
+            children.forEach(function (li) {
+                var itemContent = '';
+                var nestedItems = [];
+                li.childNodes.forEach(function (child) {
+                    if (child.nodeType === Node.ELEMENT_NODE &&
+                        (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
+                        nestedItems = parseListChildren(child);
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        itemContent += child.outerHTML;
+                    } else if (child.nodeType === Node.TEXT_NODE) {
+                        itemContent += child.textContent;
+                    }
+                });
+                listItems.push({content: itemContent.trim(), items: nestedItems});
+            });
+            return listItems;
+        }
+
+        doc.body.childNodes.forEach(function (node) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                var tag = node.tagName.toLowerCase();
+
+                if (/^h[1-6]$/.test(tag)) {
+                    blocks.push({
+                        type: 'header',
+                        data: {text: node.innerHTML, level: parseInt(tag[1], 10)}
+                    });
+                } else if (tag === 'p') {
+                    if (node.innerHTML.trim()) {
+                        blocks.push({type: 'paragraph', data: {text: node.innerHTML}});
+                    }
+                } else if (tag === 'ul' || tag === 'ol') {
+                    blocks.push({
+                        type: 'list',
+                        data: {
+                            style: tag === 'ol' ? 'ordered' : 'unordered',
+                            items: parseListChildren(node)
+                        }
+                    });
+                } else if (tag === 'table') {
+                    var tableContent = [];
+                    var hasHeadings = node.querySelector('th') !== null;
+                    node.querySelectorAll('tr').forEach(function (tr) {
+                        var row = [];
+                        tr.querySelectorAll('td, th').forEach(function (cell) {
+                            row.push(cell.innerHTML);
+                        });
+                        if (row.length > 0) tableContent.push(row);
+                    });
+                    blocks.push({
+                        type: 'table',
+                        data: {withHeadings: hasHeadings, content: tableContent}
+                    });
+                } else if (tag === 'figure' && node.querySelector('img')) {
+                    var figureImage = node.querySelector('img');
+                    var figureCaption = node.querySelector('figcaption');
+                    blocks.push({
+                        type: 'image',
+                        data: {
+                            file: {url: figureImage.getAttribute('src') || ''},
+                            caption: figureCaption ? figureCaption.textContent : '',
+                            stretched: node.classList.contains('cdx-image--stretched')
+                        }
+                    });
+                } else if (tag === 'img') {
+                    blocks.push({
+                        type: 'image',
+                        data: {
+                            file: {url: node.getAttribute('src') || ''},
+                            caption: ''
+                        }
+                    });
+                } else {
+                    // Treat unknown block-level elements as paragraphs
+                    if (node.textContent.trim()) {
+                        blocks.push({type: 'paragraph', data: {text: node.innerHTML}});
+                    }
+                }
+            } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                blocks.push({type: 'paragraph', data: {text: node.textContent}});
+            }
+        });
+
+        return {blocks: blocks};
+    }
+
+    /**
+     * Hydrate the Editor.js instance with existing HTML content (for edit mode)
+     * Tries editor.blocks.renderFromHTML first, falls back to manual block parsing
+     * @param {Object} editor - The Editor.js instance
+     * @param {string} htmlString - The HTML content to load
+     */
+    function hydrateEditorFromHtml(editor, htmlString) {
+        var sanitizedHtml = sanitizeEditorHtml(htmlString);
+        if (typeof DOMPurify === 'undefined') {
+            console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration');
+        }
+
+        editor.isReady.then(function () {
+            if (typeof editor.blocks.renderFromHTML === 'function') {
+                editor.blocks.renderFromHTML(sanitizedHtml);
+            } else {
+                // Fallback: parse HTML to Editor.js blocks manually
+                var blocksData = htmlToEditorJsBlocks(sanitizedHtml);
+                if (blocksData.blocks.length > 0) {
+                    editor.blocks.render(blocksData);
+                }
+            }
+        }).catch(function (error) {
+            console.error('Error hydrating editor from HTML:', error);
+        });
+    }
+
+    /**
+     * Populate form fields with existing article data (edit mode)
+     */
+    function populateFormForEditMode() {
+        var article = pageState.originalArticleData;
+        if (!article) return;
+
+        var titleInput = document.getElementById('new-article-title');
+        if (titleInput) titleInput.value = article.title || '';
+
+        var statusSelect = document.getElementById('new-article-status');
+        if (statusSelect && article.status) statusSelect.value = article.status;
+
+        var externalLinkInput = document.getElementById('new-article-external-link');
+        if (externalLinkInput) externalLinkInput.value = article.externalLink || '';
+
+        var clientCommentsInput = document.getElementById('new-article-client-comments');
+        if (clientCommentsInput) clientCommentsInput.value = article.clientComments || '';
+
+        // Update tags display
+        updateSelectedTagsDisplay();
+
+        // Hydrate editor with article description HTML
+        if (article.description && pageState.editorInstance) {
+            hydrateEditorFromHtml(pageState.editorInstance, article.description);
+        }
+    }
+
+    /**
+     * Setup file upload handlers
+     */
+    function setupFileUploadHandlers() {
+        var dropzone = document.getElementById('new-article-file-dropzone');
+        var fileInput = document.getElementById('new-article-file-input');
+
+        if (!dropzone || !fileInput || !pageState.canUserUpload) return;
+
+        dropzone.addEventListener('click', function () {
+            fileInput.click();
+        });
+
+        dropzone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            dropzone.classList.add('border-blue-500', 'bg-blue-50');
+        });
+
+        dropzone.addEventListener('dragleave', function () {
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+
+        dropzone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+            handleFileSelect(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', function (e) {
+            handleFileSelect(e.target.files);
+            fileInput.value = ''; // Reset to allow re-selecting same file
+        });
+    }
+
+    /**
+     * Handle file selection
+     * @param {FileList} files - Selected files
+     */
+    function handleFileSelect(files) {
+        const maxSize = 50 * 1024 * 1024;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+
+            if (file.size > maxSize) {
+                dhtmlx.message({
+                    type: 'error',
+                    text: 'El archivo "' + file.name + '" excede el límite de 50MB'
+                });
+                continue;
+            }
+
+            pageState.stagedFiles.push({
+                id: createTempUploadId('staged-file'),
+                file: file,
+                name: file.name,
+                size: file.size,
+                description: ''
+            });
+        }
+
+        updateStagedFilesDisplay();
+        markFormDirty();
+    }
+
+    function createTempUploadId(prefix) {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+            return prefix + '-' + window.crypto.randomUUID();
+        }
+
+        return prefix + '-' + Date.now() + '-' + Math.floor(Math.random() * 100000);
+    }
+
+    function ensureFileNameHasExtension(fileName, originalFileName) {
+        if (!fileName) return originalFileName;
+
+        var trimmed = fileName.trim();
+        if (!trimmed) return originalFileName;
+
+        var originalExtension = '';
+        var dotIndex = originalFileName.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            originalExtension = originalFileName.substring(dotIndex);
+        }
+
+        if (originalExtension && trimmed.toLowerCase().lastIndexOf(originalExtension.toLowerCase()) !== trimmed.length - originalExtension.length) {
+            return trimmed + originalExtension;
+        }
+
+        return trimmed;
+    }
+
+    function renameBrowserFile(file, desiredFileName) {
+        if (!desiredFileName || desiredFileName === file.name) return file;
+
+        var finalName = ensureFileNameHasExtension(desiredFileName, file.name);
+
+        try {
+            return new File(
+                [file],
+                finalName,
+                {
+                    type: file.type,
+                    lastModified: file.lastModified
+                }
+            );
+        } catch (error) {
+            console.warn('Could not rename File object, using original file name.', error);
+            return file;
+        }
+    }
+
+    function normalizeStagedEditorImageUrls(html) {
+        if (!html || !pageState.stagedImages || !pageState.stagedImages.length) {
+            return html;
+        }
+
+        var normalized = html;
+
+        pageState.stagedImages.forEach(function (image) {
+            if (!image.previewUrl || !image.id) return;
+
+            var escapedPreviewUrl = image.previewUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var tempUrl = 'mapcel-image://' + image.id;
+
+            normalized = normalized.replace(
+                new RegExp(escapedPreviewUrl, 'g'),
+                tempUrl
+            );
+        });
+
+        return normalized;
+    }
+
+    /**
+     * Update staged files display
+     */
+    function updateStagedFilesDisplay() {
+        const container = document.getElementById('new-article-staged-files');
+
+        if (!container) return;
+
+        updateMediaCounts();
+
+        if (pageState.stagedFiles.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = pageState.stagedFiles.map(function (fileData) {
+            var sizeKB = Math.round(fileData.size / 1024);
+            var sizeDisplay = sizeKB > 1024 ? (sizeKB / 1024).toFixed(1) + ' MB' : sizeKB + ' KB';
+
+            return `
         <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200" data-file-id="${escapeHtml(fileData.id)}">
           <div class="flex items-center gap-2 min-w-0">
             <svg class="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1441,126 +1451,66 @@ var NewArticlePageUI = (function() {
           </button>
         </div>
       `;
-    }).join('');
+        }).join('');
 
-    // Attach remove handlers
-    container.querySelectorAll('.remove-staged-file').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var fileId = btn.getAttribute('data-file-id');
-        removeStagedFile(fileId);
-      });
-    });
-  }
-
-  /**
-   * Remove a staged file
-   * @param {string} fileId - File ID to remove
-   */
-  function removeStagedFile(fileId) {
-    pageState.stagedFiles = pageState.stagedFiles.filter(function(f) {
-      return f.id !== fileId;
-    });
-    updateStagedFilesDisplay();
-  }
-
-  /**
-   * Setup image upload handlers
-   */
-  function setupImageUploadHandlers() {
-    var imageInput = document.getElementById('new-article-image-input');
-
-    if (!imageInput || !pageState.canUserUpload) return;
-
-    imageInput.addEventListener('change', function(e) {
-      handleImageSelect(e.target.files);
-      imageInput.value = '';
-    });
-  }
-
-  /**
-   * Setup handlers for the media library search inputs
-   */
-  function setupMediaLibraryHandlers() {
-    var fileSearchInput = document.getElementById('new-article-file-search');
-    if (fileSearchInput) {
-      fileSearchInput.value = pageState.fileSearchQuery || '';
-      fileSearchInput.addEventListener('input', function(e) {
-        pageState.fileSearchQuery = e.target.value || '';
-        updateAvailableFilesDisplay();
-      });
-    }
-
-    var imageSearchInput = document.getElementById('new-article-image-search');
-    if (imageSearchInput) {
-      imageSearchInput.value = pageState.imageSearchQuery || '';
-      imageSearchInput.addEventListener('input', function(e) {
-        pageState.imageSearchQuery = e.target.value || '';
-        updateAvailableImagesDisplay();
-      });
-    }
-  }
-
-  /**
-   * Handle image selection
-   * @param {FileList} files - Selected files
-   */
-  function handleImageSelect(files) {
-    var maxSize = 10 * 1024 * 1024; // 10MB
-    var acceptedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
-
-    for (var i = 0; i < files.length; i++) {
-      var file = files[i];
-      
-      if (acceptedTypes.indexOf(file.type) === -1) {
-        dhtmlx.message({
-          type: 'error',
-          text: 'El archivo "' + file.name + '" no es un formato de imagen válido'
+        // Attach remove handlers
+        container.querySelectorAll('.remove-staged-file').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fileId = btn.getAttribute('data-file-id');
+                removeStagedFile(fileId);
+            });
         });
-        continue;
-      }
+    }
 
-      if (file.size > maxSize) {
-        dhtmlx.message({
-          type: 'error',
-          text: 'La imagen "' + file.name + '" excede el límite de 10MB'
+    /**
+     * Remove a staged file
+     * @param {string} fileId - File ID to remove
+     */
+    function removeStagedFile(fileId) {
+        pageState.stagedFiles = pageState.stagedFiles.filter(function (f) {
+            return f.id !== fileId;
         });
-        continue;
-      }
-
-      // Create preview URL and add to staged images with unique ID
-      var previewUrl = URL.createObjectURL(file);
-      pageState.stagedImages.push({
-        id: 'staged-image-' + Date.now() + '-' + Math.floor(Math.random() * 10000) + '-' + i,
-        file: file,
-        name: file.name,
-        size: file.size,
-        previewUrl: previewUrl,
-        desiredFileName: file.name,
-        description: ''
-      });
+        updateStagedFilesDisplay();
     }
+    /**
+     * Setup handlers for the media library search inputs
+     */
+    function setupMediaLibraryHandlers() {
+        var fileSearchInput = document.getElementById('new-article-file-search');
+        if (fileSearchInput) {
+            fileSearchInput.value = pageState.fileSearchQuery || '';
+            fileSearchInput.addEventListener('input', function (e) {
+                pageState.fileSearchQuery = e.target.value || '';
+                updateAvailableFilesDisplay();
+            });
+        }
 
-    updateStagedImagesDisplay();
-    markFormDirty();
-  }
-
-  /**
-   * Update staged images display
-   */
-  function updateStagedImagesDisplay() {
-    var container = document.getElementById('new-article-staged-images');
-    
-    if (!container) return;
-
-    updateMediaCounts();
-
-    if (pageState.stagedImages.length === 0) {
-      container.innerHTML = '';
-      return;
+        var imageSearchInput = document.getElementById('new-article-image-search');
+        if (imageSearchInput) {
+            imageSearchInput.value = pageState.imageSearchQuery || '';
+            imageSearchInput.addEventListener('input', function (e) {
+                pageState.imageSearchQuery = e.target.value || '';
+                updateAvailableImagesDisplay();
+            });
+        }
     }
+    /**
+     * Update staged images display
+     */
+    function updateStagedImagesDisplay() {
+        var container = document.getElementById('new-article-staged-images');
 
-    container.innerHTML = pageState.stagedImages.map(function(imageData) {
-      return `
+        if (!container) return;
+
+        updateMediaCounts();
+
+        if (pageState.stagedImages.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = pageState.stagedImages.map(function (imageData) {
+            return `
         <div class="relative group" data-image-id="${escapeHtml(imageData.id)}">
           <img 
             src="${imageData.previewUrl}" 
@@ -1578,266 +1528,272 @@ var NewArticlePageUI = (function() {
           </button>
         </div>
       `;
-    }).join('');
+        }).join('');
 
-    // Attach remove handlers
-    container.querySelectorAll('.remove-staged-image').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-image-id');
-        removeStagedImage(imageId);
-      });
-    });
-  }
-
-  /**
-   * Remove a staged image
-   * @param {string} imageId - Image ID to remove
-   */
-  function removeStagedImage(imageId) {
-    var image = pageState.stagedImages.find(function(img) {
-      return img.id === imageId;
-    });
-    
-    if (image && image.previewUrl) {
-      URL.revokeObjectURL(image.previewUrl);
-    }
-
-    pageState.stagedImages = pageState.stagedImages.filter(function(img) {
-      return img.id !== imageId;
-    });
-    updateStagedImagesDisplay();
-  }
-
-  // =========================================================================
-  // Media Library + Attachments
-  // =========================================================================
-
-  /**
-   * Format counts for display in header badges
-   * @param {number} count - Item count
-   * @param {string} singularLabel - Singular label
-   * @param {string} pluralLabel - Plural label
-   * @returns {string} Formatted label
-   */
-  function formatCountLabel(count, singularLabel, pluralLabel) {
-    return count + ' ' + (count === 1 ? singularLabel : pluralLabel);
-  }
-
-  /**
-   * Find index of an ID in a list using string matching
-   * @param {Array} list - Array of IDs
-   * @param {string|number} id - ID to find
-   * @returns {number} Index or -1
-   */
-  function findIdIndex(list, id) {
-    var targetId = String(id);
-    return list.findIndex(function(item) {
-      return String(item) === targetId;
-    });
-  }
-
-  /**
-   * Update media counts in section headers
-   */
-  function updateMediaCounts() {
-    var imagesCount = document.getElementById('new-article-images-count');
-    var filesCount = document.getElementById('new-article-files-count');
-
-    var totalImages = pageState.attachedImages.length + pageState.stagedImages.length;
-    var totalFiles = pageState.attachedFiles.length + pageState.stagedFiles.length;
-
-    if (imagesCount) {
-      imagesCount.textContent = formatCountLabel(totalImages, 'imagen', 'imágenes');
-    }
-    if (filesCount) {
-      filesCount.textContent = formatCountLabel(totalFiles, 'archivo', 'archivos');
-    }
-  }
-
-  /**
-   * Format file sizes for display
-   * @param {number|string} sizeValue - File size in bytes or formatted string
-   * @returns {string} Human-readable size
-   */
-  function formatFileSize(sizeValue) {
-    if (sizeValue === null || sizeValue === undefined) return '—';
-    if (typeof sizeValue === 'string') return sizeValue;
-    if (typeof sizeValue !== 'number' || isNaN(sizeValue)) return '—';
-    var KB_IN_BYTES = 1024;
-    var MB_IN_BYTES = KB_IN_BYTES * 1024;
-    var GB_IN_BYTES = MB_IN_BYTES * 1024;
-
-    if (sizeValue < KB_IN_BYTES) return sizeValue + ' B';
-    if (sizeValue < MB_IN_BYTES) return Math.round(sizeValue / KB_IN_BYTES) + ' KB';
-    if (sizeValue < GB_IN_BYTES) return (sizeValue / MB_IN_BYTES).toFixed(1) + ' MB';
-    return (sizeValue / GB_IN_BYTES).toFixed(1) + ' GB';
-  }
-
-  /**
-   * Escape string for safe HTML attribute usage
-   * @param {string} value - Raw attribute value
-   * @returns {string} Escaped attribute string
-   */
-  function escapeHtmlAttribute(value) {
-    return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  }
-
-  /**
-   * Validate that a URL is safe (no javascript: protocol)
-   * @param {string} url - URL to validate
-   * @returns {string} Safe URL or empty string
-   */
-  function sanitizeUrl(url) {
-    if (!url) return '';
-    var trimmedUrl = url.trim();
-    var normalizedUrl = trimmedUrl.toLowerCase();
-    var urlWithoutWhitespace = trimmedUrl.replace(/\s+/g, '').toLowerCase();
-    if (urlWithoutWhitespace.indexOf('javascript:') === 0 ||
-        urlWithoutWhitespace.indexOf('data:') === 0 ||
-        urlWithoutWhitespace.indexOf('vbscript:') === 0 ||
-        urlWithoutWhitespace.indexOf('file:') === 0) {
-      return '';
-    }
-
-    var hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmedUrl);
-    if (hasProtocol && normalizedUrl.indexOf('http://') !== 0 && normalizedUrl.indexOf('https://') !== 0) {
-      return '';
-    }
-    if (!hasProtocol && normalizedUrl.indexOf('/') !== 0) {
-      return '';
-    }
-
-    return escapeHtmlAttribute(trimmedUrl);
-  }
-
-  /**
-   * Resolve fileIds from original article data into attached media lists
-   */
-  function resolveFileIdsFromArticleData() {
-    if (!pageState.originalArticleData || !pageState.originalArticleData.fileIds) return;
-
-    var fileIds = pageState.originalArticleData.fileIds;
-    if (!Array.isArray(fileIds) || fileIds.length === 0) return;
-
-    var imageIdSet = new Set(pageState.allImages.map(function(img) { return String(img.id); }));
-    var fileIdSet = new Set(pageState.allFiles.map(function(file) { return String(file.id); }));
-
-    fileIds.forEach(function(id) {
-      var normalizedId = String(id);
-      if (imageIdSet.has(normalizedId) && findIdIndex(pageState.attachedImages, normalizedId) === -1) {
-        pageState.attachedImages.push(id);
-      } else if (fileIdSet.has(normalizedId) && findIdIndex(pageState.attachedFiles, normalizedId) === -1) {
-        pageState.attachedFiles.push(id);
-      }
-    });
-  }
-
-  /**
-   * Load media library data for the company
-   */
-  function loadMediaData() {
-    if (!pageState.companyCode) return;
-
-    ImageService.getImages(pageState.companyCode)
-      .then(function(images) {
-        pageState.allImages = images || [];
-        resolveFileIdsFromArticleData();
-        updateAvailableImagesDisplay();
-        updateAttachedImagesDisplay();
-        updateMediaCounts();
-      })
-      .catch(function(error) {
-        console.error('Error loading images:', error);
-        dhtmlx.message({
-          type: 'error',
-          text: 'No se pudieron cargar las imágenes disponibles'
+        // Attach remove handlers
+        container.querySelectorAll('.remove-staged-image').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var imageId = btn.getAttribute('data-image-id');
+                removeStagedImage(imageId);
+            });
         });
-      });
-
-    FileService.getFiles(pageState.companyCode)
-      .then(function(files) {
-        pageState.allFiles = files || [];
-        resolveFileIdsFromArticleData();
-        updateAvailableFilesDisplay();
-        updateAttachedFilesDisplay();
-        updateMediaCounts();
-      })
-      .catch(function(error) {
-        console.error('Error loading files:', error);
-        dhtmlx.message({
-          type: 'error',
-          text: 'No se pudieron cargar los archivos disponibles'
-        });
-      });
-  }
-
-  /**
-   * Update the available images list (company library)
-   */
-  function updateAvailableImagesDisplay() {
-    var container = document.getElementById('new-article-available-images');
-    if (!container) return;
-
-    var filteredImages = pageState.allImages.slice();
-
-    if (pageState.imageSearchQuery) {
-      var query = pageState.imageSearchQuery.toLowerCase();
-      filteredImages = filteredImages.filter(function(img) {
-        return (img.name && img.name.toLowerCase().includes(query)) ||
-          (img.description && img.description.toLowerCase().includes(query));
-      });
     }
 
-    filteredImages = filteredImages.filter(function(img) {
-      return findIdIndex(pageState.attachedImages, img.id) === -1;
-    });
+    /**
+     * Remove a staged image
+     * @param {string} imageId - Image ID to remove
+     */
+    function removeStagedImage(imageId) {
+        var image = pageState.stagedImages.find(function (img) {
+            return img.id === imageId;
+        });
 
-    if (filteredImages.length === 0) {
-      container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay imágenes disponibles</div>';
-      return;
+        if (image && image.previewUrl) {
+            URL.revokeObjectURL(image.previewUrl);
+        }
+
+        pageState.stagedImages = pageState.stagedImages.filter(function (img) {
+            return img.id !== imageId;
+        });
+        updateStagedImagesDisplay();
     }
 
-    container.innerHTML = filteredImages.map(function(img) {
-      return renderAvailableImageItem(img);
-    }).join('');
+    // =========================================================================
+    // Media Library + Attachments
+    // =========================================================================
 
-    container.querySelectorAll('[data-attach-image-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-attach-image-id');
-        attachImage(imageId);
-      });
-    });
+    /**
+     * Format counts for display in header badges
+     * @param {number} count - Item count
+     * @param {string} singularLabel - Singular label
+     * @param {string} pluralLabel - Plural label
+     * @returns {string} Formatted label
+     */
+    function formatCountLabel(count, singularLabel, pluralLabel) {
+        return count + ' ' + (count === 1 ? singularLabel : pluralLabel);
+    }
 
-    container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-        insertEditorBlock('image', {
-          file: {
-            url: imageUrl
-          }
+    /**
+     * Find index of an ID in a list using string matching
+     * @param {Array} list - Array of IDs
+     * @param {string|number} id - ID to find
+     * @returns {number} Index or -1
+     */
+    function findIdIndex(list, id) {
+        var targetId = String(id);
+        return list.findIndex(function (item) {
+            return String(item) === targetId;
         });
-      });
-    });
-  }
+    }
 
-  /**
-   * Render an available image row
-   * @param {Object} img - Image object
-   * @returns {string} HTML string
-   */
-  function renderAvailableImageItem(img) {
-    var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
-    var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
-    var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
-    var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+    /**
+     * Update media counts in section headers
+     */
+    function updateMediaCounts() {
+        var imagesCount = document.getElementById('new-article-images-count');
+        var filesCount = document.getElementById('new-article-files-count');
 
-    return `
+        var totalImages = pageState.attachedImages.length + pageState.stagedImages.length;
+        var totalFiles = pageState.attachedFiles.length + pageState.stagedFiles.length;
+
+        if (imagesCount) {
+            imagesCount.textContent = formatCountLabel(totalImages, 'imagen', 'imágenes');
+        }
+        if (filesCount) {
+            filesCount.textContent = formatCountLabel(totalFiles, 'archivo', 'archivos');
+        }
+    }
+
+    /**
+     * Format file sizes for display
+     * @param {number|string} sizeValue - File size in bytes or formatted string
+     * @returns {string} Human-readable size
+     */
+    function formatFileSize(sizeValue) {
+        if (sizeValue === null || sizeValue === undefined) return '—';
+        if (typeof sizeValue === 'string') return sizeValue;
+        if (typeof sizeValue !== 'number' || isNaN(sizeValue)) return '—';
+        var KB_IN_BYTES = 1024;
+        var MB_IN_BYTES = KB_IN_BYTES * 1024;
+        var GB_IN_BYTES = MB_IN_BYTES * 1024;
+
+        if (sizeValue < KB_IN_BYTES) return sizeValue + ' B';
+        if (sizeValue < MB_IN_BYTES) return Math.round(sizeValue / KB_IN_BYTES) + ' KB';
+        if (sizeValue < GB_IN_BYTES) return (sizeValue / MB_IN_BYTES).toFixed(1) + ' MB';
+        return (sizeValue / GB_IN_BYTES).toFixed(1) + ' GB';
+    }
+
+    /**
+     * Escape string for safe HTML attribute usage
+     * @param {string} value - Raw attribute value
+     * @returns {string} Escaped attribute string
+     */
+    function escapeHtmlAttribute(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    /**
+     * Validate that a URL is safe (no JavaScript: protocol)
+     * @param {string} url - URL to validate
+     * @returns {string} Safe URL or empty string
+     */
+    function sanitizeUrl(url) {
+        if (!url) return '';
+        var trimmedUrl = url.trim();
+        var normalizedUrl = trimmedUrl.toLowerCase();
+        var urlWithoutWhitespace = trimmedUrl.replace(/\s+/g, '').toLowerCase();
+        if (urlWithoutWhitespace.indexOf('javascript:') === 0 ||
+            urlWithoutWhitespace.indexOf('data:') === 0 ||
+            urlWithoutWhitespace.indexOf('vbscript:') === 0 ||
+            urlWithoutWhitespace.indexOf('file:') === 0) {
+            return '';
+        }
+
+        var hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmedUrl);
+        if (hasProtocol && normalizedUrl.indexOf('http://') !== 0 && normalizedUrl.indexOf('https://') !== 0) {
+            return '';
+        }
+        if (!hasProtocol && normalizedUrl.indexOf('/') !== 0) {
+            return '';
+        }
+
+        return escapeHtmlAttribute(trimmedUrl);
+    }
+
+    /**
+     * Resolve fileIds from original article data into attached media lists
+     */
+    function resolveFileIdsFromArticleData() {
+        if (!pageState.originalArticleData || !pageState.originalArticleData.fileIds) return;
+
+        var fileIds = pageState.originalArticleData.fileIds;
+        if (!Array.isArray(fileIds) || fileIds.length === 0) return;
+
+        var imageIdSet = new Set(pageState.allImages.map(function (img) {
+            return String(img.id);
+        }));
+        var fileIdSet = new Set(pageState.allFiles.map(function (file) {
+            return String(file.id);
+        }));
+
+        fileIds.forEach(function (id) {
+            var normalizedId = String(id);
+            if (imageIdSet.has(normalizedId) && findIdIndex(pageState.attachedImages, normalizedId) === -1) {
+                pageState.attachedImages.push(id);
+            } else if (fileIdSet.has(normalizedId) && findIdIndex(pageState.attachedFiles, normalizedId) === -1) {
+                pageState.attachedFiles.push(id);
+            }
+        });
+    }
+
+    /**
+     * Load media library data for the company
+     */
+    function loadMediaData() {
+        if (!pageState.companyCode) return;
+
+        ImageService.getImages(pageState.companyCode)
+            .then(function (images) {
+                pageState.allImages = images || [];
+                resolveFileIdsFromArticleData();
+                updateAvailableImagesDisplay();
+                updateAttachedImagesDisplay();
+                updateMediaCounts();
+            })
+            .catch(function (error) {
+                if (error.status === 404) return;
+                console.error('Error loading images:', error);
+                dhtmlx.message({
+                    type: 'error',
+                    text: 'No se pudieron cargar las imágenes disponibles'
+                });
+            });
+
+        FileService.getFiles(pageState.companyCode)
+            .then(function (files) {
+                pageState.allFiles = files || [];
+                resolveFileIdsFromArticleData();
+                updateAvailableFilesDisplay();
+                updateAttachedFilesDisplay();
+                updateMediaCounts();
+            })
+            .catch(function (error) {
+                if (error.status === 404) return;
+                console.error('Error loading files:', error);
+                dhtmlx.message({
+                    type: 'error',
+                    text: 'No se pudieron cargar los archivos disponibles'
+                });
+            });
+    }
+
+    /**
+     * Update the available images list (company library)
+     */
+    function updateAvailableImagesDisplay() {
+        var container = document.getElementById('new-article-available-images');
+        if (!container) return;
+
+        var filteredImages = pageState.allImages.slice();
+
+        if (pageState.imageSearchQuery) {
+            var query = pageState.imageSearchQuery.toLowerCase();
+            filteredImages = filteredImages.filter(function (img) {
+                return (img.name && img.name.toLowerCase().includes(query)) ||
+                    (img.description && img.description.toLowerCase().includes(query));
+            });
+        }
+
+        filteredImages = filteredImages.filter(function (img) {
+            return findIdIndex(pageState.attachedImages, img.id) === -1;
+        });
+
+        if (filteredImages.length === 0) {
+            container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay imágenes disponibles</div>';
+            return;
+        }
+
+        container.innerHTML = filteredImages.map(function (img) {
+            return renderAvailableImageItem(img);
+        }).join('');
+
+        container.querySelectorAll('[data-attach-image-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var imageId = btn.getAttribute('data-attach-image-id');
+                attachImage(imageId);
+            });
+        });
+
+        container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+                const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+                insertEditorBlock('image', {
+                    file: {
+                        url: imageUrl
+                    }
+                });
+            });
+        });
+    }
+
+    /**
+     * Render an available image row
+     * @param {Object} img - Image object
+     * @returns {string} HTML string
+     */
+    function renderAvailableImageItem(img) {
+        const imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
+        const thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
+        const dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
+        const sizeLabel = img.size ? escapeHtml(img.size) : '—';
+
+        return `
       <div class="flex items-center p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
         <img 
           src="${thumbnailUrl}" 
@@ -1865,56 +1821,56 @@ var NewArticlePageUI = (function() {
         </button>
       </div>
     `;
-  }
-
-  /**
-   * Update the available files list (company library)
-   */
-  function updateAvailableFilesDisplay() {
-    var container = document.getElementById('new-article-available-files');
-    if (!container) return;
-
-    var filteredFiles = pageState.allFiles.slice();
-
-    if (pageState.fileSearchQuery) {
-      var query = pageState.fileSearchQuery.toLowerCase();
-      filteredFiles = filteredFiles.filter(function(file) {
-        return (file.name && file.name.toLowerCase().includes(query)) ||
-          (file.description && file.description.toLowerCase().includes(query));
-      });
     }
 
-    filteredFiles = filteredFiles.filter(function(file) {
-      return findIdIndex(pageState.attachedFiles, file.id) === -1;
-    });
+    /**
+     * Update the available files list (company library)
+     */
+    function updateAvailableFilesDisplay() {
+        const container = document.getElementById('new-article-available-files');
+        if (!container) return;
 
-    if (filteredFiles.length === 0) {
-      container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay archivos disponibles</div>';
-      return;
+        let filteredFiles = pageState.allFiles.slice();
+
+        if (pageState.fileSearchQuery) {
+            const query = pageState.fileSearchQuery.toLowerCase();
+            filteredFiles = filteredFiles.filter(function (file) {
+                return (file.name && file.name.toLowerCase().includes(query)) ||
+                    (file.description && file.description.toLowerCase().includes(query));
+            });
+        }
+
+        filteredFiles = filteredFiles.filter(function (file) {
+            return findIdIndex(pageState.attachedFiles, file.id) === -1;
+        });
+
+        if (filteredFiles.length === 0) {
+            container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm">No hay archivos disponibles</div>';
+            return;
+        }
+
+        container.innerHTML = filteredFiles.map(function (file) {
+            return renderAvailableFileItem(file);
+        }).join('');
+
+        container.querySelectorAll('[data-attach-file-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fileId = btn.getAttribute('data-attach-file-id');
+                attachFile(fileId);
+            });
+        });
     }
 
-    container.innerHTML = filteredFiles.map(function(file) {
-      return renderAvailableFileItem(file);
-    }).join('');
+    /**
+     * Render an available file row
+     * @param {Object} file - File object
+     * @returns {string} HTML string
+     */
+    function renderAvailableFileItem(file) {
+        var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
+        var fileSizeLabel = escapeHtml(formatFileSize(file.size));
 
-    container.querySelectorAll('[data-attach-file-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var fileId = btn.getAttribute('data-attach-file-id');
-        attachFile(fileId);
-      });
-    });
-  }
-
-  /**
-   * Render an available file row
-   * @param {Object} file - File object
-   * @returns {string} HTML string
-   */
-  function renderAvailableFileItem(file) {
-    var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
-    var fileSizeLabel = escapeHtml(formatFileSize(file.size));
-
-    return `
+        return `
       <div class="flex items-center p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
         <div class="w-10 h-10 flex items-center justify-center bg-gray-100 rounded flex-shrink-0">
           <span class="text-xs font-medium text-gray-500">${extension}</span>
@@ -1932,92 +1888,94 @@ var NewArticlePageUI = (function() {
         </button>
       </div>
     `;
-  }
-
-  /**
-   * Attach an image to the article
-   * @param {string} imageId - Image ID to attach
-   */
-  function attachImage(imageId) {
-    if (findIdIndex(pageState.attachedImages, imageId) !== -1) return;
-    pageState.attachedImages.push(imageId);
-    updateAttachedImagesDisplay();
-    updateAvailableImagesDisplay();
-    updateMediaCounts();
-    markFormDirty();
-  }
-
-  /**
-   * Detach an image from the article
-   * @param {string} imageId - Image ID to detach
-   */
-  function detachImage(imageId) {
-    var index = findIdIndex(pageState.attachedImages, imageId);
-    if (index === -1) return;
-    pageState.attachedImages.splice(index, 1);
-    updateAttachedImagesDisplay();
-    updateAvailableImagesDisplay();
-    updateMediaCounts();
-    markFormDirty();
-  }
-
-  /**
-   * Attach a file to the article
-   * @param {string} fileId - File ID to attach
-   */
-  function attachFile(fileId) {
-    if (findIdIndex(pageState.attachedFiles, fileId) !== -1) return;
-    pageState.attachedFiles.push(fileId);
-    updateAttachedFilesDisplay();
-    updateAvailableFilesDisplay();
-    updateMediaCounts();
-    markFormDirty();
-  }
-
-  /**
-   * Detach a file from the article
-   * @param {string} fileId - File ID to detach
-   */
-  function detachFile(fileId) {
-    var index = findIdIndex(pageState.attachedFiles, fileId);
-    if (index === -1) return;
-    pageState.attachedFiles.splice(index, 1);
-    updateAttachedFilesDisplay();
-    updateAvailableFilesDisplay();
-    updateMediaCounts();
-    markFormDirty();
-  }
-
-  /**
-   * Update attached images display
-   */
-  function updateAttachedImagesDisplay() {
-    var container = document.getElementById('new-article-attached-images');
-    if (!container) return;
-
-    if (pageState.attachedImages.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400"></div>';
-      return;
     }
 
-    var attachedImageObjects = pageState.attachedImages.map(function(id) {
-      return pageState.allImages.find(function(img) {
-        return String(img.id) === String(id);
-      });
-    }).filter(function(img) { return img; });
-
-    if (attachedImageObjects.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400">Imágenes adjuntas no disponibles</div>';
-      return;
+    /**
+     * Attach an image to the article
+     * @param {string} imageId - Image ID to attach
+     */
+    function attachImage(imageId) {
+        if (findIdIndex(pageState.attachedImages, imageId) !== -1) return;
+        pageState.attachedImages.push(imageId);
+        updateAttachedImagesDisplay();
+        updateAvailableImagesDisplay();
+        updateMediaCounts();
+        markFormDirty();
     }
 
-    container.innerHTML = attachedImageObjects.map(function(img) {
-      var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
-      var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
-      var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
-      var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+    /**
+     * Detach an image from the article
+     * @param {string} imageId - Image ID to detach
+     */
+    function detachImage(imageId) {
+        var index = findIdIndex(pageState.attachedImages, imageId);
+        if (index === -1) return;
+        pageState.attachedImages.splice(index, 1);
+        updateAttachedImagesDisplay();
+        updateAvailableImagesDisplay();
+        updateMediaCounts();
+        markFormDirty();
+    }
 
-      return `
+    /**
+     * Attach a file to the article
+     * @param {string} fileId - File ID to attach
+     */
+    function attachFile(fileId) {
+        if (findIdIndex(pageState.attachedFiles, fileId) !== -1) return;
+        pageState.attachedFiles.push(fileId);
+        updateAttachedFilesDisplay();
+        updateAvailableFilesDisplay();
+        updateMediaCounts();
+        markFormDirty();
+    }
+
+    /**
+     * Detach a file from the article
+     * @param {string} fileId - File ID to detach
+     */
+    function detachFile(fileId) {
+        var index = findIdIndex(pageState.attachedFiles, fileId);
+        if (index === -1) return;
+        pageState.attachedFiles.splice(index, 1);
+        updateAttachedFilesDisplay();
+        updateAvailableFilesDisplay();
+        updateMediaCounts();
+        markFormDirty();
+    }
+
+    /**
+     * Update attached images display
+     */
+    function updateAttachedImagesDisplay() {
+        const container = document.getElementById('new-article-attached-images');
+        if (!container) return;
+
+        if (pageState.attachedImages.length === 0) {
+            container.innerHTML = '<div class="text-sm text-gray-400"></div>';
+            return;
+        }
+
+        const attachedImageObjects = pageState.attachedImages.map(function (id) {
+            return pageState.allImages.find(function (img) {
+                return String(img.id) === String(id);
+            });
+        }).filter(function (img) {
+            return img;
+        });
+
+        if (attachedImageObjects.length === 0) {
+            container.innerHTML = '<div class="text-sm text-gray-400">Imágenes adjuntas no disponibles</div>';
+            return;
+        }
+
+        container.innerHTML = attachedImageObjects.map(function (img) {
+            var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
+            var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
+            var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
+            var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+
+            return `
         <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
           <img 
             src="${thumbnailUrl}" 
@@ -2045,56 +2003,58 @@ var NewArticlePageUI = (function() {
           </button>
         </div>
       `;
-    }).join('');
+        }).join('');
 
-    container.querySelectorAll('[data-detach-image-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var imageId = btn.getAttribute('data-detach-image-id');
-        detachImage(imageId);
-      });
-    });
-
-    container.querySelectorAll('[data-copy-image-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-        const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-        insertEditorBlock('image', {
-          file: {
-            url: imageUrl
-          }
+        container.querySelectorAll('[data-detach-image-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var imageId = btn.getAttribute('data-detach-image-id');
+                detachImage(imageId);
+            });
         });
-      });
-    });
-  }
 
-  /**
-   * Update attached files display
-   */
-  function updateAttachedFilesDisplay() {
-    var container = document.getElementById('new-article-attached-files');
-    if (!container) return;
-
-    if (pageState.attachedFiles.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400">Sin archivos adjuntos</div>';
-      return;
+        container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
+                const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+                insertEditorBlock('image', {
+                    file: {
+                        url: imageUrl
+                    }
+                });
+            });
+        });
     }
 
-    var attachedFileObjects = pageState.attachedFiles.map(function(id) {
-      return pageState.allFiles.find(function(file) {
-        return String(file.id) === String(id);
-      });
-    }).filter(function(file) { return file; });
+    /**
+     * Update attached files display
+     */
+    function updateAttachedFilesDisplay() {
+        var container = document.getElementById('new-article-attached-files');
+        if (!container) return;
 
-    if (attachedFileObjects.length === 0) {
-      container.innerHTML = '<div class="text-sm text-gray-400">Archivos adjuntos no disponibles</div>';
-      return;
-    }
+        if (pageState.attachedFiles.length === 0) {
+            container.innerHTML = '<div class="text-sm text-gray-400">Sin archivos adjuntos</div>';
+            return;
+        }
 
-    container.innerHTML = attachedFileObjects.map(function(file) {
-      var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
-      var fileSizeLabel = escapeHtml(formatFileSize(file.size));
+        var attachedFileObjects = pageState.attachedFiles.map(function (id) {
+            return pageState.allFiles.find(function (file) {
+                return String(file.id) === String(id);
+            });
+        }).filter(function (file) {
+            return file;
+        });
 
-      return `
+        if (attachedFileObjects.length === 0) {
+            container.innerHTML = '<div class="text-sm text-gray-400">Archivos adjuntos no disponibles</div>';
+            return;
+        }
+
+        container.innerHTML = attachedFileObjects.map(function (file) {
+            var extension = escapeHtml(Utils.getFileExtension(file.name).toUpperCase());
+            var fileSizeLabel = escapeHtml(formatFileSize(file.size));
+
+            return `
         <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
           <div class="w-8 h-8 flex items-center justify-center bg-white rounded flex-shrink-0">
             <span class="text-xs font-medium text-gray-500">${extension}</span>
@@ -2112,97 +2072,45 @@ var NewArticlePageUI = (function() {
           </button>
         </div>
       `;
-    }).join('');
+        }).join('');
 
-    container.querySelectorAll('[data-detach-file-id]').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var fileId = btn.getAttribute('data-detach-file-id');
-        detachFile(fileId);
-      });
-    });
-  }
-
-  /**
-   * Copy image URL to clipboard with feedback
-   * @param {string|number} imageIdAndExtension - Image ID
-   */
-  function copyImageUrlToClipboard(imageIdAndExtension) {
-    var imageUrl = buildEditorImageUrl(pageState.companyCode, imageIdAndExtension);
-
-    function showCopySuccess() {
-      dhtmlx.message({
-        type: 'success',
-        text: 'URL de la imagen copiada'
-      });
-    }
-
-    function showCopyError() {
-      dhtmlx.message({
-        type: 'error',
-        text: 'No se pudo copiar la URL de la imagen'
-      });
-    }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(imageUrl)
-        .then(showCopySuccess)
-        .catch(function(error) {
-          console.warn('Clipboard write failed:', error);
-          showCopyError();
+        container.querySelectorAll('[data-detach-file-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var fileId = btn.getAttribute('data-detach-file-id');
+                detachFile(fileId);
+            });
         });
-      return;
     }
 
-    try {
-      // Legacy fallback for browsers without the navigator.clipboard API.
-      var temporaryInput = document.createElement('textarea');
-      temporaryInput.value = imageUrl;
-      temporaryInput.style.position = 'fixed';
-      temporaryInput.style.opacity = '0';
-      document.body.appendChild(temporaryInput);
-      temporaryInput.select();
-      var wasCopied = document.execCommand('copy');
-      document.body.removeChild(temporaryInput);
-      if (wasCopied) {
-        showCopySuccess();
-      } else {
-        showCopyError();
-      }
-    } catch (error) {
-      console.warn('Clipboard fallback failed:', error);
-      showCopyError();
-    }
-  }
+    /**
+     * Open tag picker
+     */
+    function openTagPicker() {
+        var selectedIds = pageState.selectedTags.map(function (tag) {
+            return tag.id;
+        });
 
-  /**
-   * Open tag picker
-   */
-  function openTagPicker() {
-    var selectedIds = pageState.selectedTags.map(function(tag) {
-      return tag.id;
-    });
-
-    TagPickerUI.openTagPicker(pageState.companyCode, selectedIds, function(selectedTags) {
-      pageState.selectedTags = selectedTags;
-      updateSelectedTagsDisplay();
-      markFormDirty();
-    });
-  }
-
-  /**
-   * Update selected tags display
-   */
-  function updateSelectedTagsDisplay() {
-    var container = document.getElementById('new-article-selected-tags');
-    if (!container) return;
-
-    if (pageState.selectedTags.length === 0) {
-      container.innerHTML = '<span class="text-gray-400 text-sm">Ninguna etiqueta seleccionada</span>';
-      return;
+        TagPickerUI.openTagPicker(pageState.companyCode, selectedIds, function (selectedTags) {
+            pageState.selectedTags = selectedTags;
+            updateSelectedTagsDisplay();
+            markFormDirty();
+        });
     }
 
-    container.innerHTML = pageState.selectedTags.map(function(tag) {
-      return `
+    /**
+     * Update selected tags display
+     */
+    function updateSelectedTagsDisplay() {
+        var container = document.getElementById('new-article-selected-tags');
+        if (!container) return;
+
+        if (pageState.selectedTags.length === 0) {
+            container.innerHTML = '<span class="text-gray-400 text-sm">Ninguna etiqueta seleccionada</span>';
+            return;
+        }
+
+        container.innerHTML = pageState.selectedTags.map(function (tag) {
+            return `
         <span 
           class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
           style="background-color: ${escapeHtml(tag.color)}20; color: ${escapeHtml(tag.color)}; border: 1px solid ${escapeHtml(tag.color)}40;"
@@ -2210,492 +2118,489 @@ var NewArticlePageUI = (function() {
           ${escapeHtml(tag.name)}
         </span>
       `;
-    }).join('');
-  }
-
-  /**
-   * Validate form data
-   * @param {string} descriptionHtml - HTML content from the editor
-   * @returns {boolean} True if valid
-   */
-  function validateForm(descriptionHtml) {
-    const titleInput = document.getElementById('new-article-title');
-    const linkInput = document.getElementById('new-article-external-link');
-
-    var errors = [];
-
-    if (!titleInput || !titleInput.value.trim()) {
-      errors.push('El título es obligatorio');
+        }).join('');
     }
 
-    if (!descriptionHtml || !descriptionHtml.trim()) {
-      errors.push('La descripción es obligatoria');
-    }
-    
-    if (!validateLink(linkInput.value.trim())) {
-      errors.push('El enlace externo no es válido');
-    }
+    /**
+     * Validate form data
+     * @param {string} descriptionHtml - HTML content from the editor
+     * @returns {boolean} True if valid
+     */
+    function validateForm(descriptionHtml) {
+        const titleInput = document.getElementById('new-article-title');
+        const linkInput = document.getElementById('new-article-external-link');
 
-    if (errors.length > 0) {
-      dhtmlx.alert({
-        title: 'Campos requeridos',
-        text: errors.join('<br>')
-      });
-      return false;
-    }
+        var errors = [];
 
-    return true;
-  }
-  
-  function validateLink(linkContent) {
-    // Empty link is valid
-    if (linkContent.trim().length === 0) { return true }
-
-    try {
-      const url = new URL(linkContent);
-      // Optional: Ensure the protocol is http or https
-      return url.protocol === "http:" || url.protocol === "https:";
-    } catch (err) {
-      return false;
-    }
-  }
-
-  /**
-   * Get form data including the editor HTML content
-   * @param {string} descriptionHtml - HTML string from the editor
-   * @returns {Object} Form data object ready for API submission
-   */
-  function getFormData(descriptionHtml) {
-    var titleInput = document.getElementById('new-article-title');
-    var statusSelect = document.getElementById('new-article-status');
-    var externalLinkInput = document.getElementById('new-article-external-link');
-    var clientCommentsInput = document.getElementById('new-article-client-comments');
-
-    var tagIds = pageState.selectedTags.map(function(tag) {
-      return tag.id;
-    });
-
-    return {
-      title: titleInput ? titleInput.value.trim() : '',
-      description: descriptionHtml,
-      status: statusSelect ? statusSelect.value : 'Borrador',
-      externalLink: externalLinkInput ? externalLinkInput.value.trim() : '',
-      clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
-      companyCode: pageState.companyCode,
-      tags: tagIds,
-      attachedImages: pageState.attachedImages.slice(),
-      attachedFiles: pageState.attachedFiles.slice(),
-      fileIds: pageState.attachedImages.slice().concat(pageState.attachedFiles.slice())
-    };
-  }
-
-  function normalizeArrayToStringSet(values) {
-    var normalizedValues = Array.isArray(values) ? values : [];
-    return new Set(normalizedValues.map(function(value) { return String(value); }));
-  }
-
-  function getOriginalArticleTagIds() {
-    if (!pageState.originalArticleData || !Array.isArray(pageState.originalArticleData.tags)) {
-      return [];
-    }
-
-    return pageState.originalArticleData.tags.map(function(tag) {
-      if (tag && typeof tag === 'object' && tag.id !== undefined && tag.id !== null) {
-        return String(tag.id);
-      }
-      return String(tag);
-    });
-  }
-
-  function haveSameNormalizedValues(leftValues, rightValues) {
-    var leftSet = normalizeArrayToStringSet(leftValues);
-    var rightSet = normalizeArrayToStringSet(rightValues);
-    if (leftSet.size !== rightSet.size) {
-      return false;
-    }
-
-    var sameValues = true;
-    leftSet.forEach(function(value) {
-      if (!rightSet.has(value)) {
-        sameValues = false;
-      }
-    });
-    return sameValues;
-  }
-
-  function appendStringArray(formData, fieldName, values) {
-    if (!Array.isArray(values) || values.length === 0) return;
-    values.forEach(function(value) {
-      formData.append(fieldName, String(value));
-    });
-  }
-
-  function appendStagedUploadsToMultipart(formData) {
-    const uploads = pageState.stagedFiles.concat(pageState.stagedImages);
-    
-    uploads.forEach(function(uploadData) {
-      if (!uploadData || !uploadData.file) return;
-      formData.append('uploads.Files', uploadData.file, uploadData.file.name);
-      if (uploadData.description !== undefined && uploadData.description !== null && String(uploadData.description).trim() !== '') {
-        formData.append('uploads.Descriptions', String(uploadData.description).trim());
-      } else {
-        formData.append('uploads.Descriptions', '');
-      }
-    });
-  }
-
-  function buildCreateArticleMultipartData(formDataValues) {
-    const multipartData = new FormData();
-    multipartData.append('Title', formDataValues.title);
-    multipartData.append('Description', formDataValues.description);
-    multipartData.append('ExternalLink', formDataValues.externalLink);
-    multipartData.append('ClientComments', formDataValues.clientComments);
-    multipartData.append('Status', formDataValues.status);
-    appendStringArray(multipartData, 'TagIds', formDataValues.tags);
-    appendStagedUploadsToMultipart(multipartData);
-    return multipartData;
-  }
-
-  function buildUpdateArticleMultipartData(formDataValues) {
-    var multipartData = new FormData();
-    var originalArticle = pageState.originalArticleData || {};
-    var originalFileIds = Array.isArray(originalArticle.fileIds) ? originalArticle.fileIds.map(function(id) { return String(id); }) : [];
-    var currentFileIds = formDataValues.fileIds.map(function(id) { return String(id); });
-    var addedExistingFileIds = currentFileIds.filter(function(currentId) {
-      return originalFileIds.indexOf(currentId) === -1;
-    });
-    var removedFiles = originalFileIds.filter(function(originalId) {
-      return currentFileIds.indexOf(originalId) === -1;
-    });
-
-    if ((originalArticle.title || '') !== formDataValues.title) {
-      multipartData.append('Title', formDataValues.title);
-    }
-    if ((originalArticle.description || '') !== formDataValues.description) {
-      multipartData.append('Description', formDataValues.description);
-    }
-    if ((originalArticle.externalLink || '') !== formDataValues.externalLink) {
-      multipartData.append('ExternalLink', formDataValues.externalLink);
-    }
-    if ((originalArticle.clientComments || '') !== formDataValues.clientComments) {
-      multipartData.append('ClientComments', formDataValues.clientComments);
-    }
-    if ((originalArticle.status || '') !== formDataValues.status) {
-      multipartData.append('Status', formDataValues.status);
-    }
-
-    if (!haveSameNormalizedValues(getOriginalArticleTagIds(), formDataValues.tags)) {
-      appendStringArray(multipartData, 'TagIds', formDataValues.tags);
-    }
-
-    appendStringArray(multipartData, 'FileIds', addedExistingFileIds);
-    appendStringArray(multipartData, 'RemovedFiles', removedFiles);
-    appendStagedUploadsToMultipart(multipartData);
-    return multipartData;
-  }
-
-  /**
-   * Handle form submission (create or edit)
-   * Saves editor content as HTML and sends to the backend API
-   */
-  function handleSubmit() {
-    var submitBtn = document.getElementById('new-article-submit-btn');
-
-    if (!pageState.editorInstance) {
-      console.error('Editor not initialized');
-      return;
-    }
-
-    // Save editor content (returns a Promise with JSON block data)
-    return pageState.editorInstance.save()
-      .then(function(editorData) {
-        // Convert Editor.js JSON blocks to standard HTML
-        var descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
-        if (typeof DOMPurify === 'undefined') {
-          console.warn('DOMPurify not loaded: HTML output will not be sanitized');
+        if (!titleInput || !titleInput.value.trim()) {
+            errors.push('El título es obligatorio');
         }
 
-        if (!validateForm(descriptionHtml)) {
-          return;
+        if (!descriptionHtml || !descriptionHtml.trim()) {
+            errors.push('La descripción es obligatoria');
         }
 
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
+        if (!validateLink(linkInput.value.trim())) {
+            errors.push('El enlace externo no es válido');
         }
 
-        var formDataValues = getFormData(descriptionHtml);
-        var multipartPayload = pageState.editMode
-          ? buildUpdateArticleMultipartData(formDataValues)
-          : buildCreateArticleMultipartData(formDataValues);
-
-        if (pageState.editMode) {
-          return ArticleService.updateArticle(pageState.articleId, multipartPayload, pageState.companyCode);
+        if (errors.length > 0) {
+            dhtmlx.alert({
+                title: 'Campos requeridos',
+                text: errors.join('<br>')
+            });
+            return false;
         }
-        return ArticleService.createArticle(multipartPayload, pageState.companyCode);
-      })
-      .then(function(response) {
-        if (response && response.status === 'success') {
-          var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
-          dhtmlx.message({
-            text: 'Artículo ' + actionLabel + ' exitosamente',
-            type: 'success',
-            expire: 3000
-          });
 
-          var savedData = response.data;
-          var navigateBackCallback = pageState.onNavigateBack;
-          resetPageState();
-          if (navigateBackCallback) {
-            navigateBackCallback(savedData);
-          }
+        return true;
+    }
+
+    function validateLink(linkContent) {
+        // Empty link is valid
+        if (linkContent.trim().length === 0) {
+            return true
         }
-      })
-      .catch(function(error) {
-        console.error('Error saving article:', error);
-        dhtmlx.alert({
-          title: 'Error',
-          text: 'Error al guardar el artículo: ' + error.message
+
+        try {
+            const url = new URL(linkContent);
+            // Optional: Ensure the protocol is http or https
+            return url.protocol === "http:" || url.protocol === "https:";
+        } catch (err) {
+            return false;
+        }
+    }
+
+    /**
+     * Get form data including the editor HTML content
+     * @param {string} descriptionHtml - HTML string from the editor
+     * @returns {Object} Form data object ready for API submission
+     */
+    function getFormData(descriptionHtml) {
+        const titleInput = document.getElementById('new-article-title');
+        const statusSelect = document.getElementById('new-article-status');
+        const externalLinkInput = document.getElementById('new-article-external-link');
+        const clientCommentsInput = document.getElementById('new-article-client-comments');
+
+        const tagIds = pageState.selectedTags.map(function (tag) {
+            return String(tag.id);
         });
 
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+        const fileIds = pageState.attachedImages
+            .slice()
+            .concat(pageState.attachedFiles.slice())
+            .map(function (id) { return String(id); });
+
+        return {
+            title: titleInput ? titleInput.value.trim() : '',
+            descriptionHtml: descriptionHtml,
+            status: statusSelect ? statusSelect.value : 'Borrador',
+            externalLink: externalLinkInput ? externalLinkInput.value.trim() : '',
+            clientComments: clientCommentsInput ? clientCommentsInput.value.trim() : '',
+            companyCode: pageState.companyCode,
+            tagIds: tagIds,
+            fileIds: fileIds
+        };
+    }
+    function appendStringArray(formData, fieldName, values) {
+        if (!Array.isArray(values) || values.length === 0) return;
+        values.forEach(function (value) {
+            formData.append(fieldName, String(value));
+        });
+    }
+
+    function appendStagedUploadsToMultipart(formData) {
+        const filesManifest = [];
+        (pageState.stagedFiles || []).forEach(function (f) {
+            formData.append('Files', f.file);
+            filesManifest.push({
+                ClientTempId: f.id,
+                Description: f.description || ''
+            });
+        });
+        formData.append('FilesManifestJson', JSON.stringify(filesManifest));
+
+        const imagesManifest = [];
+        (pageState.stagedImages || []).forEach(function (img) {
+            formData.append('Images', img.file);
+            imagesManifest.push({
+                ClientTempId: img.id,
+                Description: img.description || ''
+            });
+        });
+        formData.append('ImagesManifestJson', JSON.stringify(imagesManifest));
+    }
+
+    function buildCreateArticleMultipartData(values) {
+        const formData = new FormData();
+
+        formData.append('Title', values.title);
+        formData.append('DescriptionHtml', values.descriptionHtml);
+        formData.append('Status', values.status);
+
+        if (values.externalLink) {
+            formData.append('ExternalLink', values.externalLink);
         }
-      });
-  }
 
-  /**
-   * Handle delete article action with confirmation
-   */
-  function handleDeleteArticle() {
-    if (!pageState.editMode || !pageState.articleId || !pageState.companyCode) return;
-
-    var deleteBtn = document.getElementById('new-article-delete-btn');
-    var articleId = pageState.articleId;
-    var companyCode = pageState.companyCode;
-
-    dhtmlx.confirm({
-      title: 'Confirmar eliminación',
-      text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
-      callback: function(result) {
-        if (!result) return;
-
-        if (deleteBtn) {
-          deleteBtn.disabled = true;
-          deleteBtn.textContent = 'Eliminando...';
+        if (values.clientComments) {
+            formData.append('ClientComments', values.clientComments);
         }
 
-        fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`, {
-          method: 'DELETE'
-        })
-          .then(function(response) {
-            if (!response.ok) {
-              throw new Error('Failed to delete article: ' + response.status);
-            }
+        if (values.tagIds && values.tagIds.length) {
+            values.tagIds.forEach(function (tagId) {
+                formData.append('TagIds', tagId);
+            });
+        }
 
-            if (typeof ArticleService !== 'undefined' && ArticleService.clearCache) {
-              ArticleService.clearCache();
-            }
+        const filesManifest = [];
+        (pageState.stagedFiles || []).forEach(function (f) {
+            formData.append('Files', f.file);
+            filesManifest.push({
+                ClientTempId: f.id,
+                Description: f.description || ''
+            });
+        });
+        formData.append('FilesManifestJson', JSON.stringify(filesManifest));
 
-            dhtmlx.message({
-              type: 'success',
-              text: 'Artículo eliminado exitosamente',
-              expire: 3000
+        const imagesManifest = [];
+        (pageState.stagedImages || []).forEach(function (img) {
+            formData.append('Images', img.file);
+            imagesManifest.push({
+                ClientTempId: img.id,
+                Description: img.description || ''
+            });
+        });
+        formData.append('ImagesManifestJson', JSON.stringify(imagesManifest));
+
+        return formData;
+    }
+
+    function buildUpdateArticleMultipartData(formDataValues) {
+        const multipartData = new FormData();
+        const originalArticle = pageState.originalArticleData || {};
+
+        const originalFileIds = Array.isArray(originalArticle.fileIds)
+            ? originalArticle.fileIds.map(function (id) {
+                return String(id);
+            })
+            : [];
+
+        const currentFileIds = Array.isArray(formDataValues.fileIds)
+            ? formDataValues.fileIds.map(function (id) {
+                return String(id);
+            })
+            : [];
+
+        const addedExistingFileIds = currentFileIds.filter(function (currentId) {
+            return originalFileIds.indexOf(currentId) === -1;
+        });
+
+        const removedFiles = originalFileIds.filter(function (originalId) {
+            return currentFileIds.indexOf(originalId) === -1;
+        });
+
+        multipartData.append('Title', formDataValues.title);
+        multipartData.append('DescriptionHtml', formDataValues.descriptionHtml);
+        multipartData.append('Status', formDataValues.status);
+        multipartData.append('ExternalLink', formDataValues.externalLink || '');
+        multipartData.append('ClientComments', formDataValues.clientComments || '');
+
+        appendStringArray(multipartData, 'TagIds', formDataValues.tagIds || []);
+        appendStringArray(multipartData, 'FileIds', addedExistingFileIds);
+        appendStringArray(multipartData, 'RemovedFiles', removedFiles);
+
+        appendStagedUploadsToMultipart(multipartData);
+
+        return multipartData;
+    }
+
+    /**
+     * Handle form submission (create or edit)
+     * Saves editor content as HTML and sends to the backend API
+     */
+    function handleSubmit() {
+        const submitBtn = document.getElementById('new-article-submit-btn');
+
+        if (!pageState.editorInstance) {
+            console.error('Editor not initialized');
+            return;
+        }
+
+        // Save editor content (returns a Promise with JSON block data)
+        return pageState.editorInstance.save()
+            .then(function (editorData) {
+                let descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
+                descriptionHtml = normalizeStagedEditorImageUrls(descriptionHtml);
+
+                if (typeof DOMPurify === 'undefined') {
+                    console.warn('DOMPurify not loaded: HTML output will not be sanitized');
+                }
+
+                if (!validateForm(descriptionHtml)) {
+                    return;
+                }
+
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
+                }
+
+                const formDataValues = getFormData(descriptionHtml);
+                const multipartPayload = pageState.editMode
+                    ? buildUpdateArticleMultipartData(formDataValues)
+                    : buildCreateArticleMultipartData(formDataValues);
+
+                if (pageState.editMode) {
+                    return ArticleService.updateArticle(pageState.articleId, multipartPayload, pageState.companyCode);
+                }
+                return ArticleService.createArticle(multipartPayload, pageState.companyCode);
+            })
+            .then(function (response) {
+                if (response && response.status === 'success') {
+                    const actionLabel = pageState.editMode ? 'actualizado' : 'creado';
+                    dhtmlx.message({
+                        text: 'Artículo ' + actionLabel + ' exitosamente',
+                        type: 'success',
+                        expire: 3000
+                    });
+
+                    const savedData = response.data;
+                    const navigateBackCallback = pageState.onNavigateBack;
+                    resetPageState();
+                    if (navigateBackCallback) {
+                        navigateBackCallback(savedData);
+                    }
+                }
+            })
+            .catch(function (error) {
+                console.error('Error saving article:', error);
+                dhtmlx.alert({
+                    title: 'Error',
+                    text: 'Error al guardar el artículo: ' + error.message
+                });
+
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+                }
+            });
+    }
+
+    /**
+     * Handle delete article action with confirmation
+     */
+    function handleDeleteArticle() {
+        if (!pageState.editMode || !pageState.articleId || !pageState.companyCode) return;
+
+        const deleteBtn = document.getElementById('new-article-delete-btn');
+        const articleId = pageState.articleId;
+        const companyCode = pageState.companyCode;
+
+        dhtmlx.confirm({
+            title: 'Confirmar eliminación',
+            text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+            callback: function (result) {
+                if (!result) return;
+
+                if (deleteBtn) {
+                    deleteBtn.disabled = true;
+                    deleteBtn.textContent = 'Eliminando...';
+                }
+
+                fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}/${encodeURIComponent(articleId)}`, {
+                    method: 'DELETE'
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to delete article: ' + response.status);
+                        }
+
+                        if (typeof ArticleService !== 'undefined' && ArticleService.clearCache) {
+                            ArticleService.clearCache();
+                        }
+
+                        dhtmlx.message({
+                            type: 'success',
+                            text: 'Artículo eliminado exitosamente',
+                            expire: 3000
+                        });
+
+                        var navigateBackCallback = pageState.onNavigateBack;
+                        resetPageState();
+                        if (navigateBackCallback) {
+                            navigateBackCallback();
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error('Error deleting article:', error);
+                        dhtmlx.alert({
+                            title: 'Error',
+                            text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+                        });
+
+                        if (deleteBtn) {
+                            deleteBtn.disabled = false;
+                            deleteBtn.textContent = 'Eliminar';
+                        }
+                    });
+            }
+        });
+    }
+
+    /**
+     * Shared initialization logic for both create and edit modes
+     * Sets up the page layout, renders HTML, attaches events, and initializes the editor
+     * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
+     * @param {string} companyCode - Company code
+     * @param {string} companyName - Company name for display
+     * @param {Function} onNavigateBack - Callback when navigating back
+     */
+    function initializePage(layoutCell, companyCode, companyName, onNavigateBack) {
+        pageState.companyCode = companyCode;
+        pageState.companyName = companyName || '';
+        pageState.layoutCell = layoutCell;
+        pageState.onNavigateBack = onNavigateBack;
+        pageState.canUserUpload = true;
+
+        CompanyService.canUsersUpload(companyCode)
+            .then(function (canUpload) {
+                pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
+                renderAndAttach();
+            })
+            .catch(function (error) {
+                console.error('Error checking upload permissions:', error);
+                renderAndAttach();
             });
 
-            var navigateBackCallback = pageState.onNavigateBack;
-            resetPageState();
-            if (navigateBackCallback) {
-              navigateBackCallback();
-            }
-          })
-          .catch(function(error) {
-            console.error('Error deleting article:', error);
+        function renderAndAttach() {
+            layoutCell.attachHTMLString(renderPageHtml());
+            setTimeout(function () {
+                attachEventHandlers();
+                attachEditorToolbarHandlers();
+                initializeEditor();
+                updateStagedFilesDisplay();
+                updateStagedImagesDisplay();
+                updateAttachedFilesDisplay();
+                updateAttachedImagesDisplay();
+                updateAvailableFilesDisplay();
+                updateAvailableImagesDisplay();
+                updateMediaCounts();
+                loadMediaData();
+                if (pageState.editMode) {
+                    populateFormForEditMode();
+                }
+            }, 100);
+        }
+    }
+
+    /**
+     * Open the New Article page (Create Mode)
+     * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
+     * @param {string} companyCode - Company code for the new article
+     * @param {string} companyName - Company name for display
+     * @param {Function} onNavigateBack - Callback when navigating back to grid
+     */
+    function openPage(layoutCell, companyCode, companyName, onNavigateBack) {
+        // Check permissions
+        if (typeof AdminNewArticlePage === 'undefined') {
             dhtmlx.alert({
-              title: 'Error',
-              text: 'No se pudo eliminar el artículo. Por favor, inténtelo de nuevo.'
+                title: 'Acceso denegado',
+                text: 'No tienes permiso para crear artículos.'
             });
+            return;
+        }
 
-            if (deleteBtn) {
-              deleteBtn.disabled = false;
-              deleteBtn.textContent = 'Eliminar';
+        // Reset state for create mode
+        pageState.editMode = false;
+        pageState.articleId = null;
+        pageState.originalArticleData = null;
+        pageState.selectedTags = [];
+        pageState.allImages = [];
+        pageState.allFiles = [];
+        pageState.attachedImages = [];
+        pageState.attachedFiles = [];
+        pageState.imageSearchQuery = '';
+        pageState.fileSearchQuery = '';
+        pageState.stagedFiles = [];
+        pageState.stagedImages = [];
+        pageState.isFormDirty = false;
+
+        initializePage(layoutCell, companyCode, companyName, onNavigateBack);
+    }
+
+    /**
+     * Open the Article page in Edit Mode
+     * Loads existing article data into the form and editor
+     * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
+     * @param {Object} articleData - The full article object to edit
+     * @param {string} companyName - Company name for display
+     * @param {Function} onNavigateBack - Callback when navigating back to grid
+     */
+    function openEditPage(layoutCell, articleData, companyName, onNavigateBack) {
+        // Check permissions
+        if (typeof AdminEditArticleButton === 'undefined') {
+            dhtmlx.alert({
+                title: 'Acceso denegado',
+                text: 'No tienes permiso para editar artículos.'
+            });
+            return;
+        }
+
+        if (!articleData || !articleData.id) {
+            console.error('Invalid article data for edit mode');
+            return;
+        }
+
+        // Set state for edit mode
+        resetPageState();
+        pageState.editMode = true;
+        pageState.articleId = articleData.id;
+        pageState.originalArticleData = articleData;
+
+        // Pre-populate tags from article data
+        pageState.selectedTags = [];
+        if (articleData.tags && Array.isArray(articleData.tags)) {
+            pageState.selectedTags = articleData.tags.map(function (tag) {
+                if (typeof tag === 'string') {
+                    return {id: tag, name: tag, color: '#666'};
+                }
+                return tag;
+            });
+        }
+
+        if (articleData.attachedImages && Array.isArray(articleData.attachedImages)) {
+            pageState.attachedImages = articleData.attachedImages.slice();
+        }
+
+        if (articleData.attachedFiles && Array.isArray(articleData.attachedFiles)) {
+            pageState.attachedFiles = articleData.attachedFiles.slice();
+        }
+
+        initializePage(layoutCell, articleData.companyCode, companyName, onNavigateBack);
+    }
+
+    function cleanupStagedImagePreviewUrls() {
+        (pageState.stagedImages || []).forEach(function (img) {
+            if (img.previewUrl) {
+                URL.revokeObjectURL(img.previewUrl);
             }
-          });
-      }
-    });
-  }
-
-  /**
-   * Shared initialization logic for both create and edit modes
-   * Sets up the page layout, renders HTML, attaches events, and initializes the editor
-   * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
-   * @param {string} companyCode - Company code
-   * @param {string} companyName - Company name for display
-   * @param {Function} onNavigateBack - Callback when navigating back
-   */
-  function initializePage(layoutCell, companyCode, companyName, onNavigateBack) {
-    pageState.companyCode = companyCode;
-    pageState.companyName = companyName || '';
-    pageState.layoutCell = layoutCell;
-    pageState.onNavigateBack = onNavigateBack;
-    pageState.canUserUpload = true;
-
-    CompanyService.canUsersUpload(companyCode)
-      .then(function(canUpload) {
-        pageState.canUserUpload = typeof AdminUploadOverride !== 'undefined' || canUpload;
-        renderAndAttach();
-      })
-      .catch(function(error) {
-        console.error('Error checking upload permissions:', error);
-        renderAndAttach();
-      });
-
-    function renderAndAttach() {
-      layoutCell.attachHTMLString(renderPageHtml());
-      setTimeout(function() {
-        attachEventHandlers();
-        attachEditorToolbarHandlers();
-        initializeEditor();
-        updateStagedFilesDisplay();
-        updateStagedImagesDisplay();
-        updateAttachedFilesDisplay();
-        updateAttachedImagesDisplay();
-        updateAvailableFilesDisplay();
-        updateAvailableImagesDisplay();
-        updateMediaCounts();
-        loadMediaData();
-        if (pageState.editMode) {
-          populateFormForEditMode();
-        }
-      }, 100);
-    }
-  }
-
-  /**
-   * Open the New Article page (Create Mode)
-   * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
-   * @param {string} companyCode - Company code for the new article
-   * @param {string} companyName - Company name for display
-   * @param {Function} onNavigateBack - Callback when navigating back to grid
-   */
-  function openPage(layoutCell, companyCode, companyName, onNavigateBack) {
-    // Check permissions
-    if (typeof AdminNewArticlePage === 'undefined') {
-      dhtmlx.alert({
-        title: 'Acceso denegado',
-        text: 'No tienes permiso para crear artículos.'
-      });
-      return;
+        });
     }
 
-    // Reset state for create mode
-    pageState.editMode = false;
-    pageState.articleId = null;
-    pageState.originalArticleData = null;
-    pageState.selectedTags = [];
-    pageState.allImages = [];
-    pageState.allFiles = [];
-    pageState.attachedImages = [];
-    pageState.attachedFiles = [];
-    pageState.imageSearchQuery = '';
-    pageState.fileSearchQuery = '';
-    pageState.stagedFiles = [];
-    pageState.stagedImages = [];
-    pageState.isFormDirty = false;
-
-    initializePage(layoutCell, companyCode, companyName, onNavigateBack);
-  }
-
-  /**
-   * Open the Article page in Edit Mode
-   * Loads existing article data into the form and editor
-   * @param {Object} layoutCell - DHTMLX Layout Cell to mount the page
-   * @param {Object} articleData - The full article object to edit
-   * @param {string} companyName - Company name for display
-   * @param {Function} onNavigateBack - Callback when navigating back to grid
-   */
-  function openEditPage(layoutCell, articleData, companyName, onNavigateBack) {
-    // Check permissions
-    if (typeof AdminEditArticleButton === 'undefined') {
-      dhtmlx.alert({
-        title: 'Acceso denegado',
-        text: 'No tienes permiso para editar artículos.'
-      });
-      return;
+    /**
+     * Close the page and clean up resources
+     */
+    function closePage() {
+        // Destroy Editor.js instance
+        destroyEditor();
+        cleanupStagedImagePreviewUrls();
+        resetPageState();
     }
 
-    if (!articleData || !articleData.id) {
-      console.error('Invalid article data for edit mode');
-      return;
-    }
-
-    // Set state for edit mode
-    pageState.editMode = true;
-    pageState.articleId = articleData.id;
-    pageState.originalArticleData = articleData;
-    pageState.allImages = [];
-    pageState.allFiles = [];
-    pageState.attachedImages = [];
-    pageState.attachedFiles = [];
-    pageState.imageSearchQuery = '';
-    pageState.fileSearchQuery = '';
-    pageState.stagedFiles = [];
-    pageState.stagedImages = [];
-    pageState.isFormDirty = false;
-
-    // Pre-populate tags from article data
-    pageState.selectedTags = [];
-    if (articleData.tags && Array.isArray(articleData.tags)) {
-      pageState.selectedTags = articleData.tags.map(function(tag) {
-        if (typeof tag === 'string') {
-          return { id: tag, name: tag, color: '#666' };
-        }
-        return tag;
-      });
-    }
-
-    if (articleData.attachedImages && Array.isArray(articleData.attachedImages)) {
-      pageState.attachedImages = articleData.attachedImages.slice();
-    }
-
-    if (articleData.attachedFiles && Array.isArray(articleData.attachedFiles)) {
-      pageState.attachedFiles = articleData.attachedFiles.slice();
-    }
-
-    initializePage(layoutCell, articleData.companyCode, companyName, onNavigateBack);
-  }
-
-  /**
-   * Close the page and clean up resources
-   */
-  function closePage() {
-    // Destroy Editor.js instance
-    destroyEditor();
-
-    // Revoke any object URLs
-    pageState.stagedImages.forEach(function(img) {
-      if (img.previewUrl) {
-        URL.revokeObjectURL(img.previewUrl);
-      }
-    });
-
-    resetPageState();
-  }
-
-  /**
-   * Check if the page is currently open
-   * @returns {boolean} True if page is open
-   */
-  function isPageOpen() {
-    return pageState.layoutCell !== null;
-  }
-
-  // Public API
-  return {
-    openPage: openPage,
-    openEditPage: openEditPage,
-    closePage: closePage,
-    pageState: pageState,
-  };
+// Public API
+    return {
+        openPage: openPage,
+        openEditPage: openEditPage,
+        closePage: closePage,
+        pageState: pageState,
+    };
 })();

@@ -57,6 +57,9 @@ public interface IArticlesService
         string action,
         CancellationToken cancellationToken);
 
+    Task<ArticleDetailsDto> UpdateAggregateAsync(
+        UpdateArticleCommand command,
+        CancellationToken cancellationToken);
 
 }
 
@@ -65,7 +68,6 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
     // -------------------
     // --- SQL Queries ---
     // -------------------
-    // TODO: Add date range filters
     private const string SqlSelectArticlesWithQuery = @"
             WITH ArticleBase AS (
                 SELECT a.article_id
@@ -108,7 +110,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
                 WHERE at.article_id = a.article_id
             ) AS tag_data
             OUTER APPLY (
-                SELECT STRING_AGG(fa.file_id, ',') AS files
+                SELECT STRING_AGG(CAST(fa.file_id AS NVARCHAR(36)), ',') AS files
                 FROM [RepositorioArticulos].[dbo].[file_articles] fa
                 WHERE fa.article_id = a.article_id
             ) as file_data
@@ -154,7 +156,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             @Status
         );
     ";
-    private const string SqlUpdateArticle = @"
+    private const string SqlUpdateArticle = """
         UPDATE [RepositorioArticulos].[dbo].[articles]
         SET
             title = @Title,
@@ -165,14 +167,19 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             updated_at = SYSDATETIME()
         WHERE article_id = @ArticleId
           AND company_code = @CompanyCode;
-    ";
-    private const string SqlDeleteArticleTags = @"
+
+        SELECT updated_at
+        FROM [RepositorioArticulos].[dbo].[articles]
+        WHERE article_id = @ArticleId
+          AND company_code = @CompanyCode;
+    """;
+    private const string SqlDeleteArticleTags = """
         DELETE at
         FROM [RepositorioArticulos].[dbo].[article_tags] at
         INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = at.article_id
         WHERE at.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
-    ";
+    """;
     private const string SqlInsertArticleTagsFromCsv = @"
         INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (article_id, tag_id)
         SELECT
@@ -267,7 +274,40 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             ON f.file_id = TRY_CAST(s.value AS int)
            AND f.company_code = @CompanyCode;
     ";
-
+    private const string SqlEnsureArticleExists = @"
+            SELECT COUNT(1)
+            FROM [RepositorioArticulos].[dbo].[articles]
+            WHERE article_id = @ArticleId
+              AND company_code = @CompanyCode;
+        ";
+    private const string SqlLinkExistingFileToArticle = @"
+        INSERT INTO [RepositorioArticulos].[dbo].[file_articles]
+        (
+            file_id,
+            article_id
+        )
+        SELECT
+            f.file_id,
+            @ArticleId
+        FROM [RepositorioArticulos].[dbo].[files] f
+        WHERE f.file_id = @FileId
+          AND f.company_code = @CompanyCode
+          AND NOT EXISTS (
+              SELECT 1
+              FROM [RepositorioArticulos].[dbo].[file_articles] fa
+              WHERE fa.file_id = f.file_id
+                AND fa.article_id = @ArticleId
+          );
+    ";
+    private const string SqlUnlinkFileFromArticle = @"
+        DELETE fa
+        FROM [RepositorioArticulos].[dbo].[file_articles] fa
+        INNER JOIN [RepositorioArticulos].[dbo].[files] f
+            ON f.file_id = fa.file_id
+        WHERE fa.article_id = @ArticleId
+          AND fa.file_id = @FileId
+          AND f.company_code = @CompanyCode;
+    ";
     
     
     public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
@@ -298,7 +338,7 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
         command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
         command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.UniqueIdentifier) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
         
-        int total = 0;
+        var total = 0;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
         {
             var idPos = reader.GetOrdinal("article_id");
@@ -631,7 +671,13 @@ public sealed class ArticlesService(IConfiguration configuration) : BaseService(
             throw;
         }
     }
-    
+
+    public async Task<ArticleDetailsDto> UpdateAggregateAsync(UpdateArticleCommand command, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+
     // ----------- Helper Validation Functions -----------
     private static void ValidateCompany(Guid companyCode)
     {

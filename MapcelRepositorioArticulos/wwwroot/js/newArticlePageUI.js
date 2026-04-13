@@ -608,7 +608,7 @@ var NewArticlePageUI = (function() {
 
     loadCkeditorStylesheet();
     ckeditorDependenciesPromise = loadScriptOnce(CKEDITOR_SCRIPT_URL, function() {
-      return !!(window.CKEDITOR && window.CKEDITOR.ClassicEditor);
+      return !!getClassicEditorConstructor();
     });
 
     return ckeditorDependenciesPromise;
@@ -652,6 +652,16 @@ var NewArticlePageUI = (function() {
   /**
    * Initialize the CKEditor 5 instance
    */
+  function getClassicEditorConstructor() {
+    if (window.CKEDITOR && window.CKEDITOR.ClassicEditor) {
+      return window.CKEDITOR.ClassicEditor;
+    }
+    if (window.ClassicEditor) {
+      return window.ClassicEditor;
+    }
+    return null;
+  }
+
   function initializeEditor() {
     destroyEditor();
 
@@ -668,7 +678,11 @@ var NewArticlePageUI = (function() {
 
     ensureCkeditorDependenciesLoaded()
       .then(function() {
-        return window.CKEDITOR.ClassicEditor.create(editorHolder, {
+        var classicEditorConstructor = getClassicEditorConstructor();
+        if (!classicEditorConstructor) {
+          throw new Error('CKEditor ClassicEditor constructor is not available.');
+        }
+        return classicEditorConstructor.create(editorHolder, {
           initialData: initialEditorData,
           placeholder: 'Describe el artículo en detalle...',
           toolbar: {
@@ -715,68 +729,27 @@ var NewArticlePageUI = (function() {
       });
   }
 
-  function getImageDimensions(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const dimensions = { width: img.width, height: img.height };
-        URL.revokeObjectURL(img.src);
-        resolve(dimensions);
-      };
-      // Handle potential load errors
-      img.onerror = () => resolve({ width: 0, height: 0 });
-    });
-  }
-  
   function imageUploadProcess(file) {
-    return getImageDimensions(file).then(function(dimensions) {
-      return promptAndInsertEditorImage(file, dimensions);
-    }).catch(function(error) {
-      return { success: 0, file: '' }
-    });
-  }
-  
-  /**
-   * Prompt for metadata and upload image for CKEditor
-   * @param {File} file
-   * @param {{width: number, height: number}} dimensions
-   */
-  function promptAndInsertEditorImage(file, dimensions) {
-    if (pageState.isCurrentlyUploading) {
-      return Promise.reject("Otra imagen está en proceso de subida.");
-    }
-    
-    pageState.isCurrentlyUploading = true;
-    
-    const defaultMetadata = {
+    var defaultMetadata = {
       description: file && file.name ? file.name : '',
       desiredFileName: file && file.name ? file.name : '',
-      dimensions: dimensions ? dimensions : {},
+      dimensions: { width: 0, height: 0 }
     };
-    
-    return ImageMetadataEditorUI.promptForFileMetadata(file, defaultMetadata)
-      // Load image preview
-      .then(function(metadata) {
-        if (!metadata) {
-          dhtmlx.message({ type: 'info', text: 'Carga de imagen cancelada' });
-          return null;
+    return uploadEditorImageByFile(file, defaultMetadata)
+      .then(function(result) {
+        if (!result || !result.file || !result.file.url) {
+          throw new Error('No se pudo completar la carga de imagen.');
         }
-        
-        return uploadEditorImageByFile(file, metadata)
-          .then(function(result) {
-            if (!result || !result.file || !result.file.url) return null;
-            return result;
-          });
+        return result;
       })
       .catch(function(error) {
-        console.error('Error al subir imagen arrastrada:', error);
+        console.error('Error al subir imagen al editor:', error);
         dhtmlx.message({
           type: 'error',
-          text: error && error.message ? error.message : 'No se pudo subir la imagen arrastrada.'
+          text: error && error.message ? error.message : 'No se pudo subir la imagen al editor.'
         });
-        return null;
-      }).finally(function() { pageState.isCurrentlyUploading = false; });
+        throw error;
+      });
   }
 
   /**
@@ -799,18 +772,14 @@ var NewArticlePageUI = (function() {
     }
 
     try {
-      if (pageState.editorInstance.commands.get('insertImage')) {
-        pageState.editorInstance.execute('insertImage', {
-          source: safeImageUrl
-        });
-      } else {
-        var fallbackHtml = '<p><img src="' + safeImageUrl + '" alt="' + escapeHtmlAttribute(altText || '') + '" /></p>';
-        pageState.editorInstance.model.change(function() {
-          var viewFragment = pageState.editorInstance.data.processor.toView(fallbackHtml);
-          var modelFragment = pageState.editorInstance.data.toModel(viewFragment);
-          pageState.editorInstance.model.insertContent(modelFragment);
-        });
-      }
+      var fallbackHtml = '<p><img src="' + safeImageUrl + '" alt="' + escapeHtmlAttribute(altText || '') + '" /></p>';
+      // Convert HTML into the editor model to keep image insertion compatible
+      // across CKEditor CDN builds that may expose different insertion commands.
+      pageState.editorInstance.model.change(function() {
+        var viewFragment = pageState.editorInstance.data.processor.toView(fallbackHtml);
+        var modelFragment = pageState.editorInstance.data.toModel(viewFragment);
+        pageState.editorInstance.model.insertContent(modelFragment);
+      });
       pageState.editorInstance.editing.view.focus();
       markFormDirty();
     } catch (error) {
@@ -955,9 +924,12 @@ var NewArticlePageUI = (function() {
   function destroyEditor() {
     if (pageState.editorInstance) {
       var currentEditor = pageState.editorInstance;
-      pageState.editorInstance = null;
       currentEditor.destroy().catch(function(error) {
         console.warn('Error destroying CKEditor instance:', error);
+      }).finally(function() {
+        if (pageState.editorInstance === currentEditor) {
+          pageState.editorInstance = null;
+        }
       });
     }
   }

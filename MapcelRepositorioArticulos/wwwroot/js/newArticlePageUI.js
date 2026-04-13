@@ -6,11 +6,11 @@
  * Features:
  * - Breadcrumb navigation with dirty form confirmation
  * - Two-column layout (Core Data | Categorization & Assets)
- * - Editor.js rich text editor for article descriptions (outputs HTML)
+ * - CKEditor 5 rich text editor for article descriptions (outputs HTML)
  * - Tag selection via TagPickerUI
  * - File and image upload with staged file management
  * - Role-based permission checks
- * - Edit mode support: hydrates Editor.js from existing HTML content
+ * - Edit mode support: hydrates CKEditor from existing HTML content
  * 
  * Dependencies:
  * - dataModels.js (for status configuration)
@@ -20,8 +20,7 @@
  * - TagPickerUI.js (for tag selection)
  * - CompanyService.js (for role checks)
  * - UserService.js (for user permissions)
- * - Editor.js (CDN: @editorjs/editorjs, @editorjs/header, @editorjs/list, @editorjs/table)
- * - editorjs-html (CDN: editorjs-html@4.0.0 for JSON-to-HTML conversion)
+ * - CKEditor 5 (CDN: ckeditor5.umd.js and ckeditor5.css)
  * - DOMPurify (for HTML sanitization)
  */
 
@@ -46,9 +45,7 @@ var NewArticlePageUI = (function() {
     isFormDirty: false,
     allTags: [],
     canUserUpload: true,     // Determined by CompanySettings
-    editorInstance: null,    // Editor.js instance
-    editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
-    imagePasteHandler: null, // Paste handler reference for cleanup
+    editorInstance: null,    // CKEditor 5 instance
     editMode: false,         // true when editing an existing article
     articleId: null,         // Article ID when in edit mode
     originalArticleData: null, // Original article data for edit mode
@@ -64,6 +61,9 @@ var NewArticlePageUI = (function() {
     clientComments: ''
   };
   var MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
+  var CKEDITOR_SCRIPT_URL = 'https://cdn.ckeditor.com/ckeditor5/47.1.0/ckeditor5.umd.js';
+  var CKEDITOR_STYLE_URL = 'https://cdn.ckeditor.com/ckeditor5/47.1.0/ckeditor5.css';
+  var ckeditorDependenciesPromise = null;
 
   /**
    * Get status options from articleStatusConfiguration
@@ -289,66 +289,18 @@ var NewArticlePageUI = (function() {
           />
         </div>
 
-        <!-- Description Field (Editor.js) -->
+        <!-- Description Field (CKEditor 5) -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
             Descripción <span class="text-red-500">*</span>
           </label>
           <div id="new-article-editor-container" class="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-[520px] min-h-[420px]">
-            <div 
-              id="new-article-editor-toolbar" 
-              class="sticky top-0 z-20 bg-gray-50 border-b border-gray-200 px-3 py-2 flex flex-wrap gap-2"
-            >
-              <button 
-                type="button" 
-                data-editor-action="paragraph"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>+ Párrafo</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="heading"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>⋆ Encabezado</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="list"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>• Lista</span>
-              </button>
-              
-              <button
-                type="button"
-                data-editor-action="ordered-list"
-                class="d-inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"  
-              >
-                <span># Enumeración</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="table"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>Tabla</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="image"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>Imagen</span>
-              </button>
-            </div>
             <div class="flex-1 overflow-y-auto bg-white" id="new-article-editor-scroll">
-              <div id="new-article-editorjs" class="min-h-[360px] px-4 py-4"></div>
+              <div id="new-article-ckeditor" class="min-h-[360px] px-4 py-4"></div>
             </div>
           </div>
           <div class="mt-2 text-xs text-gray-500">
-            Editor de texto enriquecido: encabezados, listas, tablas.
+            Editor de texto enriquecido con herramientas de formato, tablas, medios e imágenes.
           </div>
         </div>
 
@@ -612,129 +564,155 @@ var NewArticlePageUI = (function() {
   }
 
   // =========================================================================
-  // Editor.js Integration
+  // CKEditor 5 Integration
   // =========================================================================
 
-  /**
-   * Initialize the Editor.js instance
-   * Must be called after the DOM container #new-article-editorjs is rendered
-   */
-  function initializeEditor() {
-    if (pageState.editorInstance) {
-      pageState.editorInstance.destroy();
-      pageState.editorInstance = null;
+  function loadScriptOnce(scriptUrl, checkLoadedCallback) {
+    if (checkLoadedCallback()) {
+      return Promise.resolve();
     }
 
-    var editorHolder = document.getElementById('new-article-editorjs');
-    if (!editorHolder) {
-      console.error('Editor.js holder element not found');
-      return;
-    }
-
-    var hasImageTool = typeof ImageTool !== 'undefined';
-    var hasSimpleImage = typeof SimpleImage !== 'undefined';
-    var imageToolConfig = null;
-
-    if (hasImageTool) {
-      imageToolConfig = {
-        class: ImageTool,
-        config: {
-          uploader: {
-            uploadByFile: imageUploadProcess,
-            uploadByUrl: uploadEditorImageByUrl
-          }
-        }
-      };
-      pageState.editorUsesSimpleImage = false;
-    } else if (hasSimpleImage) {
-      imageToolConfig = {
-        class: SimpleImage
-      };
-      pageState.editorUsesSimpleImage = true;
-    } else {
-      console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
-      pageState.editorUsesSimpleImage = false;
-    }
-
-    pageState.editorInstance = new EditorJS({
-      holder: 'new-article-editorjs',
-      placeholder: 'Describe el artículo en detalle...',
-      minHeight: 360,
-      tools: {
-        header: {
-          class: Header,
-          config: {
-            levels: [1, 2, 3, 4, 5, 6],
-            defaultLevel: 2
-          }
-        },
-        list: {
-          class: typeof EditorjsList !== 'undefined' ? EditorjsList
-               : typeof NestedList !== 'undefined' ? NestedList
-               : List,
-          inlineToolbar: true
-        },
-        table: {
-          class: Table,
-          inlineToolbar: true
-        },
-        code: {
-          class: CodeTool
-        },
-
-        delimiter: {
-          class: Delimiter
-        },
-        image: imageToolConfig,
-        ColorPicker: {
-          class: ColorPicker.default,
-        },
-      },
-      onReady: function() {
-        attachImageUrlPasteHandler();
-      },
-      onChange: function() {
-        markFormDirty();
+    return new Promise(function(resolve, reject) {
+      var existingScript = document.querySelector('script[src="' + scriptUrl + '"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', function() { resolve(); }, { once: true });
+        existingScript.addEventListener('error', function() { reject(new Error('No se pudo cargar el script de CKEditor.')); }, { once: true });
+        return;
       }
+
+      var scriptTag = document.createElement('script');
+      scriptTag.src = scriptUrl;
+      scriptTag.async = true;
+      scriptTag.onload = function() { resolve(); };
+      scriptTag.onerror = function() { reject(new Error('No se pudo cargar CKEditor desde CDN.')); };
+      document.head.appendChild(scriptTag);
     });
   }
 
-  /**
-   * Detect image URLs and insert a SimpleImage block on paste.
-   */
-  function attachImageUrlPasteHandler() {
-    var editorHolder = document.getElementById('new-article-editorjs');
-    if (!editorHolder || !pageState.editorInstance) return;
-
-    if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
-
-    if (pageState.imagePasteHandler) {
-      document.removeEventListener('paste', pageState.imagePasteHandler);
+  function loadCkeditorStylesheet() {
+    if (document.querySelector('link[data-mapcel-ckeditor-style="true"]')) {
+      return;
     }
 
-    pageState.imagePasteHandler = function(event) {
-      var target = event.target;
-      if (!editorHolder.contains(target)) return;
+    var styleLink = document.createElement('link');
+    styleLink.rel = 'stylesheet';
+    styleLink.href = CKEDITOR_STYLE_URL;
+    styleLink.setAttribute('data-mapcel-ckeditor-style', 'true');
+    document.head.appendChild(styleLink);
+  }
 
-      var clipboard = event.clipboardData || window.clipboardData;
-      if (!clipboard) return;
+  function ensureCkeditorDependenciesLoaded() {
+    if (ckeditorDependenciesPromise) {
+      return ckeditorDependenciesPromise;
+    }
 
-      var text = (clipboard.getData && clipboard.getData('text/plain')) || '';
-      var url = (text || '').trim();
-      if (!isLikelyImageUrl(url)) return;
+    loadCkeditorStylesheet();
+    ckeditorDependenciesPromise = loadScriptOnce(CKEDITOR_SCRIPT_URL, function() {
+      return !!(window.CKEDITOR && window.CKEDITOR.ClassicEditor);
+    });
 
-      event.preventDefault();
+    return ckeditorDependenciesPromise;
+  }
 
-      try {
-        var index = pageState.editorInstance.blocks.getCurrentBlockIndex();
-        pageState.editorInstance.blocks.insert('image', { url: url }, {}, index + 1, true);
-        markFormDirty();
-      } catch (error) {
-        console.warn('Failed to insert image block from pasted URL:', error);
-      }
+  function CkeditorImageUploadAdapter(loader) {
+    this.loader = loader;
+    this.isAborted = false;
+  }
+
+  CkeditorImageUploadAdapter.prototype.upload = function() {
+    var adapter = this;
+    return this.loader.file
+      .then(function(file) {
+        if (adapter.isAborted) {
+          throw new Error('Carga de imagen cancelada.');
+        }
+        return imageUploadProcess(file);
+      })
+      .then(function(result) {
+        var uploadedUrl = result && result.file ? result.file.url : '';
+        if (!uploadedUrl) {
+          throw new Error('No se pudo obtener la URL de la imagen cargada.');
+        }
+        return {
+          default: uploadedUrl
+        };
+      });
+  };
+
+  CkeditorImageUploadAdapter.prototype.abort = function() {
+    this.isAborted = true;
+  };
+
+  function createMapcelUploadAdapterPlugin(editor) {
+    editor.plugins.get('FileRepository').createUploadAdapter = function(loader) {
+      return new CkeditorImageUploadAdapter(loader);
     };
+  }
 
-    document.addEventListener('paste', pageState.imagePasteHandler);
+  /**
+   * Initialize the CKEditor 5 instance
+   */
+  function initializeEditor() {
+    destroyEditor();
+
+    var editorHolder = document.getElementById('new-article-ckeditor');
+    if (!editorHolder) {
+      console.error('CKEditor holder element not found');
+      return;
+    }
+
+    var initialEditorData = '';
+    if (pageState.editMode && pageState.originalArticleData && pageState.originalArticleData.description) {
+      initialEditorData = sanitizeEditorHtml(pageState.originalArticleData.description);
+    }
+
+    ensureCkeditorDependenciesLoaded()
+      .then(function() {
+        return window.CKEDITOR.ClassicEditor.create(editorHolder, {
+          initialData: initialEditorData,
+          placeholder: 'Describe el artículo en detalle...',
+          toolbar: {
+            items: [
+              'heading', '|',
+              'bold', 'italic', 'link', '|',
+              'bulletedList', 'numberedList', '|',
+              'insertTable', 'uploadImage', 'mediaEmbed', '|',
+              'undo', 'redo'
+            ],
+            shouldNotGroupWhenFull: true
+          },
+          image: {
+            toolbar: [
+              'imageTextAlternative',
+              'toggleImageCaption',
+              'imageStyle:inline',
+              'imageStyle:block',
+              'imageStyle:side'
+            ]
+          },
+          table: {
+            contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+          },
+          link: {
+            addTargetToExternalLinks: true,
+            defaultProtocol: 'https://'
+          },
+          extraPlugins: [createMapcelUploadAdapterPlugin]
+        });
+      })
+      .then(function(editor) {
+        pageState.editorInstance = editor;
+        editor.model.document.on('change:data', function() {
+          markFormDirty();
+        });
+      })
+      .catch(function(error) {
+        console.error('Error initializing CKEditor:', error);
+        dhtmlx.alert({
+          title: 'Error',
+          text: 'No se pudo inicializar el editor de texto.'
+        });
+      });
   }
 
   function getImageDimensions(file) {
@@ -760,7 +738,7 @@ var NewArticlePageUI = (function() {
   }
   
   /**
-   * Prompt for metadata and upload before inserting into Editor.js
+   * Prompt for metadata and upload image for CKEditor
    * @param {File} file
    * @param {{width: number, height: number}} dimensions
    */
@@ -787,14 +765,7 @@ var NewArticlePageUI = (function() {
         
         return uploadEditorImageByFile(file, metadata)
           .then(function(result) {
-            if (!result || !result.file || !result.file.url || !pageState.editorInstance) return null;
-            
-            var currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-            var blockData = pageState.editorUsesSimpleImage
-              ? { url: result.file.url, caption: metadata.description || '' }
-              : { file: { url: result.file.url }, caption: metadata.description || '' };
-            
-            markFormDirty();
+            if (!result || !result.file || !result.file.url) return null;
             return result;
           });
       })
@@ -809,103 +780,50 @@ var NewArticlePageUI = (function() {
   }
 
   /**
-   * Insert a block into the editor after the current selection.
-   * If the current block is empty, it replaces it.
-   * If the current block has content, it inserts after it.
-   * @param {string} blockType
-   * @param {Object} blockData
+   * Insert an image into CKEditor by URL.
+   * @param {string} imageUrl
+   * @param {string=} altText
    */
-  async function insertEditorBlock(blockType, blockData) {
-    if (!pageState.editorInstance) return;
+  function insertImageIntoEditor(imageUrl, altText) {
+    if (!pageState.editorInstance) {
+      return;
+    }
+
+    var safeImageUrl = sanitizeUrl(imageUrl);
+    if (!safeImageUrl) {
+      dhtmlx.message({
+        type: 'error',
+        text: 'La URL de la imagen no es válida.'
+      });
+      return;
+    }
 
     try {
-      await pageState.editorInstance.isReady;
-
-      const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-      let shouldReplace = false;
-      let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
-
-      // Check if the current block is empty
-      if (typeof currentIndex === 'number' && currentIndex >= 0) {
-        const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
-        const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
-
-        // If it's an empty paragraph, we mark it for replacement
-        if (isCurrentBlockEmpty) {
-          shouldReplace = true;
-          targetIndex = currentIndex; // Insert at the same position
-        }
+      if (pageState.editorInstance.commands.get('insertImage')) {
+        pageState.editorInstance.execute('insertImage', {
+          source: safeImageUrl
+        });
+      } else {
+        var fallbackHtml = '<p><img src="' + safeImageUrl + '" alt="' + escapeHtmlAttribute(altText || '') + '" /></p>';
+        pageState.editorInstance.model.change(function() {
+          var viewFragment = pageState.editorInstance.data.processor.toView(fallbackHtml);
+          var modelFragment = pageState.editorInstance.data.toModel(viewFragment);
+          pageState.editorInstance.model.insertContent(modelFragment);
+        });
       }
-
-      // 2. If replacing, delete the empty block first
-      if (shouldReplace) {
-        pageState.editorInstance.blocks.delete(currentIndex);
-      }
-
-      // 3. Insert the new block
-      pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
-
-      // 4. Move Caret to the new block
-      // We use a small timeout to ensure the DOM has rendered the new block before focusing
-      setTimeout(() => {
-        const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
-        if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
-          pageState.editorInstance.caret.setToBlock(finalIndex);
-        }
-      }, 10);
-
+      pageState.editorInstance.editing.view.focus();
       markFormDirty();
     } catch (error) {
-      console.warn('Unable to insert block:', error);
+      console.error('Error inserting image in CKEditor:', error);
+      dhtmlx.message({
+        type: 'error',
+        text: 'No se pudo insertar la imagen en la descripción.'
+      });
     }
   }
 
   /**
-   * Handle quick action toolbar clicks.
-   * @param {string} action
-   */
-  function handleEditorToolbarAction(action) {
-    switch (action) {
-      case 'paragraph':
-        insertEditorBlock('paragraph', { text: '' });
-        break;
-      case 'heading':
-        insertEditorBlock('header', { text: '', level: 2 });
-        break;
-      case 'list':
-        insertEditorBlock('list', { style: 'unordered', items: [{ content: '', items: [] }] });
-        break;
-      case 'ordered-list':
-        insertEditorBlock('list', { style: 'ordered', items: [{ content: '', items: [] }] });
-        break;
-      case 'table':
-        insertEditorBlock('table', { withHeadings: false, content: [['', ''], ['', '']] });
-        break;
-      case 'image':
-        insertEditorBlock('image', pageState.editorUsesSimpleImage ? { url: '', caption: 'Haz clic para editar la imagen' } : { file: { url: '' }, caption: 'Selecciona o pega una imagen' });
-        break;
-      default:
-        break;
-    }
-  }
-
-  /**
-   * Attach click handlers to the persistent editor toolbar.
-   */
-  function attachEditorToolbarHandlers() {
-    var toolbar = document.getElementById('new-article-editor-toolbar');
-    if (!toolbar) return;
-
-    toolbar.addEventListener('click', function(event) {
-      var button = event.target.closest('[data-editor-action]');
-      if (!button) return;
-      var action = button.getAttribute('data-editor-action');
-      handleEditorToolbarAction(action);
-    });
-  }
-
-  /**
-   * Build the public file URL used by Editor.js image blocks
+   * Build the public file URL used by CKEditor image content
    * @param {string} companyCode - Company identifier
    * @param {string|number} fileId - Uploaded file identifier with extension
    * @returns {string} Image retrieval URL
@@ -933,8 +851,8 @@ var NewArticlePageUI = (function() {
   }
 
   /**
-   * Upload an image file to FilesController for Editor.js Image Tool
-   * @param {File} file - Local file selected in Editor.js
+   * Upload an image file to FilesController for CKEditor image uploads
+   * @param {File} file - Local file selected in CKEditor
    * @param {{description: string, desiredFileName: string, dimensions: [number, number]}} metadata
    * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
    */
@@ -1032,47 +950,15 @@ var NewArticlePageUI = (function() {
   }
   
   /**
-   * Keep URL-based image insertion available in Image Tool.
-   * @param {string} imageUrl - URL entered in Editor.js
-   * @returns {Promise<{success: number, file: {url: string}}>}
-   */
-  function uploadEditorImageByUrl(imageUrl) {
-    if (!imageUrl || !imageUrl.trim()) {
-      var urlError = new Error('Debes indicar una URL de imagen válida.');
-      dhtmlx.message({ type: 'error', text: urlError.message });
-      return Promise.reject(urlError);
-    }
-
-    return Promise.resolve({
-      success: 1,
-      file: {
-        url: imageUrl.trim()
-      }
-    });
-  }
-
-  /**
-   * Check if the pasted URL is likely an image URL.
-   * @param {string} url
-   * @returns {boolean}
-   */
-  function isLikelyImageUrl(url) {
-    if (!url) return false;
-    if (!/^https?:\/\//i.test(url)) return false;
-    return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
-  }
-
-  /**
-   * Destroy the Editor.js instance and clean up
+   * Destroy the CKEditor instance and clean up
    */
   function destroyEditor() {
     if (pageState.editorInstance) {
-      pageState.editorInstance.destroy();
+      var currentEditor = pageState.editorInstance;
       pageState.editorInstance = null;
-    }
-    if (pageState.imagePasteHandler) {
-      document.removeEventListener('paste', pageState.imagePasteHandler);
-      pageState.imagePasteHandler = null;
+      currentEditor.destroy().catch(function(error) {
+        console.warn('Error destroying CKEditor instance:', error);
+      });
     }
   }
 
@@ -1094,220 +980,21 @@ var NewArticlePageUI = (function() {
     return DOMPurify.sanitize(htmlString, EDITOR_HTML_SANITIZE_CONFIG);
   }
 
-  /**
-   * Sanitize table cell HTML content, preserving headings, images, and inline styles.
-   * @param {string} cellHtml
-   * @returns {string}
-   */
-  function sanitizeEditorTableCellHtml(cellHtml) {
-    return sanitizeEditorHtml(cellHtml || '');
-  }
-
-  /**
-   * Render list items recursively for editorjs-html custom parser
-   * Handles both simple string items and nested object-based items (list v2.0+)
-   * @param {Array} items - List items from Editor.js block data
-   * @param {string} listTag - 'ol' or 'ul'
-   * @returns {string} HTML string of list items
-   */
-  function renderListItemsToHtml(items, listTag) {
-    return items.map(function(item) {
-      var content = typeof item === 'string' ? item : (item.content || '');
-      var nestedHtml = '';
-      if (item.items && item.items.length > 0) {
-        nestedHtml = '<' + listTag + '>' + renderListItemsToHtml(item.items, listTag) + '</' + listTag + '>';
-      }
-      return '<li>' + content + nestedHtml + '</li>';
-    }).join('');
-  }
-
-  /**
-   * Convert Editor.js saved data (JSON) to a standard HTML string
-   * Uses editorjs-html with custom parsers for list and table blocks
-   * @param {Object} editorData - The saved data from editor.save()
-   * @returns {string} HTML string
-   */
-  function convertEditorDataToHtml(editorData) {
-    if (!editorData || !editorData.blocks || editorData.blocks.length === 0) {
-      return '';
+  function hasMeaningfulEditorContent(htmlString) {
+    if (!htmlString || !htmlString.trim()) {
+      return false;
     }
 
-    var customParsers = {
-      list: function(block) {
-        var listTag = block.data.style === 'ordered' ? 'ol' : 'ul';
-        var itemsHtml = renderListItemsToHtml(block.data.items, listTag);
-        return '<' + listTag + '>' + itemsHtml + '</' + listTag + '>';
-      },
-      table: function(block) {
-        var rows = block.data.content || [];
-        var withHeadings = block.data.withHeadings;
-        var tableHtml = '<table>';
-        rows.forEach(function(row, rowIndex) {
-          tableHtml += '<tr>';
-          row.forEach(function(cell) {
-            var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
-            var safeCellHtml = sanitizeEditorTableCellHtml(cell);
-            tableHtml += '<' + cellTag + '>' + safeCellHtml + '</' + cellTag + '>';
-          });
-          tableHtml += '</tr>';
-        });
-        tableHtml += '</table>';
-        return tableHtml;
-      },
-      image: function(block) {
-        var imageUrl = '';
-        var caption = '';
-        var isStretched = false;
-
-        if (block && block.data) {
-          imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
-          caption = block.data.caption || '';
-          isStretched = !!block.data.stretched;
-        }
-
-        if (!imageUrl) return '';
-
-        var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
-        var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
-        return '<figure class="' + figureClass + '"><img src="' + escapeHtml(imageUrl) + '" alt=""/>' + captionHtml + '</figure>';
-      }
-    };
-
-    var parser = edjsHTML(customParsers);
-    var htmlArray = parser.parse(editorData);
-    return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
-  }
-
-  /**
-   * Convert an HTML string into Editor.js block data for hydration in edit mode
-   * Parses HTML elements into block objects compatible with Editor.js blocks.render()
-   * @param {string} htmlString - The HTML string to convert
-   * @returns {Object} Editor.js data object with blocks array
-   */
-  function htmlToEditorJsBlocks(htmlString) {
-    var tempParser = new DOMParser();
-    var doc = tempParser.parseFromString(htmlString, 'text/html');
-    var blocks = [];
-
-    /**
-     * Parse <li> children of a list element into Editor.js list items
-     * @param {HTMLElement} listElement - The <ul> or <ol> element
-     * @returns {Array} Array of list item objects
-     */
-    function parseListChildren(listElement) {
-      var listItems = [];
-      var children = listElement.querySelectorAll(':scope > li');
-      children.forEach(function(li) {
-        var itemContent = '';
-        var nestedItems = [];
-        li.childNodes.forEach(function(child) {
-          if (child.nodeType === Node.ELEMENT_NODE &&
-              (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
-            nestedItems = parseListChildren(child);
-          } else if (child.nodeType === Node.ELEMENT_NODE) {
-            itemContent += child.outerHTML;
-          } else if (child.nodeType === Node.TEXT_NODE) {
-            itemContent += child.textContent;
-          }
-        });
-        listItems.push({ content: itemContent.trim(), items: nestedItems });
-      });
-      return listItems;
+    var htmlParser = new DOMParser();
+    var parsedDocument = htmlParser.parseFromString(htmlString, 'text/html');
+    if (parsedDocument.body.querySelector('img, table, video, iframe, blockquote, ul, ol')) {
+      return true;
     }
 
-    doc.body.childNodes.forEach(function(node) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        var tag = node.tagName.toLowerCase();
-
-        if (/^h[1-6]$/.test(tag)) {
-          blocks.push({
-            type: 'header',
-            data: { text: node.innerHTML, level: parseInt(tag[1], 10) }
-          });
-        } else if (tag === 'p') {
-          if (node.innerHTML.trim()) {
-            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
-          }
-        } else if (tag === 'ul' || tag === 'ol') {
-          blocks.push({
-            type: 'list',
-            data: {
-              style: tag === 'ol' ? 'ordered' : 'unordered',
-              items: parseListChildren(node)
-            }
-          });
-        } else if (tag === 'table') {
-          var tableContent = [];
-          var hasHeadings = node.querySelector('th') !== null;
-          node.querySelectorAll('tr').forEach(function(tr) {
-            var row = [];
-            tr.querySelectorAll('td, th').forEach(function(cell) {
-              row.push(cell.innerHTML);
-            });
-            if (row.length > 0) tableContent.push(row);
-          });
-          blocks.push({
-            type: 'table',
-            data: { withHeadings: hasHeadings, content: tableContent }
-          });
-        } else if (tag === 'figure' && node.querySelector('img')) {
-          var figureImage = node.querySelector('img');
-          var figureCaption = node.querySelector('figcaption');
-          blocks.push({
-            type: 'image',
-            data: {
-              file: { url: figureImage.getAttribute('src') || '' },
-              caption: figureCaption ? figureCaption.textContent : '',
-              stretched: node.classList.contains('cdx-image--stretched')
-            }
-          });
-        } else if (tag === 'img') {
-          blocks.push({
-            type: 'image',
-            data: {
-              file: { url: node.getAttribute('src') || '' },
-              caption: ''
-            }
-          });
-        } else {
-          // Treat unknown block-level elements as paragraphs
-          if (node.textContent.trim()) {
-            blocks.push({ type: 'paragraph', data: { text: node.innerHTML } });
-          }
-        }
-      } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-        blocks.push({ type: 'paragraph', data: { text: node.textContent } });
-      }
-    });
-
-    return { blocks: blocks };
-  }
-
-  /**
-   * Hydrate the Editor.js instance with existing HTML content (for edit mode)
-   * Tries editor.blocks.renderFromHTML first, falls back to manual block parsing
-   * @param {Object} editor - The Editor.js instance
-   * @param {string} htmlString - The HTML content to load
-   */
-  function hydrateEditorFromHtml(editor, htmlString) {
-    var sanitizedHtml = sanitizeEditorHtml(htmlString);
-    if (typeof DOMPurify === 'undefined') {
-      console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration');
-    }
-
-    editor.isReady.then(function() {
-      if (typeof editor.blocks.renderFromHTML === 'function') {
-        editor.blocks.renderFromHTML(sanitizedHtml);
-      } else {
-        // Fallback: parse HTML to Editor.js blocks manually
-        var blocksData = htmlToEditorJsBlocks(sanitizedHtml);
-        if (blocksData.blocks.length > 0) {
-          editor.blocks.render(blocksData);
-        }
-      }
-    }).catch(function(error) {
-      console.error('Error hydrating editor from HTML:', error);
-    });
+    var plainText = (parsedDocument.body.textContent || '')
+      .replace(/\u00a0/g, ' ')
+      .trim();
+    return plainText.length > 0;
   }
 
   /**
@@ -1332,10 +1019,6 @@ var NewArticlePageUI = (function() {
     // Update tags display
     updateSelectedTagsDisplay();
 
-    // Hydrate editor with article description HTML
-    if (article.description && pageState.editorInstance) {
-      hydrateEditorFromHtml(pageState.editorInstance, article.description);
-    }
   }
 
   /**
@@ -1817,11 +1500,7 @@ var NewArticlePageUI = (function() {
       btn.addEventListener('click', function() {
         var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
         const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-        insertEditorBlock('image', {
-          file: {
-            url: imageUrl
-          }
-        });
+        insertImageIntoEditor(imageUrl);
       });
     });
   }
@@ -2058,11 +1737,7 @@ var NewArticlePageUI = (function() {
       btn.addEventListener('click', function() {
         var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
         const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-        insertEditorBlock('image', {
-          file: {
-            url: imageUrl
-          }
-        });
+        insertImageIntoEditor(imageUrl);
       });
     });
   }
@@ -2228,7 +1903,7 @@ var NewArticlePageUI = (function() {
       errors.push('El título es obligatorio');
     }
 
-    if (!descriptionHtml || !descriptionHtml.trim()) {
+    if (!hasMeaningfulEditorContent(descriptionHtml)) {
       errors.push('La descripción es obligatoria');
     }
     
@@ -2301,113 +1976,102 @@ var NewArticlePageUI = (function() {
       return;
     }
 
-    // Save editor content (returns a Promise with JSON block data)
-    pageState.editorInstance.save()
-      .then(function(editorData) {
-        // Convert Editor.js JSON blocks to standard HTML
-        var descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
-        if (typeof DOMPurify === 'undefined') {
-          console.warn('DOMPurify not loaded: HTML output will not be sanitized');
-        }
+    // Save editor content as HTML string via CKEditor
+    var descriptionHtml = sanitizeEditorHtml(pageState.editorInstance.getData());
+    if (typeof DOMPurify === 'undefined') {
+      console.warn('DOMPurify not loaded: HTML output will not be sanitized');
+    }
 
-        if (!validateForm(descriptionHtml)) {
-          return;
-        }
+    if (!validateForm(descriptionHtml)) {
+      return;
+    }
 
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
-        }
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = pageState.editMode ? 'Guardando...' : 'Creando...';
+    }
 
-        var formData = getFormData(descriptionHtml);
+    var formData = getFormData(descriptionHtml);
 
-        // Upload any staged files and images
-        var uploadPromises = [];
+    // Upload any staged files and images
+    var uploadPromises = [];
 
-        pageState.stagedFiles.forEach(function(fileData) {
-          uploadPromises.push(
-            FileService.uploadFiles([fileData.file], '', pageState.companyCode)
-              .then(function(files) {
-                var uploadedFile = files && files[0];
-                if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
-                  throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
-                }
-                return { type: 'file', id: uploadedFile.id };
-              })
-          );
+    pageState.stagedFiles.forEach(function(fileData) {
+      uploadPromises.push(
+        FileService.uploadFiles([fileData.file], '', pageState.companyCode)
+          .then(function(files) {
+            var uploadedFile = files && files[0];
+            if (!uploadedFile || uploadedFile.id === undefined || uploadedFile.id === null) {
+              throw new Error('La respuesta del servidor no contiene el identificador del archivo.');
+            }
+            return { type: 'file', id: uploadedFile.id };
+          })
+      );
+    });
+
+    pageState.stagedImages.forEach(function(imageData) {
+      uploadPromises.push(
+        ImageService.uploadImages([imageData.file], [], imageData.description || '', pageState.companyCode, [{
+          description: imageData.description || '',
+          desiredFileName: imageData.desiredFileName || imageData.file.name
+        }])
+          .then(function(images) {
+            var uploadedImage = images && images[0];
+            if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {
+              throw new Error('La respuesta del servidor no contiene el identificador de la imagen.');
+            }
+            return { type: 'image', id: uploadedImage.id };
+          })
+      );
+    });
+
+    // Wait for all uploads to complete, then save the article
+    Promise.all(uploadPromises)
+      .then(function(uploadResults) {
+        uploadResults.forEach(function(result) {
+          if (result.type === 'file') {
+            formData.attachedFiles.push(result.id);
+          } else if (result.type === 'image') {
+            formData.attachedImages.push(result.id);
+          }
         });
 
-        pageState.stagedImages.forEach(function(imageData) {
-          uploadPromises.push(
-            ImageService.uploadImages([imageData.file], [], imageData.description || '', pageState.companyCode, [{
-              description: imageData.description || '',
-              desiredFileName: imageData.desiredFileName || imageData.file.name
-            }])
-              .then(function(images) {
-                var uploadedImage = images && images[0];
-                if (!uploadedImage || uploadedImage.id === undefined || uploadedImage.id === null) {
-                  throw new Error('La respuesta del servidor no contiene el identificador de la imagen.');
-                }
-                return { type: 'image', id: uploadedImage.id };
-              })
-          );
-        });
+        formData.fileIds = formData.attachedImages.slice().concat(formData.attachedFiles.slice());
 
-        // Wait for all uploads to complete, then save the article
-        Promise.all(uploadPromises)
-          .then(function(uploadResults) {
-            uploadResults.forEach(function(result) {
-              if (result.type === 'file') {
-                formData.attachedFiles.push(result.id);
-              } else if (result.type === 'image') {
-                formData.attachedImages.push(result.id);
-              }
-            });
-
-            formData.fileIds = formData.attachedImages.slice().concat(formData.attachedFiles.slice());
-
-            if (pageState.editMode) {
-              return ArticleService.updateArticle(pageState.articleId, formData, pageState.companyCode);
-            } else {
-              return ArticleService.createArticle(formData, pageState.companyCode);
-            }
-          })
-          .then(function(response) {
-            if (response.status === 'success') {
-              var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
-              dhtmlx.message({
-                text: 'Artículo ' + actionLabel + ' exitosamente',
-                type: 'success',
-                expire: 3000
-              });
-
-              var savedData = response.data;
-              var navigateBackCallback = pageState.onNavigateBack;
-              resetPageState();
-              if (navigateBackCallback) {
-                navigateBackCallback(savedData);
-              }
-            }
-          })
-          .catch(function(error) {
-            console.error('Error saving article:', error);
-            dhtmlx.alert({
-              title: 'Error',
-              text: 'Error al guardar el artículo: ' + error.message
-            });
-
-            if (submitBtn) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
-            }
+        if (pageState.editMode) {
+          return ArticleService.updateArticle(pageState.articleId, formData, pageState.companyCode);
+        } else {
+          return ArticleService.createArticle(formData, pageState.companyCode);
+        }
+      })
+      .then(function(response) {
+        if (response.status === 'success') {
+          var actionLabel = pageState.editMode ? 'actualizado' : 'creado';
+          dhtmlx.message({
+            text: 'Artículo ' + actionLabel + ' exitosamente',
+            type: 'success',
+            expire: 3000
           });
+
+          var savedData = response.data;
+          var navigateBackCallback = pageState.onNavigateBack;
+          resetPageState();
+          if (navigateBackCallback) {
+            navigateBackCallback(savedData);
+          }
+        }
       })
       .catch(function(error) {
-        console.error('Error saving editor content:', error);
+        console.error('Error saving article:', error);
         dhtmlx.alert({
           title: 'Error',
-          text: 'Error al obtener el contenido del editor.'
+          text: 'Error al guardar el artículo: ' + error.message
         });
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = pageState.editMode ? 'Guardar Cambios' : 'Crear Artículo';
+        }
       });
   }
 
@@ -2501,7 +2165,6 @@ var NewArticlePageUI = (function() {
       layoutCell.attachHTMLString(renderPageHtml());
       setTimeout(function() {
         attachEventHandlers();
-        attachEditorToolbarHandlers();
         initializeEditor();
         updateStagedFilesDisplay();
         updateStagedImagesDisplay();
@@ -2616,7 +2279,7 @@ var NewArticlePageUI = (function() {
    * Close the page and clean up resources
    */
   function closePage() {
-    // Destroy Editor.js instance
+    // Destroy CKEditor instance
     destroyEditor();
 
     // Revoke any object URLs

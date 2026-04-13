@@ -494,7 +494,12 @@ public sealed class IntegratedArticleService(IConfiguration configuration, IWebH
     {
         throw new NotImplementedException();
     }
-    
+
+    public async Task<ArticleDetailsDto> UpdateAggregateAsync(UpdateArticleCommand command, CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
     /// <summary>
     /// Validates the provided companyCode is not null or empty.
     /// </summary>

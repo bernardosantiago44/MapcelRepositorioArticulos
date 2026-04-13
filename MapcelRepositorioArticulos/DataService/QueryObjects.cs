@@ -79,7 +79,7 @@ public class FileQuery
     public Guid? CompanyCode { get; set; }
     public string? SearchTerm { get; set; } = null;
     public bool ImagesOnly { get; set; } = false;
-    public int? Id { get; set; } = null;
+    public Guid? Id { get; set; } = null;
     public string[]? Extensions { get; set; } = null;
     public DateOnly? DateFrom { get; init; } = null;
     public DateOnly? DateTo { get; init; } = null;

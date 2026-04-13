@@ -22,7 +22,7 @@ public abstract class BaseService
         }
         catch (Exception error)
         {
-            Log.Fatal($"DataService.BaseService:25 - ${error.Message}");
+            Log.Fatal("DataService.BaseService:25 - ${ErrorMessage}", error.Message);
         }
     }
     

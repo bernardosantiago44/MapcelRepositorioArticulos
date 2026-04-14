@@ -9,7 +9,7 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("/api/articles/{companyCode:guid}")]
-public class ArticlesController(IArticlesService service, IArticleAggregateService newService, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
+public class ArticlesController(IArticleAggregateService service, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
@@ -145,7 +145,7 @@ public class ArticlesController(IArticlesService service, IArticleAggregateServi
             var command = MapToCreateArticleCommand(companyCode, request);
             command.Validate();
             
-            var createdArticle = await newService.CreateAggregateAsync(command, cancellationToken);
+            var createdArticle = await service.CreateAggregateAsync(command, cancellationToken);
 
             return CreatedAtAction(
                 nameof(GetById),
@@ -168,12 +168,11 @@ public class ArticlesController(IArticlesService service, IArticleAggregateServi
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
         [FromRoute] Guid companyCode,
-        [FromBody] BulkUpdateTagsRequest? request,
+        [FromBody] BulkUpdateTagsRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            if (request is null) return BadRequest("Request body is required.");
             if (request.TagId <= 0) return BadRequest("TagId must be > 0.");
             if (string.IsNullOrWhiteSpace(request.Action)) return BadRequest("Action is required.");
 
@@ -229,7 +228,7 @@ public class ArticlesController(IArticlesService service, IArticleAggregateServi
             var command = MapToUpdateArticleCommand(id, companyCode, request);
             command.Validate();
 
-            var updated = await newService.UpdateAggregateAsync(command, cancellationToken);
+            var updated = await service.UpdateAggregateAsync(command, cancellationToken);
             return Ok(updated);
         }
         catch (KeyNotFoundException ex)

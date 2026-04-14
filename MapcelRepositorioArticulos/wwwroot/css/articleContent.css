@@ -1,5 +1,5 @@
 /* Container & Base Typography */
-.article-html-content, .ce-block {
+.article-html-content {
     --primary-text: #2c3e50;
     --secondary-text: #546e7a;
     --border-color: #e0e0e0;
@@ -13,29 +13,29 @@
 }
 
 /* Headings - Using margins to create clear visual hierarchy */
-.article-html-content h1, .ce-block h1,
-.article-html-content h2, .ce-block-h2,
-.article-html-content h3, .ce-block-h3,
-.article-html-content h4, .ce-block-h4,
-.article-html-content h5, .ce-block-h5,
-.article-html-content h6, .ce-block-h6 {
+.article-html-content h1, .ck h1,
+.article-html-content h2, .ck-h2,
+.article-html-content h3, .ck-h3,
+.article-html-content h4, .ck-h4,
+.article-html-content h5, .ck-h5,
+.article-html-content h6, .ck-h6 {
     font-weight: 700;
     line-height: 1.2;
 }
 
-.article-html-content h1, .ce-block h1 { font-size: 2.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
-.article-html-content h2, .ce-block h2 { font-size: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
-.article-html-content h3, .ce-block h3 { font-size: 1.75rem; }
-.article-html-content h4, .ce-block h4 { font-size: 1.5rem; }
+.article-html-content h1, .ck h1 { font-size: 2.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+.article-html-content h2, .ck h2 { font-size: 2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+.article-html-content h3, .ck h3 { font-size: 1.75rem; }
+.article-html-content h4, .ck h4 { font-size: 1.5rem; }
 
 /* Paragraphs and Spacing */
-.article-html-content p, .ce-block p {
+.article-html-content p, .ck p {
     margin: 0.8em 0;
 }
 
 /* Lists */
-.article-html-content ul, .ce-block ul, 
-.article-html-content ol, .ce-block ol {
+.article-html-content ul, .ck ul, 
+.article-html-content ol, .ck ol {
     padding-left: 2em;
     margin: 0.6em 0;
 }

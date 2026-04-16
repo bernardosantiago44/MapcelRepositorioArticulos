@@ -1561,7 +1561,7 @@ const NewArticlePageUI = (function () {
         container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-                const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+                const imageUrl = sanitizeUrl(imageIdWithExtension);
                 insertImageIntoEditor(imageUrl);
             });
         });
@@ -1591,7 +1591,7 @@ const NewArticlePageUI = (function () {
         </div>
         <button 
           type="button"
-          data-copy-image-id="${imageIdAndExtension}"
+          data-copy-image-id="${thumbnailUrl}"
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
           title="Insertar a la descripción"
         >

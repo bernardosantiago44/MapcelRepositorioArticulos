@@ -154,6 +154,7 @@ public interface IFilesService
     private const string SqlInsertFile = """
         INSERT INTO [RepositorioArticulos].[dbo].[files]
         (
+            file_id,
             company_code,
             name,
             size_bytes,
@@ -167,6 +168,7 @@ public interface IFilesService
         OUTPUT INSERTED.file_id
         VALUES
         (
+            @FileId,
             @CompanyCode,
             @Name,
             @SizeBytes,
@@ -425,9 +427,10 @@ public interface IFilesService
         var extension = Path.GetExtension(originalFileName);
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
+        var fileId = Guid.NewGuid();
         var isImage = IsImage(file, extension);
-        var thumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? null : upload.ThumbnailUrl.Trim();
-        var hasImageMetadata = upload.Width is not null || upload.Height is not null || thumbnailUrl is not null;
+        var thumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? "" : upload.ThumbnailUrl.Trim();
+        var hasImageMetadata = upload.Width is not null || upload.Height is not null;
         if (!isImage && hasImageMetadata)
         {
             Log.Warning(
@@ -443,63 +446,46 @@ public interface IFilesService
         await connection.OpenAsync(cancellationToken);
 
         await using var tx = await connection.BeginTransactionAsync(cancellationToken);
-        string? physicalPath = null;
+        
+        // Save File to disk
+        var physicalPath = BuildPhysicalFilePath(companyCode, fileId, extension);
+        var relativePath = $"/files/{companyCode:D}/{fileId:D}{extension}";
+        await using (var fs = new FileStream(
+                         physicalPath,
+                         FileMode.CreateNew,
+                         FileAccess.Write,
+                         FileShare.None,
+                         bufferSize: 1024 * 1024,
+                         useAsync: true))
+        {
+            await file.CopyToAsync(fs, cancellationToken);
+        }
+
+        var thumbnailUri = new Uri(relativePath, UriKind.RelativeOrAbsolute);
+        
         try
         {
             await using var insertFileCommand = new SqlCommand(SqlInsertFile, connection, (SqlTransaction)tx);
             insertFileCommand.CommandType = CommandType.Text;
 
+            insertFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
             insertFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             insertFileCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = name });
             insertFileCommand.Parameters.Add(new SqlParameter("@SizeBytes", SqlDbType.BigInt) { Value = file.Length });
             insertFileCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = (object?)description ?? DBNull.Value });
             insertFileCommand.Parameters.Add(new SqlParameter("@Width", SqlDbType.Int) { Value = (object?)width ?? DBNull.Value });
             insertFileCommand.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = (object?)height ?? DBNull.Value });
-            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = (object?)thumbnailUrl ?? DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = thumbnailUri.ToString() });
             insertFileCommand.Parameters.Add(new SqlParameter("@IsImage", SqlDbType.Bit) { Value = isImage });
             insertFileCommand.Parameters.Add(new SqlParameter("@Extension", SqlDbType.VarChar, 15) { Value = extension });
 
-            var fileResult = await insertFileCommand.ExecuteScalarAsync(cancellationToken);
-            if (fileResult is null)
-                throw new InvalidOperationException("FilesService.CreateAsync(Guid:file:token): Failed to create file record.");
-
-            var newFileId = Guid.Parse(fileResult.ToString() ?? Guid.Empty.ToString());
-            physicalPath = BuildPhysicalFilePath(companyCode, newFileId, extension);
-
-            var relativePath = $"/files/{companyCode:D}/{newFileId:D}{extension}";
-
-            await using (var fs = new FileStream(
-                             physicalPath,
-                             FileMode.CreateNew,
-                             FileAccess.Write,
-                             FileShare.None,
-                             bufferSize: 1024 * 1024,
-                             useAsync: true))
-            {
-                await file.CopyToAsync(fs, cancellationToken);
-            }
-
-            if (thumbnailUrl is null)
-            {
-                // Relative URL is fine; frontend can prepend API base if needed
-
-                await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
-                updateThumbCmd.CommandType = CommandType.Text;
-                updateThumbCmd.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = newFileId });
-                updateThumbCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-                updateThumbCmd.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = relativePath });
-
-                await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            var thumbnailUri = new Uri(relativePath, UriKind.RelativeOrAbsolute);
-
+            await insertFileCommand.ExecuteNonQueryAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
 
             // 4) Return DTO
             return new FileAsset
             {
-                Id = newFileId.ToString(),
+                Id = fileId.ToString(),
                 Name = name,
                 Description = description ?? string.Empty,
                 Extension = extension,
@@ -640,7 +626,7 @@ public interface IFilesService
 
         var downloadPath = await GetDownloadInfoAsync(fileId, companyCode, cancellationToken);
         if  (downloadPath is null) return false;
-        var physicalPath = Path.Combine(env.WebRootPath, downloadPath);
+        var physicalPath = Path.Join(env.WebRootPath, downloadPath);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);

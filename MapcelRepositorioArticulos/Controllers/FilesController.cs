@@ -213,8 +213,7 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
             var downloadPath = await service.GetDownloadInfoAsync(id, companyCode, cancellationToken);
             if (downloadPath is null) return NotFound();
 
-            var physicalPath = Path.Combine(env.WebRootPath, downloadPath);
-
+            var physicalPath = Path.Join(env.WebRootPath, downloadPath);
             if (!System.IO.File.Exists(physicalPath))
                 return NotFound("File bytes not found on disk.");
 

@@ -115,7 +115,7 @@ public sealed class ArticleDetailsDto
 }
 
 public record BulkUpdateTagsRequest(
-    int[] ArticleIds,
+    Guid[] ArticleIds,
     int TagId,
     string Action // "add" | "remove"
 );

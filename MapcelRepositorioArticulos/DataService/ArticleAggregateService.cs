@@ -11,6 +11,73 @@ namespace MapcelRepositorioArticulos.DataService;
 public sealed class ArticleAggregateService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
     : BaseService(configuration), IArticleAggregateService
 {
+    private const string SqlSelectArticlesWithQuery = """
+            WITH ArticleBase AS (
+                SELECT a.article_id
+                FROM [RepositorioArticulos].[dbo].[articles] a
+                WHERE a.company_code = @companyCode
+                  AND (@status IS NULL OR a.status = @status)
+                  AND (@articleId IS NULL OR a.article_id = @articleId)
+                  AND (
+                        @search IS NULL
+                        OR a.title LIKE '%' + @search + '%'
+                        OR a.description LIKE '%' + @search + '%'
+                      )
+                  AND (
+                        @tagIds IS NULL OR EXISTS (
+                            SELECT 1 FROM [RepositorioArticulos].[dbo].[article_tags] filter_at
+                            WHERE filter_at.article_id = a.article_id
+                            AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
+                        )
+                      )
+                ORDER BY a.created_at DESC
+                OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
+            )
+            SELECT 
+                a.article_id,
+                a.title,
+                a.description,
+                a.status,
+                a.created_at,
+                a.updated_at,
+                tag_data.tags,
+                file_data.files,
+                client_comments,
+                external_link
+            FROM ArticleBase b
+            JOIN [RepositorioArticulos].[dbo].[articles] a ON b.article_id = a.article_id
+            OUTER APPLY (
+                SELECT STRING_AGG(t.tag_id, ',') AS tags
+                FROM [RepositorioArticulos].[dbo].[article_tags] at
+                JOIN [RepositorioArticulos].[dbo].[tags] t ON at.tag_id = t.tag_id
+                WHERE at.article_id = a.article_id
+            ) AS tag_data
+            OUTER APPLY (
+                SELECT STRING_AGG(CAST(fa.file_id AS NVARCHAR(36)), ',') AS files
+                FROM [RepositorioArticulos].[dbo].[file_articles] fa
+                WHERE fa.article_id = a.article_id
+            ) as file_data
+            ORDER BY a.created_at DESC;
+
+            -- 2. Get the total count using the EXACT SAME filters
+            SELECT COUNT(1)
+            FROM [RepositorioArticulos].[dbo].[articles] a
+            WHERE a.company_code = @companyCode
+              AND (@status IS NULL OR a.status = @status)
+              AND (@articleId IS NULL OR a.article_id = @articleId)
+              AND (
+                    @search IS NULL
+                    OR a.title LIKE '%' + @search + '%'
+                    OR a.description LIKE '%' + @search + '%'
+                  )
+              AND (
+                    @tagIds IS NULL OR EXISTS (
+                        SELECT 1 FROM [RepositorioArticulos].[dbo].[article_tags] filter_at
+                        WHERE filter_at.article_id = a.article_id
+                        AND filter_at.tag_id IN (SELECT value FROM STRING_SPLIT(@tagIds, ','))
+                    )
+                  );
+        """;
     private const string SqlInsertArticle = """
         INSERT INTO [RepositorioArticulos].[dbo].[articles]
         (
@@ -94,7 +161,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         WHERE article_id = @ArticleId
           AND company_code = @CompanyCode;
     ";
-
     private const string SqlUpdateArticle = @"
         UPDATE [RepositorioArticulos].[dbo].[articles]
         SET
@@ -111,7 +177,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         WHERE article_id = @ArticleId
           AND company_code = @CompanyCode;
     ";
-
     private const string SqlDeleteArticleTags = @"
         DELETE at
         FROM [RepositorioArticulos].[dbo].[article_tags] at
@@ -120,7 +185,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         WHERE at.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
     ";
-
     private const string SqlLinkExistingFileToArticle = @"
         INSERT INTO [RepositorioArticulos].[dbo].[file_articles]
         (
@@ -140,7 +204,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                 AND fa.article_id = @ArticleId
           );
     ";
-
     private const string SqlUnlinkFileFromArticle = @"
         DELETE fa
         FROM [RepositorioArticulos].[dbo].[file_articles] fa
@@ -150,7 +213,141 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
           AND fa.file_id = @FileId
           AND f.company_code = @CompanyCode;
     ";
+    private const string SqlBulkAddTagToArticles = """
+        IF NOT EXISTS (SELECT 1 FROM [RepositorioArticulos].[dbo].[tags] WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        BEGIN
+            SELECT CAST(-1 AS int);
+            RETURN;
+        END;
 
+        ;WITH ids AS
+        (
+            SELECT DISTINCT TRY_CAST(value AS uniqueidentifier) AS article_id
+            FROM string_split(@ArticleIdsCsv, ',')
+            WHERE TRY_CAST(value AS uniqueidentifier) IS NOT NULL
+        )
+        INSERT INTO [RepositorioArticulos].[dbo].[article_tags] (article_id, tag_id)
+        SELECT a.article_id, @TagId
+        FROM [RepositorioArticulos].[dbo].[articles] a
+        INNER JOIN ids i ON i.article_id = a.article_id
+        WHERE a.company_code = @CompanyCode
+          AND NOT EXISTS
+          (
+              SELECT 1
+              FROM [RepositorioArticulos].[dbo].[article_tags] at
+              WHERE at.article_id = a.article_id
+                AND at.tag_id = @TagId
+          );
+
+        SELECT @@ROWCOUNT;
+    """;
+    private const string SqlBulkRemoveTagFromArticles = """
+        IF NOT EXISTS (SELECT 1 FROM [RepositorioArticulos].[dbo].[tags] WHERE tag_id = @TagId AND company_code = @CompanyCode)
+        BEGIN
+            SELECT CAST(-1 AS int);
+            RETURN;
+        END;
+
+        ;WITH ids AS
+        (
+            SELECT DISTINCT TRY_CAST(value AS uniqueidentifier) AS article_id
+            FROM string_split(@ArticleIdsCsv, ',')
+            WHERE TRY_CAST(value AS uniqueidentifier) IS NOT NULL
+        )
+        DELETE at
+        FROM [RepositorioArticulos].[dbo].[article_tags] at
+        INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = at.article_id
+        INNER JOIN ids i ON i.article_id = a.article_id
+        WHERE a.company_code = @CompanyCode
+          AND at.tag_id = @TagId;
+
+        SELECT @@ROWCOUNT;
+    """;
+    private const string SqlDeleteFileArticles = """
+        DELETE fa
+        FROM [RepositorioArticulos].[dbo].[file_articles] fa
+        INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = fa.article_id
+        WHERE fa.article_id = @ArticleId
+          AND a.company_code = @CompanyCode;
+    """;
+    private const string SqlDeleteArticle = """
+        DELETE a
+        FROM [RepositorioArticulos].[dbo].[articles] a
+        WHERE a.article_id = @ArticleId
+          AND a.company_code = @CompanyCode;
+    """;
+
+    public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        query.ValidateQuery();
+
+        var rows = new List<ArticleDetailsDto>();
+
+        var offset = (query.Page - 1) * query.PageSize;
+
+        var companyCode = query.CompanyCode;
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = new SqlCommand(SqlSelectArticlesWithQuery, connection);
+        command.CommandType = CommandType.Text;
+
+        // Mandatory parameters
+        command.Parameters.Add(new SqlParameter("@offset", SqlDbType.Int) { Value = offset });
+        command.Parameters.Add(new SqlParameter("@pageSize", SqlDbType.Int) { Value = query.PageSize });
+        command.Parameters.Add(new SqlParameter("@companyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+        
+        // Optional parameters
+        command.Parameters.Add(new SqlParameter("@status", SqlDbType.VarChar, 50) { Value = string.IsNullOrWhiteSpace(query.Status) ? DBNull.Value : query.Status });
+        command.Parameters.Add(new SqlParameter("@search", SqlDbType.NVarChar, int.MaxValue) { Value = string.IsNullOrWhiteSpace(query.Search) ? DBNull.Value : query.Search });
+        command.Parameters.Add(new SqlParameter("@tagIds", SqlDbType.VarChar) { Value = !query.IsTagsFilterAvailable() ? DBNull.Value : query.CleanTagFiltersString() });
+        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.UniqueIdentifier) { Value = query.ArticleId == null ? DBNull.Value : query.ArticleId.Value });
+        
+        var total = 0;
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var idPos = reader.GetOrdinal("article_id");
+            var titlePos = reader.GetOrdinal("title");
+            var descriptionPos = reader.GetOrdinal("description");
+            var statusPos = reader.GetOrdinal("status");
+            var createdAtPos = reader.GetOrdinal("created_at");
+            var updatedAtPos = reader.GetOrdinal("updated_at");
+            var tagsPos = reader.GetOrdinal("tags");
+            var filesPos = reader.GetOrdinal("files");
+            var externalLinkPos = reader.GetOrdinal("external_link");
+            var clientCommentsPos = reader.GetOrdinal("client_comments");
+            
+            // Result set 1: page rows
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+
+                rows.Add(new ArticleDetailsDto
+                {
+                    Id = reader.GetGuid(idPos),
+                    CompanyCode = companyCode,
+                    Title = reader.IsDBNull(titlePos) ? "" : reader.GetString(titlePos),
+                    Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
+                    Status = reader.IsDBNull(statusPos) ? "" : reader.GetString(statusPos),
+                    CreatedAt = DateOnly.FromDateTime(reader.IsDBNull(createdAtPos) ? DateTime.MinValue : reader.GetDateTime(createdAtPos)),
+                    UpdatedAt = DateOnly.FromDateTime(reader.IsDBNull(updatedAtPos) ? DateTime.Now : reader.GetDateTime(updatedAtPos)),
+                    Tags = reader.IsDBNull(tagsPos) ? [] : reader.GetString(tagsPos).Split(','),
+                    FileIds = reader.IsDBNull(filesPos) ? [] : reader.GetString(filesPos).Split(','),
+                    ExternalLink = reader.IsDBNull(externalLinkPos) ? "" : reader.GetString(externalLinkPos),
+                    ClientComments =  reader.IsDBNull(clientCommentsPos) ? "" : reader.GetString(clientCommentsPos),
+                    CompanyName = ""
+                });
+            }
+
+            // Result set 2: total
+            if (!await reader.NextResultAsync(cancellationToken).ConfigureAwait(false))
+                return new PagedResult<ArticleDetailsDto>(rows, total, query.Page, query.PageSize);
+            if (await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) total = reader.GetInt32(0);
+        }
+        return new PagedResult<ArticleDetailsDto>(rows, total, query.Page, query.PageSize);
+    }
+    
     public async Task<ArticleCreatedDto> CreateAggregateAsync(
         CreateArticleCommand command,
         CancellationToken cancellationToken)
@@ -253,7 +450,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         }
     }
 
-    private async Task<DateTime> InsertArticleAsync(
+    private static async Task<DateTime> InsertArticleAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         Guid articleId,
@@ -289,7 +486,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         return Convert.ToDateTime(result);
     }
 
-    private async Task InsertArticleTagsAsync(
+    private static async Task InsertArticleTagsAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         Guid articleId,
@@ -319,7 +516,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             throw new ArgumentException("One or more TagIds are invalid for the provided company.", nameof(tagIds));
     }
 
-    private async Task InsertFileAndLinkAsync(
+    private static async Task InsertFileAndLinkAsync(
         SqlConnection connection,
         SqlTransaction transaction,
         Guid articleId,
@@ -340,7 +537,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             insertFile.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = (object?)plan.Height ?? DBNull.Value });
             insertFile.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500)
             {
-                Value = plan.IsImage ? plan.RelativePath : DBNull.Value
+                Value = plan.RelativePath
             });
             insertFile.Parameters.Add(new SqlParameter("@IsImage", SqlDbType.Bit) { Value = plan.IsImage });
             insertFile.Parameters.Add(new SqlParameter("@Extension", SqlDbType.VarChar, 20) { Value = plan.Extension });
@@ -387,19 +584,12 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
 
         foreach (var image in imagePlans)
         {
-            var escapedTempId = Regex.Escape(image.ClientTempId);
+            var tempId = image.ClientTempId;
 
-            rewritten = Regex.Replace(
-                rewritten,
-                $"src=[\"']{escapedTempId}[\"']",
-                $"src=\"{image.RelativePath}\"",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-            rewritten = Regex.Replace(
-                rewritten,
-                $"data-mapcel-temp-id=[\"']{escapedTempId}[\"']",
-                $"data-mapcel-temp-id=\"{image.ClientTempId}\" src=\"{image.RelativePath}\"",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            rewritten = rewritten.Replace(
+                $"mapcel-image:{tempId}", 
+                image.RelativePath, 
+                StringComparison.OrdinalIgnoreCase);
         }
 
         return rewritten;
@@ -424,7 +614,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             var physicalDir = isImage ? 
                 directoryBuilder.GetArticleImageFilePath(companyCode, articleId, fileId + extension) : 
                 directoryBuilder.GetArticleFilePath(companyCode, articleId, fileId + extension);
-            var relativePath = $"/{companyCode:D}/{articleId:D}/{folderName}/{fileId:D}{extension}";
+            var relativePath = $"/articles/{companyCode:D}/{articleId:D}/{folderName}/{fileId:D}{extension}";
             var name = Path.GetFileNameWithoutExtension(originalFileName).Trim();
             int? width = null, height = null;
 
@@ -509,6 +699,12 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             throw new ArgumentException("CompanyCode is required.", nameof(companyCode));
     }
 
+    private static void ValidateId(Guid articleId)
+    {
+        if  (articleId == Guid.Empty)
+            throw new ArgumentException("articleId is required.", nameof(articleId));
+    }
+
     private static async Task TryRollbackAsync(SqlTransaction transaction, CancellationToken cancellationToken)
     {
         try
@@ -517,6 +713,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         }
         catch
         {
+            //
         }
     }
 
@@ -531,7 +728,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         {
         }
     }
-    
+
     public async Task<ArticleDetailsDto?> UpdateAggregateAsync(
         UpdateArticleCommand command,
         CancellationToken cancellationToken)
@@ -539,8 +736,8 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         ArgumentNullException.ThrowIfNull(command);
         command.Validate();
 
-        var newFilePlans = BuildUploadPlans(command.CompanyCode, command.ArticleId, command.Files, isImage: false);
-        var newImagePlans = BuildUploadPlans(command.CompanyCode, command.ArticleId, command.Images, isImage: true);
+        var newFilePlans = BuildUploadPlans(command.CompanyCode, command.ArticleId, command.Files, false);
+        var newImagePlans = BuildUploadPlans(command.CompanyCode, command.ArticleId, command.Images, true);
 
         var createdPaths = new List<string>();
 
@@ -556,7 +753,8 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                 transaction,
                 command.ArticleId,
                 command.CompanyCode,
-                cancellationToken);
+                cancellationToken
+            );
 
             if (!exists)
                 throw new KeyNotFoundException("Article was not found for the provided company.");
@@ -568,7 +766,8 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                 connection,
                 transaction,
                 command,
-                cancellationToken);
+                cancellationToken
+            );
 
             await ReplaceArticleTagsAsync(
                 connection,
@@ -576,43 +775,42 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                 command.ArticleId,
                 command.CompanyCode,
                 command.TagIds,
-                cancellationToken);
+                cancellationToken
+            );
 
+            // Clean the ArticleFiles relationships
             foreach (var fileId in command.ExistingFileIdsToRemove)
-            {
                 await UnlinkExistingFileAsync(
                     connection,
                     transaction,
                     command.ArticleId,
                     command.CompanyCode,
                     fileId,
-                    cancellationToken);
-            }
+                    cancellationToken
+                );
 
+            // Link new files
             foreach (var fileId in command.ExistingFileIdsToAdd)
-            {
                 await LinkExistingFileAsync(
                     connection,
                     transaction,
                     command.ArticleId,
                     command.CompanyCode,
                     fileId,
-                    cancellationToken);
-            }
+                    cancellationToken
+                );
 
             foreach (var plan in newFilePlans)
-            {
                 await InsertFileAndLinkAsync(
                     connection,
                     transaction,
                     command.ArticleId,
                     command.CompanyCode,
                     plan,
-                    cancellationToken);
-            }
+                    cancellationToken
+                );
 
             foreach (var plan in newImagePlans)
-            {
                 await InsertFileAndLinkAsync(
                     connection,
                     transaction,
@@ -620,7 +818,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                     command.CompanyCode,
                     plan,
                     cancellationToken);
-            }
 
             foreach (var plan in newFilePlans)
             {
@@ -666,7 +863,6 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             await TryRollbackAsync(transaction, cancellationToken);
 
             foreach (var path in createdPaths)
-            {
                 try
                 {
                     if (File.Exists(path))
@@ -674,8 +870,8 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                 }
                 catch
                 {
+                    // Some directories might not have been created
                 }
-            }
 
             Log.Error(
                 ex,
@@ -686,6 +882,102 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             throw;
         }
     }
+    
+    public async Task<int> BulkUpdateSingleTagAsync(
+        Guid companyCode,
+        Guid[] articleIds,
+        int tagId,
+        string action,
+        CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyCode);
+        if (articleIds is null || articleIds.Length == 0) throw new ArgumentException("ArticleIds is required.", nameof(articleIds));
+        if (tagId <= 0) throw new ArgumentOutOfRangeException(nameof(tagId), "TagId must be > 0.");
+        if (string.IsNullOrWhiteSpace(action)) throw new ArgumentException("Action is required.", nameof(action));
+
+        var normalized = action.Trim().ToLowerInvariant();
+        if (normalized is not ("add" or "remove")) throw new ArgumentException("Action must be 'add' or 'remove'.", nameof(action));
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            var csv = string.Join(",", articleIds);
+
+            var sql = normalized == "add" ? SqlBulkAddTagToArticles : SqlBulkRemoveTagFromArticles;
+
+            await using var command = new SqlCommand(sql, connection);
+            command.CommandType = CommandType.Text;
+
+            command.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+            command.Parameters.Add(new SqlParameter("@TagId", SqlDbType.Int) { Value = tagId });
+            command.Parameters.Add(new SqlParameter("@ArticleIdsCsv", SqlDbType.VarChar, -1) { Value = csv });
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            if (result is null) throw new InvalidOperationException("ArticleService.BulkUpdateSingleTagAsync: Failed to execute bulk update.");
+
+            var updatedCount = Convert.ToInt32(result);
+
+            // -1 indicates the tag does not exist for this tenant
+            return updatedCount == -1 ? throw new KeyNotFoundException("Tag was not found for the provided companyCode.") : updatedCount;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.BulkUpdateSingleTagAsync failed for companyCode={CompanyCode}, tagId={TagId}, action={Action}", companyCode, tagId, action);
+            throw;
+        }
+    }
+    
+    public async Task<bool> DeleteAsync(Guid articleId, Guid companyCode, CancellationToken cancellationToken)
+    {
+        ValidateCompany(companyCode);
+        ValidateId(articleId);
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        try
+        {
+            // 1. Delete file_articles rows for this article (tenant-safe via join to articles)
+            await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
+            deleteFileArticlesCommand.CommandType = CommandType.Text;
+
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+
+            await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            // 2. Delete article_tags rows for this article (tenant-safe via join to articles)
+            await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
+            deleteArticleTagsCommand.CommandType = CommandType.Text;
+
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
+            deleteArticleTagsCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+
+            await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
+
+            // 3. Delete the article row
+            await using var deleteArticleCommand = new SqlCommand(SqlDeleteArticle, connection);
+            deleteArticleCommand.CommandType = CommandType.Text;
+
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
+            deleteArticleCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+
+            var deleted = await deleteArticleCommand.ExecuteNonQueryAsync(cancellationToken);
+            directoryBuilder.DeleteArticle(companyCode, articleId);
+            return deleted != 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "ArticleService.DeleteAsync(int:Guid:token) failed for articleId={ArticleId}, companyCode={CompanyCode}: {message}", articleId, companyCode, ex.Message);
+            throw;
+        }
+    }
+    
+    // -------------------------------------
+    // Helper methods
+    // -------------------------------------
 
     private static async Task<bool> EnsureArticleExistsAsync(
         SqlConnection connection,

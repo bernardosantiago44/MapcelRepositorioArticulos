@@ -2,6 +2,8 @@ using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using MapcelRepositorioArticulos.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
@@ -23,7 +25,7 @@ public interface IFilesService
     /// <exception cref="ArgumentNullException">if companyId is not provided</exception>
     /// <returns></returns>
     public Task<PagedResult<FileDto>> GetAsync(FileQuery query, CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// Returns a list of all the files related to a given article id.
     /// </summary>
@@ -31,17 +33,7 @@ public interface IFilesService
     /// <param name="cancellationToken"></param>
     /// <exception cref="ArgumentOutOfRangeException">If articleId ≤ 0</exception>
     /// <returns></returns>
-    public Task<IReadOnlyList<FileDto>> GetByArticleIdAsync(int articleId, CancellationToken cancellationToken);
-    
-    /// <summary>
-    /// Returns a list of all the files (images and files) given their ids.
-    /// Returns an empty array if no ids are provided, or if none is not found. 
-    /// </summary>
-    /// <param name="ids"></param>
-    /// <param name="cancellationToken"></param>
-    /// <exception cref="ArgumentNullException">If articleId is null</exception>
-    /// <returns></returns>
-    public Task<IReadOnlyList<FileDto>> GetByIdsAsync(int[] ids, CancellationToken cancellationToken);
+    public Task<IReadOnlyList<FileDto>> GetByArticleIdAsync(Guid articleId, CancellationToken cancellationToken);
     
     /// <summary>
     /// Creates a new File record in the database, asynchronously.
@@ -66,7 +58,7 @@ public interface IFilesService
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    Task<FileDto?> UpdateAsync(int fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken);
+    Task<FileDto?> UpdateAsync(Guid fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken);
     
     /// <summary>
     /// Deletes the file associated with the given fileId from the database.
@@ -77,7 +69,7 @@ public interface IFilesService
     /// <returns>Bool: True if the file existed, false otherwise.</returns>
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    Task<bool> DeleteAsync(int fileId, Guid companyCode, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken);
     
     /// <summary>
     /// Returns the name and file extension
@@ -87,32 +79,24 @@ public interface IFilesService
     /// <param name="companyCode"></param>
     /// <param name="cancellationToken"></param>
     /// <returns>(Name, Extension)</returns>
-    Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken);
+    Task<string?> GetDownloadInfoAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken);
+
+    string BuildPhysicalFilePath(Guid companyCode, Guid fileId, string extension);
 }
 
-public class FilesService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
+    public class FilesService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
     : BaseService(configuration), IFilesService
 {
-    private string GetArchivosRootPath()
+    private const string FilesSubdirectoryName = "files";
+    private string GetFilesRootPath()
     {
         var overridePath = configuration["Files:ArchivosRootPath"];
         if (!string.IsNullOrWhiteSpace(overridePath))
-            return Path.GetFullPath(overridePath);
+            return Path.GetRelativePath(overridePath,  Directory.GetCurrentDirectory());
         
-        var contentRoot = env.ContentRootPath;
-        var dir = new DirectoryInfo(contentRoot);
+        var contentRoot = Path.Combine(env.WebRootPath, FilesSubdirectoryName);
 
-        while (dir != null && !dir.Name.Equals("Produccion", StringComparison.OrdinalIgnoreCase))
-            dir = dir.Parent;
-
-        // If found: repoRoot = parent of Produccion (Prg6-RepositorioArticulos)
-        // Else fallback: parent of contentRoot
-        var repoRoot =
-            dir?.Parent?.FullName
-            ?? Directory.GetParent(contentRoot)?.FullName
-            ?? contentRoot;
-
-        return Path.Combine(repoRoot, "Archivos");
+        return contentRoot;
     }
 
     private static string NormalizeExtension(string extension)
@@ -121,17 +105,17 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         return extension.StartsWith('.') ? extension : "." + extension;
     }
 
-    private string BuildPhysicalFilePath(Guid companyCode, int fileId, string extension)
+    public string BuildPhysicalFilePath(Guid companyCode, Guid fileId, string extension)
     {
-        var archivosRoot = GetArchivosRootPath();
-        var companyDir = Path.Combine(archivosRoot, companyCode.ToString("D"));
+        var filesRoot = GetFilesRootPath();
+        var companyDir = Path.Combine(filesRoot, companyCode.ToString("D"));
         Directory.CreateDirectory(companyDir);
 
         var ext = NormalizeExtension(extension);
         return Path.Combine(companyDir, $"{fileId}{ext}");
     }
 
-    private const string SqlSelectFilesByArticleId = @"
+    private const string SqlSelectFilesByArticleId = """
         SELECT
             f.file_id,
             f.name,
@@ -144,15 +128,15 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         INNER JOIN [RepositorioArticulos].[dbo].[file_articles] fa ON f.file_id = fa.file_id
         WHERE fa.article_id = @articleId
         ORDER BY f.is_image DESC, f.upload_date DESC;
-    ";
-    private const string SqlSelectFilesByIdsCsv = @"
+    """;
+    private const string SqlSelectFilesByIdsCsv = """
         WITH FileBase AS (
             SELECT f.file_id
             FROM [RepositorioArticulos].[dbo].[files] f
             WHERE f.file_id IN (
-                SELECT TRY_CAST(value AS int)
+                SELECT TRY_CAST(value AS uniqueidentifier)
                 FROM STRING_SPLIT(@idsCsv, ',')
-                WHERE TRY_CAST(value AS int) IS NOT NULL
+                WHERE TRY_CAST(value AS uniqueidentifier) IS NOT NULL
             )
         )
         SELECT
@@ -166,10 +150,11 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         FROM FileBase b
         INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = b.file_id
         ORDER BY f.is_image DESC, f.upload_date DESC;
-    ";
-    private const string SqlInsertFile = @"
+    """;
+    private const string SqlInsertFile = """
         INSERT INTO [RepositorioArticulos].[dbo].[files]
         (
+            file_id,
             company_code,
             name,
             size_bytes,
@@ -183,6 +168,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         OUTPUT INSERTED.file_id
         VALUES
         (
+            @FileId,
             @CompanyCode,
             @Name,
             @SizeBytes,
@@ -193,8 +179,8 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
             @IsImage,
             @Extension
         );
-    ";
-    private const string SqlUpdateFileReturnDto = @"
+    """;
+    private const string SqlUpdateFileReturnDto = """
         UPDATE [RepositorioArticulos].[dbo].[files]
         SET
             name = COALESCE(NULLIF(@Name, ''), name),
@@ -205,38 +191,44 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
             INSERTED.description,
             INSERTED.extension,
             INSERTED.thumbnail_url,
-            INSERTED.is_image
+            INSERTED.is_image,
             DELETED.upload_date
         WHERE file_id = @FileId
           AND company_code = @CompanyCode;
-    ";
-    private const string SqlUpdateThumbnailUrl = @"
+    """;
+    private const string SqlUpdateThumbnailUrl = """
         UPDATE [RepositorioArticulos].[dbo].[files]
         SET thumbnail_url = @ThumbnailUrl
         WHERE file_id = @FileId
           AND company_code = @CompanyCode;
-    ";
-    private const string SqlDeleteFileArticles = @"
+    """;
+    private const string SqlDeleteFileArticles = """
         DELETE fa
         FROM [RepositorioArticulos].[dbo].[file_articles] fa
         INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = fa.file_id
         WHERE fa.file_id = @FileId
           AND f.company_code = @CompanyCode;
-    ";
-    private const string SqlDeleteFile = @"
+    """;
+    private const string SqlDeleteFile = """
         DELETE f
         FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
-    ";
-    private const string SqlSelectDownloadInfo = @"
+    """;
+    private const string SqlSelectDownloadInfo = """
         SELECT
             f.name,
             f.extension
         FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
-    ";
+    """;
+
+    private const string SqlSelectFileUrl = """
+        SELECT thumbnail_url
+        FROM [RepositorioArticulos].[dbo].[files] f
+        WHERE f.file_id = @FileId;
+    """;
     
     public async Task<PagedResult<FileDto>> GetAsync(FileQuery query, CancellationToken cancellationToken)
     {
@@ -375,38 +367,17 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         return new PagedResult<FileDto>(rows, total, query.Page, query.PageSize);
     }
 
-    public async Task<IReadOnlyList<FileDto>> GetByArticleIdAsync(int articleId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<FileDto>> GetByArticleIdAsync(Guid articleId, CancellationToken cancellationToken)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(articleId);
+        ArgumentException.ThrowIfNullOrEmpty(articleId.ToString());
+        if (articleId.Equals(Guid.Empty)) throw new ArgumentNullException(nameof(articleId));
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         await using var command = new SqlCommand(SqlSelectFilesByArticleId, connection);
         command.CommandType = CommandType.Text;
-        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.Int) { Value = articleId });
-
-        return await ExecuteAndMapFilesAsync(command, cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyList<FileDto>> GetByIdsAsync(int[] ids, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(ids);
-        if (ids.Length == 0) return Array.Empty<FileDto>();
-
-        // remove invalid/duplicate ids
-        var cleanIds = ids.Where(x => x > 0).Distinct().ToArray();
-        if (cleanIds.Length == 0) return Array.Empty<FileDto>();
-
-        // switch to TVP if size of ids increase.
-        var idsCsv = string.Join(",", cleanIds);
-
-        await using var connection = new SqlConnection(ConnectionString);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        await using var command = new SqlCommand(SqlSelectFilesByIdsCsv, connection);
-        command.CommandType = CommandType.Text;
-        command.Parameters.Add(new SqlParameter("@idsCsv", SqlDbType.VarChar, 8000) { Value = idsCsv });
+        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.UniqueIdentifier) { Value = articleId });
 
         return await ExecuteAndMapFilesAsync(command, cancellationToken).ConfigureAwait(false);
     }
@@ -430,12 +401,12 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         {
             rows.Add(new FileDto
             {
-                Id = reader.GetInt32(fileIdPos).ToString(),
+                Id = reader.GetGuid(fileIdPos).ToString(),
                 Name = reader.GetString(namePos),
                 Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
                 ThumbnailUrl = reader.IsDBNull(thumbnailUrlPos) ? "" : reader.GetString(thumbnailUrlPos),
                 Extension = reader.IsDBNull(extensionPos) ? "" : reader.GetString(extensionPos),
-                IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
+                IsImage = !reader.IsDBNull(isImagePos) && reader.GetBoolean(isImagePos),
                 UploadDate = reader.GetDateTime(uploadDatePos)
             });
         }
@@ -456,9 +427,10 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         var extension = Path.GetExtension(originalFileName);
         if (string.IsNullOrWhiteSpace(extension)) extension = string.Empty;
 
+        var fileId = Guid.NewGuid();
         var isImage = IsImage(file, extension);
-        var trimmedThumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? null : upload.ThumbnailUrl.Trim();
-        var hasImageMetadata = upload.Width is not null || upload.Height is not null || trimmedThumbnailUrl is not null;
+        var thumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? "" : upload.ThumbnailUrl.Trim();
+        var hasImageMetadata = upload.Width is not null || upload.Height is not null;
         if (!isImage && hasImageMetadata)
         {
             Log.Warning(
@@ -469,72 +441,51 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         var description = string.IsNullOrWhiteSpace(upload.Description) ? null : upload.Description.Trim();
         var width = isImage ? upload.Width : null;
         var height = isImage ? upload.Height : null;
-        var thumbnailUrl = isImage ? trimmedThumbnailUrl : null;
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
         await using var tx = await connection.BeginTransactionAsync(cancellationToken);
-        string? physicalPath = null;
+        
+        // Save File to disk
+        var physicalPath = BuildPhysicalFilePath(companyCode, fileId, extension);
+        var relativePath = $"/files/{companyCode:D}/{fileId:D}{extension}";
+        await using (var fs = new FileStream(
+                         physicalPath,
+                         FileMode.CreateNew,
+                         FileAccess.Write,
+                         FileShare.None,
+                         bufferSize: 1024 * 1024,
+                         useAsync: true))
+        {
+            await file.CopyToAsync(fs, cancellationToken);
+        }
+
+        var thumbnailUri = new Uri(relativePath, UriKind.RelativeOrAbsolute);
+        
         try
         {
             await using var insertFileCommand = new SqlCommand(SqlInsertFile, connection, (SqlTransaction)tx);
             insertFileCommand.CommandType = CommandType.Text;
 
+            insertFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
             insertFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             insertFileCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = name });
             insertFileCommand.Parameters.Add(new SqlParameter("@SizeBytes", SqlDbType.BigInt) { Value = file.Length });
             insertFileCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = (object?)description ?? DBNull.Value });
             insertFileCommand.Parameters.Add(new SqlParameter("@Width", SqlDbType.Int) { Value = (object?)width ?? DBNull.Value });
             insertFileCommand.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = (object?)height ?? DBNull.Value });
-            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = (object?)thumbnailUrl ?? DBNull.Value });
+            insertFileCommand.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = thumbnailUri.ToString() });
             insertFileCommand.Parameters.Add(new SqlParameter("@IsImage", SqlDbType.Bit) { Value = isImage });
             insertFileCommand.Parameters.Add(new SqlParameter("@Extension", SqlDbType.VarChar, 15) { Value = extension });
 
-            var fileResult = await insertFileCommand.ExecuteScalarAsync(cancellationToken);
-            if (fileResult is null)
-                throw new InvalidOperationException("FilesService.CreateAsync(Guid:file:token): Failed to create file record.");
-
-            var newFileId = Convert.ToInt32(fileResult);
-            physicalPath = BuildPhysicalFilePath(companyCode, newFileId, extension);
-
-            await using (var fs = new FileStream(
-                             physicalPath,
-                             FileMode.CreateNew,
-                             FileAccess.Write,
-                             FileShare.None,
-                             bufferSize: 1024 * 1024,
-                             useAsync: true))
-            {
-                await file.CopyToAsync(fs, cancellationToken);
-            }
-            
-            var generatedThumbnail = false;
-            if (isImage && thumbnailUrl is null)
-            {
-                // Relative URL is fine; frontend can prepend API base if needed
-                thumbnailUrl = $"/nuevos/repositorioarticulos/Archivos/{companyCode:D}/{newFileId}{extension}";
-                generatedThumbnail = true;
-
-                await using var updateThumbCmd = new SqlCommand(SqlUpdateThumbnailUrl, connection, (SqlTransaction)tx);
-                updateThumbCmd.CommandType = CommandType.Text;
-                updateThumbCmd.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = newFileId });
-                updateThumbCmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-                updateThumbCmd.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500) { Value = thumbnailUrl });
-
-                await updateThumbCmd.ExecuteNonQueryAsync(cancellationToken);
-            }
-
-            var thumbnailUri = thumbnailUrl is null
-                ? null
-                : new Uri(thumbnailUrl, generatedThumbnail ? UriKind.Relative : UriKind.RelativeOrAbsolute);
-
+            await insertFileCommand.ExecuteNonQueryAsync(cancellationToken);
             await tx.CommitAsync(cancellationToken);
 
             // 4) Return DTO
             return new FileAsset
             {
-                Id = newFileId.ToString(),
+                Id = fileId.ToString(),
                 Name = name,
                 Description = description ?? string.Empty,
                 Extension = extension,
@@ -620,10 +571,10 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         }
     }
 
-    public async Task<FileDto?> UpdateAsync(int fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken)
+    public async Task<FileDto?> UpdateAsync(Guid fileId, Guid companyCode, UpdateFileRequest request, CancellationToken cancellationToken)
     {
         ValidateGuid(companyCode);
-        ValidateId(fileId);
+        ValidateGuid(fileId);
         request.Validate();
 
         // Normalize to null when not provided / whitespace so SQL can keep current value
@@ -639,7 +590,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
             await using var updateCommand = new SqlCommand(SqlUpdateFileReturnDto, connection);
             updateCommand.CommandType = CommandType.Text;
 
-            updateCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
+            updateCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
             updateCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
             updateCommand.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 255) { Value = (object?)name ?? DBNull.Value });
             updateCommand.Parameters.Add(new SqlParameter("@Description", SqlDbType.NVarChar, 500) { Value = (object?)description ?? DBNull.Value });
@@ -650,7 +601,7 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
             // column index reads
             var dto = new FileDto
             {
-                Id = reader.GetInt32(0).ToString(),
+                Id = reader.GetGuid(0).ToString(),
                 Name = reader.GetString(1),
                 Description = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Extension = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
@@ -668,13 +619,14 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         }
     }
     
-    public async Task<bool> DeleteAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
+    public async Task<bool> DeleteAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken)
     {
         ValidateGuid(companyCode);
-        ValidateId(fileId);
+        ValidateGuid(fileId);
 
-        var downloadInfo = await GetDownloadInfoAsync(fileId, companyCode, cancellationToken);
-        var physicalPath = downloadInfo is null ? null : BuildPhysicalFilePath(companyCode, fileId, downloadInfo.Value.Extension);
+        var downloadPath = await GetDownloadInfoAsync(fileId, companyCode, cancellationToken);
+        if  (downloadPath is null) return false;
+        var physicalPath = Path.Join(env.WebRootPath, downloadPath);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
@@ -683,31 +635,29 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         {
             await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
             deleteFileArticlesCommand.CommandType = CommandType.Text;
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
+            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
 
             await using var deleteFileCommand = new SqlCommand(SqlDeleteFile, connection);
             deleteFileCommand.CommandType = CommandType.Text;
-            deleteFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
+            deleteFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
             deleteFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
             var deleted = await deleteFileCommand.ExecuteNonQueryAsync(cancellationToken);
             if (deleted <= 0) return false;
 
             // Best-effort physical delete
-            if (!string.IsNullOrWhiteSpace(physicalPath))
+            if (string.IsNullOrWhiteSpace(physicalPath)) return true;
+            try
             {
-                try
-                {
-                    if (File.Exists(physicalPath))
-                        File.Delete(physicalPath);
-                }
-                catch (Exception ioEx)
-                {
-                    Log.Warning(ioEx, "Failed to delete physical file {PhysicalPath} for fileId={FileId}", physicalPath, fileId);
-                }
+                if (File.Exists(physicalPath))
+                    File.Delete(physicalPath);
+            }
+            catch (Exception ioEx)
+            {
+                Log.Warning(ioEx, "Failed to delete physical file {PhysicalPath} for fileId={FileId}", physicalPath, fileId);
             }
 
             return true;
@@ -719,29 +669,27 @@ public class FilesService(IConfiguration configuration, IWebHostEnvironment env,
         }
     }
     
-    public async Task<(string Name, string Extension)?> GetDownloadInfoAsync(int fileId, Guid companyCode, CancellationToken cancellationToken)
+    public async Task<string?> GetDownloadInfoAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken)
     {
         ValidateGuid(companyCode);
-        ValidateId(fileId);
+        ValidateGuid(fileId);
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
         try
         {
-            await using var cmd = new SqlCommand(SqlSelectDownloadInfo, connection);
+            await using var cmd = new SqlCommand(SqlSelectFileUrl, connection);
             cmd.CommandType = CommandType.Text;
 
-            cmd.Parameters.Add(new SqlParameter("@FileId", SqlDbType.Int) { Value = fileId });
-            cmd.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
+            cmd.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken)) return null;
 
-            var name = reader.GetString(0);
-            var extension = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+            var url = reader.GetString(0);
 
-            return (name, extension);
+            return url;
         }
         catch (Exception ex)
         {

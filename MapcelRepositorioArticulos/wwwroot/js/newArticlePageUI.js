@@ -6,11 +6,11 @@
  * Features:
  * - Breadcrumb navigation with dirty form confirmation
  * - Two-column layout (Core Data | Categorization & Assets)
- * - Editor.js rich text editor for article descriptions (outputs HTML)
+ * - CKEditor 5 rich text editor for article descriptions (outputs HTML)
  * - Tag selection via TagPickerUI
  * - File and image upload with staged file management
  * - Role-based permission checks
- * - Edit mode support: hydrates Editor.js from existing HTML content
+ * - Edit mode support with initialData from existing HTML content
  *
  * Dependencies:
  * - dataModels.js (for status configuration)
@@ -20,8 +20,7 @@
  * - TagPickerUI.js (for tag selection)
  * - CompanyService.js (for role checks)
  * - UserService.js (for user permissions)
- * - Editor.js (CDN: @editorjs/editorjs, @editorjs/header, @editorjs/list, @editorjs/table)
- * - editorjs-html (CDN: editorjs-html@4.0.0 for JSON-to-HTML conversion)
+ * - CKEditor 5 (CDN)
  * - DOMPurify (for HTML sanitization)
  */
 const NewArticlePageUI = (function () {
@@ -45,9 +44,7 @@ const NewArticlePageUI = (function () {
         isFormDirty: false,
         allTags: [],
         canUserUpload: true,     // Determined by CompanySettings
-        editorInstance: null,    // Editor.js instance
-        editorUsesSimpleImage: false, // true when falling back to SimpleImage tool
-        imagePasteHandler: null, // Paste handler reference for cleanup
+        editorInstance: null,    // CKEditor instance
         editMode: false,         // true when editing an existing article
         articleId: null,         // Article ID when in edit mode
         originalArticleData: null, // Original article data for edit mode
@@ -56,6 +53,8 @@ const NewArticlePageUI = (function () {
 
     // Constants
     const MAX_EDITOR_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
+    const CKEDITOR_SCRIPT_URL = 'https://cdn.ckeditor.com/ckeditor5/47.1.0/ckeditor5.umd.js';
+    const CKEDITOR_STYLE_URL = 'https://cdn.ckeditor.com/ckeditor5/47.1.0/ckeditor5.css';
 
     /**
      * Get status options from articleStatusConfiguration
@@ -281,66 +280,18 @@ const NewArticlePageUI = (function () {
           />
         </div>
 
-        <!-- Description Field (Editor.js) -->
+        <!-- Description Field (CKEditor) -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2">
             Descripción <span class="text-red-500">*</span>
           </label>
           <div id="new-article-editor-container" class="border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-[520px] min-h-[420px]">
-            <div 
-              id="new-article-editor-toolbar" 
-              class="sticky top-0 z-20 bg-gray-50 border-b border-gray-200 px-3 py-2 flex flex-wrap gap-2"
-            >
-              <button 
-                type="button" 
-                data-editor-action="paragraph"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>+ Párrafo</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="heading"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>⋆ Encabezado</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="list"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>• Lista</span>
-              </button>
-              
-              <button
-                type="button"
-                data-editor-action="ordered-list"
-                class="d-inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"  
-              >
-                <span># Enumeración</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="table"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>Tabla</span>
-              </button>
-              <button 
-                type="button" 
-                data-editor-action="image"
-                class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-              >
-                <span>Imagen</span>
-              </button>
-            </div>
             <div class="flex-1 overflow-y-auto bg-white" id="new-article-editor-scroll">
-              <div id="new-article-editorjs" class="min-h-[360px] px-4 py-4"></div>
+              <div id="new-article-ckeditor" class="min-h-[360px] px-4 py-4"></div>
             </div>
           </div>
           <div class="mt-2 text-xs text-gray-500">
-            Editor de texto enriquecido: encabezados, listas, tablas.
+            Editor de texto enriquecido: encabezados, listas, tablas e imágenes.
           </div>
         </div>
 
@@ -603,12 +554,84 @@ const NewArticlePageUI = (function () {
     }
 
     // =========================================================================
-    // Editor.js Integration
+    // CKEditor 5 Integration
     // =========================================================================
 
+    var ckEditorAssetsPromise = null;
+
+    function ensureCkEditorAssetsLoaded() {
+        if (window.CKEDITOR && window.CKEDITOR.ClassicEditor) {
+            return Promise.resolve();
+        }
+
+        if (ckEditorAssetsPromise) {
+            return ckEditorAssetsPromise;
+        }
+
+        ckEditorAssetsPromise = new Promise(function (resolve, reject) {
+            if (!document.querySelector('link[data-ckeditor-style="true"]')) {
+                var styleElement = document.createElement('link');
+                styleElement.rel = 'stylesheet';
+                styleElement.href = CKEDITOR_STYLE_URL;
+                styleElement.setAttribute('data-ckeditor-style', 'true');
+                document.head.appendChild(styleElement);
+            }
+
+            var existingScriptElement = document.querySelector('script[data-ckeditor-script="true"]');
+            if (existingScriptElement) {
+                existingScriptElement.addEventListener('load', function () {
+                    resolve();
+                }, {once: true});
+                existingScriptElement.addEventListener('error', function () {
+                    reject(new Error('No se pudo cargar CKEditor 5.'));
+                }, {once: true});
+
+                return;
+            }
+
+            var scriptElement = document.createElement('script');
+            scriptElement.src = CKEDITOR_SCRIPT_URL;
+            scriptElement.setAttribute('data-ckeditor-script', 'true');
+            scriptElement.onload = function () {
+                resolve();
+            };
+            scriptElement.onerror = function () {
+                reject(new Error('No se pudo cargar CKEditor 5.'));
+            };
+            document.head.appendChild(scriptElement);
+        }).catch(function (error) {
+            ckEditorAssetsPromise = null;
+            throw error;
+        });
+
+        return ckEditorAssetsPromise;
+    }
+
+    function createCkEditorUploadAdapter(loader) {
+        return {
+            upload: function () {
+                return loader.file
+                    .then(function (file) {
+                        return imageUploadProcess(file);
+                    })
+                    .then(function (result) {
+                        if (!result || !result.file || !result.file.url) {
+                            throw new Error('No se pudo subir la imagen seleccionada.');
+                        }
+                        loader.backendId = result.file.id;
+
+                        return {default: result.file.url};
+                    });
+            },
+            abort: function () {
+                // Uploads are staged locally; there is no in-flight request to cancel at this point.
+            }
+        };
+    }
+
     /**
-     * Initialize the Editor.js instance
-     * Must be called after the DOM container #new-article-editorjs is rendered
+     * Initialize the CKEditor 5 instance
+     * Must be called after the DOM container #new-article-ckeditor is rendered
      */
     function initializeEditor() {
         if (pageState.editorInstance) {
@@ -616,116 +639,211 @@ const NewArticlePageUI = (function () {
             pageState.editorInstance = null;
         }
 
-      const editorHolder = document.getElementById('new-article-editorjs');
-      if (!editorHolder) {
-            console.error('Editor.js holder element not found');
-            return;
-      }
+        const editorHolder = document.getElementById('new-article-ckeditor');
+        if (!editorHolder) {
+            console.error('CKEditor holder element not found');
+            return Promise.resolve();
+        }
 
-      const hasImageTool = typeof ImageTool !== 'undefined';
-      const hasSimpleImage = typeof SimpleImage !== 'undefined';
-      let imageToolConfig = null;
+        const initialDescriptionHtml = pageState.editMode && pageState.originalArticleData && pageState.originalArticleData.description
+            ? sanitizeEditorHtml(pageState.originalArticleData.description)
+            : '';
 
-      if (hasImageTool) {
-            imageToolConfig = {
-                class: ImageTool,
-                config: {
-                    uploader: {
-                        uploadByFile: imageUploadProcess,
-                        uploadByUrl: uploadEditorImageByUrl
-                    }
+        return ensureCkEditorAssetsLoaded()
+            .then(function () {
+                if (!window.CKEDITOR || !window.CKEDITOR.ClassicEditor) {
+                    throw new Error('CKEditor 5 no está disponible después de cargar los assets.');
                 }
-            };
-            pageState.editorUsesSimpleImage = false;
-        } else if (hasSimpleImage) {
-            imageToolConfig = {
-                class: SimpleImage
-            };
-            pageState.editorUsesSimpleImage = true;
-        } else {
-            console.warn('No image tool found. Ensure @editorjs/simple-image is loaded.');
-            pageState.editorUsesSimpleImage = false;
-        }
 
-        pageState.editorInstance = new EditorJS({
-            holder: 'new-article-editorjs',
-            placeholder: 'Describe el artículo en detalle...',
-            minHeight: 360,
-            tools: {
-                header: {
-                    class: Header,
-                    config: {
-                        levels: [1, 2, 3, 4, 5, 6],
-                        defaultLevel: 2
+                const {
+                    ClassicEditor,
+                    Autosave,
+                    Essentials,
+                    Paragraph,
+                    LinkImage,
+                    Link,
+                    ImageBlock,
+                    ImageToolbar,
+                    BlockQuote,
+                    Bold,
+                    ImageInsertViaUrl,
+                    AutoImage,
+                    Table,
+                    TableToolbar,
+                    Heading,
+                    ImageTextAlternative,
+                    ImageCaption,
+                    ImageStyle,
+                    Indent,
+                    IndentBlock,
+                    ImageInline,
+                    Italic,
+                    List,
+                    TableCaption,
+                    TodoList,
+                    Underline,
+                    ShowBlocks,
+                    Code,
+                    Highlight,
+                    ImageUpload,
+                    CloudServices,
+                    BalloonToolbar
+                } = window.CKEDITOR;
+                const LICENSE_KEY =
+                    'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE4MDc2NjA3OTksImp0aSI6ImE1YjA3MTdlLTc4NDItNGZjZi04M2YxLTQ1OTUyOWQ4MDkxNiIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiXSwiZmVhdHVyZXMiOlsiRFJVUCIsIkUyUCIsIkUyVyJdLCJyZW1vdmVGZWF0dXJlcyI6WyJQQiIsIlJGIiwiU0NIIiwiVENQIiwiVEwiLCJUQ1IiLCJJUiIsIlNVQSIsIkI2NEEiLCJMUCIsIkhFIiwiUkVEIiwiUEZPIiwiV0MiLCJGQVIiLCJCS00iLCJGUEgiLCJNUkUiXSwidmMiOiI1ZjI4YzAzMiJ9.W2RJI7OfEh8GMiXn2-HTyi3FAF-skSjxYzCVPiqVoXfARsfKjfL5G5ICvQnF6hKJjit1MpWJ6yh6UnGDU1WjeQ';
+
+                const editorConfig = {
+                    attachTo: document.querySelector('#new-article-ckeditor'),
+                    root: {
+                        placeholder: 'Escribe una descripción detallada aquí.',
+                        initialData: initialDescriptionHtml
+                    },
+                    toolbar: {
+                        items: [
+                            'undo',
+                            'redo',
+                            '|',
+                            'showBlocks',
+                            '|',
+                            'heading',
+                            '|',
+                            'bold',
+                            'italic',
+                            'underline',
+                            'code',
+                            '|',
+                            'link',
+                            'insertTable',
+                            'highlight',
+                            'blockQuote',
+                            '|',
+                            'bulletedList',
+                            'numberedList',
+                            'todoList',
+                            'outdent',
+                            'indent'
+                        ],
+                        shouldNotGroupWhenFull: false
+                    },
+                    plugins: [
+                        AutoImage,
+                        Autosave,
+                        BalloonToolbar,
+                        BlockQuote,
+                        Bold,
+                        CloudServices,
+                        Code,
+                        Essentials,
+                        Heading,
+                        Highlight,
+                        ImageBlock,
+                        ImageCaption,
+                        ImageInline,
+                        ImageInsertViaUrl,
+                        ImageStyle,
+                        ImageTextAlternative,
+                        ImageToolbar,
+                        ImageUpload,
+                        Indent,
+                        IndentBlock,
+                        Italic,
+                        Link,
+                        LinkImage,
+                        List,
+                        Paragraph,
+                        ShowBlocks,
+                        Table,
+                        TableCaption,
+                        TableToolbar,
+                        TodoList,
+                        Underline
+                    ],
+                    // extraPlugins: [ImageBackendIdPlugin],
+                    licenseKey: LICENSE_KEY,
+                    balloonToolbar: ['bold', 'italic', '|', 'link', '|', 'bulletedList', 'numberedList'],
+                    heading: {
+                        options: [
+                            {
+                                model: 'paragraph',
+                                title: 'Paragraph',
+                                class: 'ck-heading_paragraph'
+                            },
+                            {
+                                model: 'heading1',
+                                view: 'h1',
+                                title: 'Heading 1',
+                                class: 'ck-heading_heading1'
+                            },
+                            {
+                                model: 'heading2',
+                                view: 'h2',
+                                title: 'Heading 2',
+                                class: 'ck-heading_heading2'
+                            },
+                            {
+                                model: 'heading3',
+                                view: 'h3',
+                                title: 'Heading 3',
+                                class: 'ck-heading_heading3'
+                            },
+                            {
+                                model: 'heading4',
+                                view: 'h4',
+                                title: 'Heading 4',
+                                class: 'ck-heading_heading4'
+                            },
+                            {
+                                model: 'heading5',
+                                view: 'h5',
+                                title: 'Heading 5',
+                                class: 'ck-heading_heading5'
+                            },
+                            {
+                                model: 'heading6',
+                                view: 'h6',
+                                title: 'Heading 6',
+                                class: 'ck-heading_heading6'
+                            }
+                        ]
+                    },
+                    image: {
+                        toolbar: ['toggleImageCaption', 'imageTextAlternative', '|', 'imageStyle:inline', 'imageStyle:wrapText', 'imageStyle:breakText']
+                    },
+                    language: 'es',
+                    link: {
+                        addTargetToExternalLinks: true,
+                        defaultProtocol: 'https://',
+                        decorators: {
+                            toggleDownloadable: {
+                                mode: 'manual',
+                                label: 'Downloadable',
+                                attributes: {
+                                    download: 'file'
+                                }
+                            }
+                        }
+                    },
+                    table: {
+                        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
                     }
-                },
-                list: {
-                    class: typeof EditorjsList !== 'undefined' ? EditorjsList
-                        : typeof NestedList !== 'undefined' ? NestedList
-                            : List,
-                    inlineToolbar: true
-                },
-                table: {
-                    class: Table,
-                    inlineToolbar: true
-                },
-                code: {
-                    class: CodeTool
-                },
+                };
 
-                delimiter: {
-                    class: Delimiter
-                },
-                image: imageToolConfig,
-                ColorPicker: {
-                    class: ColorPicker.default,
-                },
-            },
-            onReady: function () {
-                attachImageUrlPasteHandler();
-            },
-            onChange: function () {
-                markFormDirty();
-            }
-        });
-    }
+                return ClassicEditor.create(editorConfig);
+            })
+            .then(function (editorInstance) {
+                pageState.editorInstance = editorInstance;
 
-    /**
-     * Detect image URLs and insert a SimpleImage block on paste.
-     */
-    function attachImageUrlPasteHandler() {
-        const editorHolder = document.getElementById('new-article-editorjs');
-        if (!editorHolder || !pageState.editorInstance) return;
+                editorInstance.plugins.get('FileRepository').createUploadAdapter = function (loader) {
+                    return createCkEditorUploadAdapter(loader);
+                };
 
-        if (!pageState.editorUsesSimpleImage || typeof SimpleImage === 'undefined') return;
-
-        if (pageState.imagePasteHandler) {
-            document.removeEventListener('paste', pageState.imagePasteHandler);
-        }
-
-        pageState.imagePasteHandler = function (event) {
-          const target = event.target;
-          if (!editorHolder.contains(target)) return;
-
-          const clipboard = event.clipboardData || window.clipboardData;
-          if (!clipboard) return;
-
-          const text = (clipboard.getData && clipboard.getData('text/plain')) || '';
-          const url = (text || '').trim();
-          if (!isLikelyImageUrl(url)) return;
-
-            event.preventDefault();
-
-            try {
-              const index = pageState.editorInstance.blocks.getCurrentBlockIndex();
-              pageState.editorInstance.blocks.insert('image', {url: url}, {}, index + 1, true);
-                markFormDirty();
-            } catch (error) {
-                console.warn('Failed to insert image block from pasted URL:', error);
-            }
-        };
-
-        document.addEventListener('paste', pageState.imagePasteHandler);
+                editorInstance.model.document.on('change:data', function () {
+                    markFormDirty();
+                });
+            })
+            .catch(function (error) {
+                console.error('Error initializing CKEditor:', error);
+            });
     }
 
     function getImageDimensions(file) {
@@ -751,7 +869,7 @@ const NewArticlePageUI = (function () {
     }
 
     /**
-     * Prompt for metadata and upload before inserting into Editor.js
+     * Prompt for metadata and upload before inserting into CKEditor
      * @param {File} file
      * @param {{width: number, height: number}} dimensions
      */
@@ -765,6 +883,7 @@ const NewArticlePageUI = (function () {
         const defaultMetadata = {
             description: file && file.name ? file.name : '',
             desiredFileName: file && file.name ? file.name : '',
+            clientTempId: createTempUploadId('staged-image'),
             dimensions: dimensions ? dimensions : {},
         };
 
@@ -795,107 +914,43 @@ const NewArticlePageUI = (function () {
             });
     }
 
-    /**
-     * Insert a block into the editor after the current selection.
-     * If the current block is empty, it replaces it.
-     * If the current block has content, it inserts after it.
-     * @param {string} blockType
-     * @param {Object} blockData
-     */
-    async function insertEditorBlock(blockType, blockData) {
-        if (!pageState.editorInstance) return;
+    function insertImageIntoEditor(imageUrl) {
+        if (!pageState.editorInstance || !imageUrl) return;
+
+        var safeImageUrl = sanitizeUrl(imageUrl);
+        if (!safeImageUrl) return;
 
         try {
-            await pageState.editorInstance.isReady;
+            // Use imageBlock to create a standalone <figure><img/></figure> node in CKEditor output.
+            pageState.editorInstance.model.change(function (writer) {
+                var imageElement = writer.createElement('imageBlock', {
+                    src: safeImageUrl
+                });
 
-            const currentIndex = pageState.editorInstance.blocks.getCurrentBlockIndex();
-            let shouldReplace = false;
-            let targetIndex = (typeof currentIndex === 'number' && currentIndex >= 0) ? currentIndex + 1 : undefined;
+                pageState.editorInstance.model.insertContent(
+                    imageElement,
+                    pageState.editorInstance.model.document.selection
+                );
 
-            // Check if the current block is empty
-            if (typeof currentIndex === 'number' && currentIndex >= 0) {
-                const currentBlock = pageState.editorInstance.blocks.getBlockByIndex(currentIndex);
-                const isCurrentBlockEmpty = currentBlock && currentBlock.isEmpty;
-
-                // If it's an empty paragraph, we mark it for replacement
-                if (isCurrentBlockEmpty) {
-                    shouldReplace = true;
-                    targetIndex = currentIndex; // Insert at the same position
-                }
-            }
-
-            // 2. If replacing, delete the empty block first
-            if (shouldReplace) {
-                pageState.editorInstance.blocks.delete(currentIndex);
-            }
-
-            // 3. Insert the new block
-            pageState.editorInstance.blocks.insert(blockType, blockData || {}, {}, targetIndex, true);
-
-            // 4. Move Caret to the new block
-            // We use a small timeout to ensure the DOM has rendered the new block before focusing
-            setTimeout(() => {
-                const finalIndex = (typeof targetIndex === 'number') ? targetIndex : (pageState.editorInstance.blocks.getBlocksCount() - 1);
-                if (pageState.editorInstance.caret && typeof pageState.editorInstance.caret.setToBlock === 'function' && finalIndex >= 0) {
-                    pageState.editorInstance.caret.setToBlock(finalIndex);
-                }
-            }, 10);
-
-            markFormDirty();
+                writer.setSelection(imageElement, 'after');
+            });
         } catch (error) {
-            console.warn('Unable to insert block:', error);
+            console.error('No se pudo insertar la imagen en el editor:', error);
+            dhtmlx.message({
+                type: 'error',
+                text: 'No se pudo insertar la imagen en la descripción.'
+            });
+            return;
         }
-    }
 
-    /**
-     * Handle quick action toolbar clicks.
-     * @param {string} action
-     */
-    function handleEditorToolbarAction(action) {
-        switch (action) {
-            case 'paragraph':
-                insertEditorBlock('paragraph', {text: ''}).then(() => {});
-                break;
-            case 'heading':
-                insertEditorBlock('header', {text: '', level: 2}).then(() => {});
-                break;
-            case 'list':
-                insertEditorBlock('list', {style: 'unordered', items: [{content: '', items: []}]}).then(() => {});
-                break;
-            case 'ordered-list':
-                insertEditorBlock('list', {style: 'ordered', items: [{content: '', items: []}]}).then(() => {});
-                break;
-            case 'table':
-                insertEditorBlock('table', {withHeadings: false, content: [['', ''], ['', '']]}).then(() => {});
-                break;
-            case 'image':
-                insertEditorBlock('image', pageState.editorUsesSimpleImage ? {
-                    url: '',
-                    caption: 'Haz clic para editar la imagen'
-                } : {file: {url: ''}, caption: 'Selecciona o pega una imagen'}).then(() => {});
-                break;
-            default:
-                break;
+        if (pageState.editorInstance && pageState.editorInstance.editing && pageState.editorInstance.editing.view) {
+            pageState.editorInstance.editing.view.focus();
         }
+        markFormDirty();
     }
 
     /**
-     * Attach click handlers to the persistent editor toolbar.
-     */
-    function attachEditorToolbarHandlers() {
-        var toolbar = document.getElementById('new-article-editor-toolbar');
-        if (!toolbar) return;
-
-        toolbar.addEventListener('click', function (event) {
-            var button = event.target.closest('[data-editor-action]');
-            if (!button) return;
-            var action = button.getAttribute('data-editor-action');
-            handleEditorToolbarAction(action);
-        });
-    }
-
-    /**
-     * Build the public file URL used by Editor.js image blocks
+     * Build the public file URL used by editor images
      * @param {string} companyCode - Company identifier
      * @param {string|number} fileId - Uploaded file identifier with extension
      * @returns {string} Image retrieval URL
@@ -905,8 +960,8 @@ const NewArticlePageUI = (function () {
     }
 
     /**
-     * Upload an image file to FilesController for Editor.js Image Tool
-     * @param {File} file - Local file selected in Editor.js
+     * Upload an image file to staged uploads for CKEditor image output
+     * @param {File} file - Local file selected in CKEditor
      * @param {{description: string, desiredFileName: string}} metadata
      * @returns {Promise<{success: number, file: {url: string, id: string|number}}>}
      */
@@ -937,13 +992,15 @@ const NewArticlePageUI = (function () {
 
         const descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
         const desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
+        const clientTempId = metadata && metadata.clientTempId
+            ? String(metadata.clientTempId)
+            : createTempUploadId('staged-image');
         const stagedFile = renameBrowserFile(file, desiredFileName);
         const previewUrl = URL.createObjectURL(stagedFile);
-        const clientTempId = previewUrl.split('/').pop();
 
         pageState.stagedImages = pageState.stagedImages || [];
         pageState.stagedImages.push({
-            id: previewUrl,
+            id: clientTempId,
             file: stagedFile,
             name: stagedFile.name,
             size: stagedFile.size,
@@ -963,54 +1020,19 @@ const NewArticlePageUI = (function () {
     }
 
     /**
-     * Keep URL-based image insertion available in Image Tool.
-     * @param {string} imageUrl - URL entered in Editor.js
-     * @returns {Promise<{success: number, file: {url: string}}>}
-     */
-    function uploadEditorImageByUrl(imageUrl) {
-        if (!imageUrl || !imageUrl.trim()) {
-            const urlError = new Error('Debes indicar una URL de imagen válida.');
-            dhtmlx.message({type: 'error', text: urlError.message});
-            return Promise.reject(urlError);
-        }
-
-        return Promise.resolve({
-            success: 1,
-            file: {
-                url: imageUrl.trim()
-            }
-        });
-    }
-
-    /**
-     * Check if the pasted URL is likely an image URL.
-     * @param {string} url
-     * @returns {boolean}
-     */
-    function isLikelyImageUrl(url) {
-        if (!url) return false;
-        if (!/^https?:\/\//i.test(url)) return false;
-        return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url) || /\/image\/|images\./i.test(url);
-    }
-
-    /**
-     * Destroy the Editor.js instance and clean up
+     * Destroy the CKEditor instance and clean up
      */
     function destroyEditor() {
         if (pageState.editorInstance) {
             pageState.editorInstance.destroy();
             pageState.editorInstance = null;
         }
-        if (pageState.imagePasteHandler) {
-            document.removeEventListener('paste', pageState.imagePasteHandler);
-            pageState.imagePasteHandler = null;
-        }
     }
 
     var EDITOR_HTML_SANITIZE_CONFIG = {
         USE_PROFILES: {html: true},
-        ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-        ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class']
+        ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img'],
+        ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class', 'width', 'height']
     };
 
     /**
@@ -1023,231 +1045,6 @@ const NewArticlePageUI = (function () {
             return htmlString;
         }
         return DOMPurify.sanitize(htmlString, EDITOR_HTML_SANITIZE_CONFIG);
-    }
-
-    /**
-     * Sanitize table cell HTML content, preserving headings, images, and inline styles.
-     * @param {string} cellHtml
-     * @returns {string}
-     */
-    function sanitizeEditorTableCellHtml(cellHtml) {
-        return sanitizeEditorHtml(cellHtml || '');
-    }
-
-    /**
-     * Render list items recursively for editorjs-html custom parser
-     * Handles both simple string items and nested object-based items (list v2.0+)
-     * @param {Array} items - List items from Editor.js block data
-     * @param {string} listTag - 'ol' or 'ul'
-     * @returns {string} HTML string of list items
-     */
-    function renderListItemsToHtml(items, listTag) {
-        return items.map(function (item) {
-            var content = typeof item === 'string' ? item : (item.content || '');
-            var nestedHtml = '';
-            if (item.items && item.items.length > 0) {
-                nestedHtml = '<' + listTag + '>' + renderListItemsToHtml(item.items, listTag) + '</' + listTag + '>';
-            }
-            return '<li>' + content + nestedHtml + '</li>';
-        }).join('');
-    }
-
-    /**
-     * Convert Editor.js saved data (JSON) to a standard HTML string
-     * Uses editorjs-html with custom parsers for list and table blocks
-     * @param {Object} editorData - The saved data from editor.save()
-     * @returns {string} HTML string
-     */
-    function convertEditorDataToHtml(editorData) {
-        if (!editorData || !editorData.blocks || editorData.blocks.length === 0) {
-            return '';
-        }
-
-        var customParsers = {
-            list: function (block) {
-                var listTag = block.data.style === 'ordered' ? 'ol' : 'ul';
-                var itemsHtml = renderListItemsToHtml(block.data.items, listTag);
-                return '<' + listTag + '>' + itemsHtml + '</' + listTag + '>';
-            },
-            table: function (block) {
-                var rows = block.data.content || [];
-                var withHeadings = block.data.withHeadings;
-                var tableHtml = '<table>';
-                rows.forEach(function (row, rowIndex) {
-                    tableHtml += '<tr>';
-                    row.forEach(function (cell) {
-                        var cellTag = (withHeadings && rowIndex === 0) ? 'th' : 'td';
-                        var safeCellHtml = sanitizeEditorTableCellHtml(cell);
-                        tableHtml += '<' + cellTag + '>' + safeCellHtml + '</' + cellTag + '>';
-                    });
-                    tableHtml += '</tr>';
-                });
-                tableHtml += '</table>';
-                return tableHtml;
-            },
-            image: function (block) {
-                var imageUrl = '';
-                var caption = '';
-                var isStretched = false;
-
-                if (block && block.data) {
-                    imageUrl = (block.data.file && block.data.file.url) || block.data.url || '';
-                    caption = block.data.caption || '';
-                    isStretched = !!block.data.stretched;
-                }
-
-                if (!imageUrl) return '';
-
-                var figureClass = 'cdx-image' + (isStretched ? ' cdx-image--stretched' : '');
-                var captionHtml = caption ? '<figcaption>' + escapeHtml(caption) + '</figcaption>' : '';
-                return `
-                  <figure class="${figureClass}">
-                    <img 
-                      src="${imageUrl}" 
-                      mapcel-temp-id="${imageUrl}" 
-                      alt="User uploaded content" 
-                    />
-                    ${captionHtml}
-                  </figure>
-                `.trim();
-            }
-        };
-
-        var parser = edjsHTML(customParsers);
-        var htmlArray = parser.parse(editorData);
-        return Array.isArray(htmlArray) ? htmlArray.join('') : htmlArray;
-    }
-
-    /**
-     * Convert an HTML string into Editor.js block data for hydration in edit mode
-     * Parses HTML elements into block objects compatible with Editor.js blocks.render()
-     * @param {string} htmlString - The HTML string to convert
-     * @returns {Object} Editor.js data object with blocks array
-     */
-    function htmlToEditorJsBlocks(htmlString) {
-        var tempParser = new DOMParser();
-        var doc = tempParser.parseFromString(htmlString, 'text/html');
-        var blocks = [];
-
-        /**
-         * Parse <li> children of a list element into Editor.js list items
-         * @param {HTMLElement} listElement - The <ul> or <ol> element
-         * @returns {Array} Array of list item objects
-         */
-        function parseListChildren(listElement) {
-            var listItems = [];
-            var children = listElement.querySelectorAll(':scope > li');
-            children.forEach(function (li) {
-                var itemContent = '';
-                var nestedItems = [];
-                li.childNodes.forEach(function (child) {
-                    if (child.nodeType === Node.ELEMENT_NODE &&
-                        (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')) {
-                        nestedItems = parseListChildren(child);
-                    } else if (child.nodeType === Node.ELEMENT_NODE) {
-                        itemContent += child.outerHTML;
-                    } else if (child.nodeType === Node.TEXT_NODE) {
-                        itemContent += child.textContent;
-                    }
-                });
-                listItems.push({content: itemContent.trim(), items: nestedItems});
-            });
-            return listItems;
-        }
-
-        doc.body.childNodes.forEach(function (node) {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                var tag = node.tagName.toLowerCase();
-
-                if (/^h[1-6]$/.test(tag)) {
-                    blocks.push({
-                        type: 'header',
-                        data: {text: node.innerHTML, level: parseInt(tag[1], 10)}
-                    });
-                } else if (tag === 'p') {
-                    if (node.innerHTML.trim()) {
-                        blocks.push({type: 'paragraph', data: {text: node.innerHTML}});
-                    }
-                } else if (tag === 'ul' || tag === 'ol') {
-                    blocks.push({
-                        type: 'list',
-                        data: {
-                            style: tag === 'ol' ? 'ordered' : 'unordered',
-                            items: parseListChildren(node)
-                        }
-                    });
-                } else if (tag === 'table') {
-                    var tableContent = [];
-                    var hasHeadings = node.querySelector('th') !== null;
-                    node.querySelectorAll('tr').forEach(function (tr) {
-                        var row = [];
-                        tr.querySelectorAll('td, th').forEach(function (cell) {
-                            row.push(cell.innerHTML);
-                        });
-                        if (row.length > 0) tableContent.push(row);
-                    });
-                    blocks.push({
-                        type: 'table',
-                        data: {withHeadings: hasHeadings, content: tableContent}
-                    });
-                } else if (tag === 'figure' && node.querySelector('img')) {
-                    var figureImage = node.querySelector('img');
-                    var figureCaption = node.querySelector('figcaption');
-                    blocks.push({
-                        type: 'image',
-                        data: {
-                            file: {url: figureImage.getAttribute('src') || ''},
-                            caption: figureCaption ? figureCaption.textContent : '',
-                            stretched: node.classList.contains('cdx-image--stretched')
-                        }
-                    });
-                } else if (tag === 'img') {
-                    blocks.push({
-                        type: 'image',
-                        data: {
-                            file: {url: node.getAttribute('src') || ''},
-                            caption: ''
-                        }
-                    });
-                } else {
-                    // Treat unknown block-level elements as paragraphs
-                    if (node.textContent.trim()) {
-                        blocks.push({type: 'paragraph', data: {text: node.innerHTML}});
-                    }
-                }
-            } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-                blocks.push({type: 'paragraph', data: {text: node.textContent}});
-            }
-        });
-
-        return {blocks: blocks};
-    }
-
-    /**
-     * Hydrate the Editor.js instance with existing HTML content (for edit mode)
-     * Tries editor.blocks.renderFromHTML first, falls back to manual block parsing
-     * @param {Object} editor - The Editor.js instance
-     * @param {string} htmlString - The HTML content to load
-     */
-    function hydrateEditorFromHtml(editor, htmlString) {
-        var sanitizedHtml = sanitizeEditorHtml(htmlString);
-        if (typeof DOMPurify === 'undefined') {
-            console.warn('DOMPurify not loaded: HTML will not be sanitized for editor hydration');
-        }
-
-        editor.isReady.then(function () {
-            if (typeof editor.blocks.renderFromHTML === 'function') {
-                editor.blocks.renderFromHTML(sanitizedHtml);
-            } else {
-                // Fallback: parse HTML to Editor.js blocks manually
-                var blocksData = htmlToEditorJsBlocks(sanitizedHtml);
-                if (blocksData.blocks.length > 0) {
-                    editor.blocks.render(blocksData);
-                }
-            }
-        }).catch(function (error) {
-            console.error('Error hydrating editor from HTML:', error);
-        });
     }
 
     /**
@@ -1272,10 +1069,6 @@ const NewArticlePageUI = (function () {
         // Update tags display
         updateSelectedTagsDisplay();
 
-        // Hydrate editor with article description HTML
-        if (article.description && pageState.editorInstance) {
-            hydrateEditorFromHtml(pageState.editorInstance, article.description);
-        }
     }
 
     /**
@@ -1401,7 +1194,7 @@ const NewArticlePageUI = (function () {
             if (!image.previewUrl || !image.id) return;
 
             var escapedPreviewUrl = image.previewUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            var tempUrl = 'mapcel-image://' + image.id;
+            var tempUrl = 'mapcel-image:' + image.id;
 
             normalized = normalized.replace(
                 new RegExp(escapedPreviewUrl, 'g'),
@@ -1772,12 +1565,8 @@ const NewArticlePageUI = (function () {
         container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-                const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-                insertEditorBlock('image', {
-                    file: {
-                        url: imageUrl
-                    }
-                });
+                const imageUrl = sanitizeUrl(imageIdWithExtension);
+                insertImageIntoEditor(imageUrl);
             });
         });
     }
@@ -1806,7 +1595,7 @@ const NewArticlePageUI = (function () {
         </div>
         <button 
           type="button"
-          data-copy-image-id="${imageIdAndExtension}"
+          data-copy-image-id="${thumbnailUrl}"
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
           title="Insertar a la descripción"
         >
@@ -2016,11 +1805,7 @@ const NewArticlePageUI = (function () {
             btn.addEventListener('click', function () {
                 var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
                 const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
-                insertEditorBlock('image', {
-                    file: {
-                        url: imageUrl
-                    }
-                });
+                insertImageIntoEditor(imageUrl);
             });
         });
     }
@@ -2325,10 +2110,10 @@ const NewArticlePageUI = (function () {
             return;
         }
 
-        // Save editor content (returns a Promise with JSON block data)
-        return pageState.editorInstance.save()
-            .then(function (editorData) {
-                let descriptionHtml = sanitizeEditorHtml(convertEditorDataToHtml(editorData));
+        // Save editor content as HTML string
+        return Promise.resolve()
+            .then(function () {
+                let descriptionHtml = (pageState.editorInstance.getData());
                 descriptionHtml = normalizeStagedEditorImageUrls(descriptionHtml);
 
                 if (typeof DOMPurify === 'undefined') {
@@ -2475,7 +2260,6 @@ const NewArticlePageUI = (function () {
             layoutCell.attachHTMLString(renderPageHtml());
             setTimeout(function () {
                 attachEventHandlers();
-                attachEditorToolbarHandlers();
                 initializeEditor();
                 updateStagedFilesDisplay();
                 updateStagedImagesDisplay();
@@ -2590,7 +2374,7 @@ const NewArticlePageUI = (function () {
      * Close the page and clean up resources
      */
     function closePage() {
-        // Destroy Editor.js instance
+        // Destroy CKEditor instance
         destroyEditor();
         cleanupStagedImagePreviewUrls();
         resetPageState();

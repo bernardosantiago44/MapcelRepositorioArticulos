@@ -1274,6 +1274,15 @@ function showNewArticlePage(companyName) {
  */
 function onNavigateBackFromNewArticle(newArticleData) {
   appState.currentArticlesView = 'grid';
+  var refreshedArticleId = (newArticleData && newArticleData.id) ? newArticleData.id : appState.selectedArticleId;
+
+  // Ensure list/detail views re-fetch fresh data after create/edit operations.
+  if (typeof ArticleService !== 'undefined' && ArticleService.clearCache) {
+    ArticleService.clearCache();
+  }
+  if (refreshedArticleId && typeof FileService !== 'undefined' && FileService.invalidateFilesByArticleCache) {
+    FileService.invalidateFilesByArticleCache(refreshedArticleId);
+  }
   
   // Close the new article page
   NewArticlePageUI.closePage();

@@ -27,7 +27,7 @@ const ImageMetadataEditorUI = (function() {
    * Prompt for metadata before uploading a new local file (description + desired filename)
    * @param {File} file - The local file about to be uploaded
    * @param {{description?: string, desiredFileName?: string}} initialMetadata - Optional metadata to prefill
-   * @returns {Promise<{description: string, desiredFileName: string}|null>}
+   * @returns {Promise<{description: string, desiredFileName: string, clientTempId: string}|null>}
    */
   function promptForFileMetadata(file, initialMetadata) {
     if (!file) return Promise.resolve(null);
@@ -135,11 +135,11 @@ const ImageMetadataEditorUI = (function() {
     `);
     
     setTimeout(() => {
-      attachNewFileHandlers(metadataWindow, file, resolver);
+      attachNewFileHandlers(metadataWindow, file, initialMetadata || {}, resolver);
     }, 50);
   }
   
-  function attachNewFileHandlers(metadataWindow, file, resolver) {
+  function attachNewFileHandlers(metadataWindow, file, initialMetadata, resolver) {
     const nameInput = document.getElementById('image-metadata-new-name');
     const descriptionTextarea = document.getElementById('image-metadata-new-description');
     const cancelBtn = document.getElementById('image-metadata-cancel-new-btn');
@@ -169,10 +169,14 @@ const ImageMetadataEditorUI = (function() {
       saveBtn.addEventListener('click', () => {
         const desiredFileName = (nameInput && nameInput.value ? nameInput.value.trim() : '') || file.name;
         const descriptionValue = descriptionTextarea ? descriptionTextarea.value.trim() : '';
+        const clientTempId = initialMetadata && initialMetadata.clientTempId
+          ? String(initialMetadata.clientTempId)
+          : '';
         
         resolver({
           description: descriptionValue,
           desiredFileName: desiredFileName,
+          clientTempId: clientTempId,
           dimensions: dimensions,
         });
         

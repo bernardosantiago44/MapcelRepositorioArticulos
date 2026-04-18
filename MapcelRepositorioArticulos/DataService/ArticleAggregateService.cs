@@ -584,19 +584,12 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
 
         foreach (var image in imagePlans)
         {
-            var escapedTempId = Regex.Escape(image.ClientTempId);
+            var tempId = image.ClientTempId;
 
-            rewritten = Regex.Replace(
-                rewritten,
-                $"src=[\"']{escapedTempId}[\"']",
-                $"src=\"{image.RelativePath}\"",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
-            rewritten = Regex.Replace(
-                rewritten,
-                $"data-mapcel-temp-id=[\"']{escapedTempId}[\"']",
-                $"data-mapcel-temp-id=\"{image.ClientTempId}\" src=\"{image.RelativePath}\"",
-                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            rewritten = rewritten.Replace(
+                $"mapcel-image:{tempId}", 
+                image.RelativePath, 
+                StringComparison.OrdinalIgnoreCase);
         }
 
         return rewritten;

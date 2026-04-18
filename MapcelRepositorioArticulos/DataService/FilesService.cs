@@ -191,7 +191,7 @@ public interface IFilesService
             INSERTED.description,
             INSERTED.extension,
             INSERTED.thumbnail_url,
-            INSERTED.is_image
+            INSERTED.is_image,
             DELETED.upload_date
         WHERE file_id = @FileId
           AND company_code = @CompanyCode;
@@ -601,7 +601,7 @@ public interface IFilesService
             // column index reads
             var dto = new FileDto
             {
-                Id = reader.GetInt32(0).ToString(),
+                Id = reader.GetGuid(0).ToString(),
                 Name = reader.GetString(1),
                 Description = reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
                 Extension = reader.IsDBNull(3) ? string.Empty : reader.GetString(3),

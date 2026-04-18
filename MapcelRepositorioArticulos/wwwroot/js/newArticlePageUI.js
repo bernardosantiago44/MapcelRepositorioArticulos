@@ -618,6 +618,7 @@ const NewArticlePageUI = (function () {
                         if (!result || !result.file || !result.file.url) {
                             throw new Error('No se pudo subir la imagen seleccionada.');
                         }
+                        loader.backendId = result.file.id;
 
                         return {default: result.file.url};
                     });
@@ -689,14 +690,13 @@ const NewArticlePageUI = (function () {
                     BalloonToolbar
                 } = window.CKEDITOR;
                 const LICENSE_KEY =
-                    'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE3NzczMzQzOTksImp0aSI6IjBiMzk4OTQzLWUxMGUtNGM2YS04Nzk2LTJlMmZjZjQ1YjZmZSIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiLCJzaCJdLCJ3aGl0ZUxhYmVsIjp0cnVlLCJsaWNlbnNlVHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiKiJdLCJ2YyI6ImZkMzJjN2E4In0.C1FMHkBqWrXhpR_oxI82HAFlGTVixGigU6mwktkcOfZuxaclsZ4e-zjYEJx2N_Xe56dXUcaIB6h9h95pW5Q6kA';
+                    'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE4MDc2NjA3OTksImp0aSI6ImE1YjA3MTdlLTc4NDItNGZjZi04M2YxLTQ1OTUyOWQ4MDkxNiIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiXSwiZmVhdHVyZXMiOlsiRFJVUCIsIkUyUCIsIkUyVyJdLCJyZW1vdmVGZWF0dXJlcyI6WyJQQiIsIlJGIiwiU0NIIiwiVENQIiwiVEwiLCJUQ1IiLCJJUiIsIlNVQSIsIkI2NEEiLCJMUCIsIkhFIiwiUkVEIiwiUEZPIiwiV0MiLCJGQVIiLCJCS00iLCJGUEgiLCJNUkUiXSwidmMiOiI1ZjI4YzAzMiJ9.W2RJI7OfEh8GMiXn2-HTyi3FAF-skSjxYzCVPiqVoXfARsfKjfL5G5ICvQnF6hKJjit1MpWJ6yh6UnGDU1WjeQ';
 
                 const editorConfig = {
                     attachTo: document.querySelector('#new-article-ckeditor'),
                     root: {
-                        placeholder: 'Type or paste your content here!',
-                        initialData:
-                            '<h2>Evaluation license key 🔑</h2>\n<p>\n\tAn evaluation key is being used in this editor. <a href="https://portal.ckeditor.com/checkout?plan=free">\n\t\tCreate an account to use your own license keys.\n\t</a>\n</p>\n\n<h2>Congratulations on setting up CKEditor 5! 🎉</h2>\n<p>\n\tYou\'ve successfully created a CKEditor 5 project. This powerful text editor\n\twill enhance your application, enabling rich text editing capabilities that\n\tare customizable and easy to use.\n</p>\n<h3>What\'s next?</h3>\n<ol>\n\t<li>\n\t\t<strong>Integrate into your app</strong>: time to bring the editing into\n\t\tyour application. Take the code you created and add to your application.\n\t</li>\n\t<li>\n\t\t<strong>Explore features:</strong> Experiment with different plugins and\n\t\ttoolbar options to discover what works best for your needs.\n\t</li>\n\t<li>\n\t\t<strong>Customize your editor:</strong> Tailor the editor\'s\n\t\tconfiguration to match your application\'s style and requirements. Or\n\t\teven write your plugin!\n\t</li>\n</ol>\n<p>\n\tKeep experimenting, and don\'t hesitate to push the boundaries of what you\n\tcan achieve with CKEditor 5. Your feedback is invaluable to us as we strive\n\tto improve and evolve. Happy editing!\n</p>\n<h3>Helpful resources</h3>\n<ul>\n\t<li>📝 <a href="https://portal.ckeditor.com/checkout?plan=free">Trial sign up</a>,</li>\n\t<li>📕 <a href="https://ckeditor.com/docs/ckeditor5/latest/installation/index.html">Documentation</a>,</li>\n\t<li>⭐️ <a href="https://github.com/ckeditor/ckeditor5">GitHub</a> (star us if you can!),</li>\n\t<li>🏠 <a href="https://ckeditor.com">CKEditor Homepage</a>,</li>\n\t<li>🧑‍💻 <a href="https://ckeditor.com/ckeditor-5/demo/">CKEditor 5 Demos</a>,</li>\n</ul>\n<h3>Need help?</h3>\n<p>\n\tSee this text, but the editor is not starting up? Check the browser\'s\n\tconsole for clues and guidance. It may be related to an incorrect license\n\tkey if you use premium features or another feature-related requirement. If\n\tyou cannot make it work, file a GitHub issue, and we will help as soon as\n\tpossible!\n</p>\n'
+                        placeholder: 'Escribe una descripción detallada aquí.',
+                        initialData: initialDescriptionHtml
                     },
                     toolbar: {
                         items: [
@@ -758,6 +758,7 @@ const NewArticlePageUI = (function () {
                         TodoList,
                         Underline
                     ],
+                    // extraPlugins: [ImageBackendIdPlugin],
                     licenseKey: LICENSE_KEY,
                     balloonToolbar: ['bold', 'italic', '|', 'link', '|', 'bulletedList', 'numberedList'],
                     heading: {
@@ -882,6 +883,7 @@ const NewArticlePageUI = (function () {
         const defaultMetadata = {
             description: file && file.name ? file.name : '',
             desiredFileName: file && file.name ? file.name : '',
+            clientTempId: createTempUploadId('staged-image'),
             dimensions: dimensions ? dimensions : {},
         };
 
@@ -990,13 +992,15 @@ const NewArticlePageUI = (function () {
 
         const descriptionValue = metadata && metadata.description ? metadata.description.trim() : '';
         const desiredFileName = metadata && metadata.desiredFileName ? metadata.desiredFileName.trim() : '';
+        const clientTempId = metadata && metadata.clientTempId
+            ? String(metadata.clientTempId)
+            : createTempUploadId('staged-image');
         const stagedFile = renameBrowserFile(file, desiredFileName);
         const previewUrl = URL.createObjectURL(stagedFile);
-        const clientTempId = previewUrl.split('/').pop();
 
         pageState.stagedImages = pageState.stagedImages || [];
         pageState.stagedImages.push({
-            id: previewUrl,
+            id: clientTempId,
             file: stagedFile,
             name: stagedFile.name,
             size: stagedFile.size,
@@ -1027,8 +1031,8 @@ const NewArticlePageUI = (function () {
 
     var EDITOR_HTML_SANITIZE_CONFIG = {
         USE_PROFILES: {html: true},
-        ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
-        ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class']
+        ADD_TAGS: ['table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'figcaption', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'img'],
+        ADD_ATTR: ['colspan', 'rowspan', 'src', 'alt', 'title', 'style', 'class', 'width', 'height']
     };
 
     /**
@@ -1190,7 +1194,7 @@ const NewArticlePageUI = (function () {
             if (!image.previewUrl || !image.id) return;
 
             var escapedPreviewUrl = image.previewUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            var tempUrl = 'mapcel-image://' + image.id;
+            var tempUrl = 'mapcel-image:' + image.id;
 
             normalized = normalized.replace(
                 new RegExp(escapedPreviewUrl, 'g'),
@@ -2109,7 +2113,7 @@ const NewArticlePageUI = (function () {
         // Save editor content as HTML string
         return Promise.resolve()
             .then(function () {
-                let descriptionHtml = sanitizeEditorHtml(pageState.editorInstance.getData());
+                let descriptionHtml = (pageState.editorInstance.getData());
                 descriptionHtml = normalizeStagedEditorImageUrls(descriptionHtml);
 
                 if (typeof DOMPurify === 'undefined') {

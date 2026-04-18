@@ -22,6 +22,31 @@
     <ItemGroup>
       <_ContentIncludedByDefault Remove="wwwroot\data\articles-mock-data.json" />
       <_ContentIncludedByDefault Remove="wwwroot\data\grid.xml" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\2b588ff4-144a-4ba4-b5af-b694eda688ce\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\2b588ff4-144a-4ba4-b5af-b694eda688ce\images\5af83e17-a3a3-4f84-8a2c-392432ff3018.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\57d9c4a3-8db5-4f75-b269-0c5182904fa9\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\57d9c4a3-8db5-4f75-b269-0c5182904fa9\files\dc8daade-ab2b-4ad3-ae97-357ce881b01a.json" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\57d9c4a3-8db5-4f75-b269-0c5182904fa9\images\d2e5d2f4-0eb6-4817-96ba-170753e4c06d.png" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\8f6c4f11-d0d3-46e7-8145-0da77c8b2278\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\8f6c4f11-d0d3-46e7-8145-0da77c8b2278\images\c3f1df8e-a892-4af5-99a9-f9fc09d8bcf7.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\90a1bacb-1ef3-4399-84b6-cc9a5691aa1a\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\90a1bacb-1ef3-4399-84b6-cc9a5691aa1a\files\796ff851-a161-4140-b735-247b3cb762b5.xlsx" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\90a1bacb-1ef3-4399-84b6-cc9a5691aa1a\images\6c18f766-6cf9-4a62-9ea4-d7aad871b467.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\99087153-524a-4e12-b211-656aba1d6e7a\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\99087153-524a-4e12-b211-656aba1d6e7a\images\fb0a9a41-4fdd-4fcd-8722-63ec1735583b.png" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\acf7e77e-8869-4f6a-90e8-ebcc0b4a3716\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\acf7e77e-8869-4f6a-90e8-ebcc0b4a3716\images\04fec174-e9d5-40ac-9394-5a536886e79e.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\ad31bb3b-c401-4c62-b173-4d577204bca4\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\ad31bb3b-c401-4c62-b173-4d577204bca4\images\520eb179-75cd-4965-93fd-5c94b9bbfd8b.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\ade58b62-99de-42f8-b8e9-7282b09680ee\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\ade58b62-99de-42f8-b8e9-7282b09680ee\images\1db7bbe0-497e-4b6e-b0b2-50976ba734f3.png" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\afa44816-d6fe-46c1-b206-4c9950f8de3f\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\afa44816-d6fe-46c1-b206-4c9950f8de3f\images\8a15d781-9eb5-4702-a36b-e6c4da94f47b.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\b6c5831f-e0d5-4f9a-8cf7-a6f8a21cf9ff\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\caf48ddf-63b7-43a1-b10d-30f6b6fc3c9d\description.txt" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\caf48ddf-63b7-43a1-b10d-30f6b6fc3c9d\files\29cb5c98-a753-4a25-a783-1513f7388976.xlsx" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\caf48ddf-63b7-43a1-b10d-30f6b6fc3c9d\images\eca9b63e-2786-453f-befe-a1581f83cd97.jpg" />
+      <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\f8739f01-29f0-4fd9-81ae-84e95a79208d\description.txt" />
     </ItemGroup>
 
 </Project>

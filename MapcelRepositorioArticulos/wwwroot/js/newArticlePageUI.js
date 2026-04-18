@@ -1366,16 +1366,75 @@ const NewArticlePageUI = (function () {
         return count + ' ' + (count === 1 ? singularLabel : pluralLabel);
     }
 
+    function getIdValue(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object' && value.id !== null && value.id !== undefined) {
+            return String(value.id).trim();
+        }
+        return String(value).trim();
+    }
+
+    function normalizeId(value) {
+        return getIdValue(value).toLowerCase();
+    }
+
+    function idsMatch(left, right) {
+        var leftId = normalizeId(left);
+        var rightId = normalizeId(right);
+        return leftId !== '' && leftId === rightId;
+    }
+
+    function toUniqueIdArray(values) {
+        if (!Array.isArray(values) || values.length === 0) return [];
+
+        var normalizedSet = new Set();
+        var normalizedValues = [];
+
+        values.forEach(function (value) {
+            var rawId = getIdValue(value);
+            var normalizedId = normalizeId(value);
+            if (!normalizedId || normalizedSet.has(normalizedId)) return;
+
+            normalizedSet.add(normalizedId);
+            normalizedValues.push(rawId);
+        });
+
+        return normalizedValues;
+    }
+
+    function mergeMediaById(existingItems, incomingItems) {
+        var mergedItems = Array.isArray(existingItems) ? existingItems.slice() : [];
+        if (!Array.isArray(incomingItems) || incomingItems.length === 0) return mergedItems;
+
+        var existingIdSet = new Set(mergedItems.map(function (item) {
+            return normalizeId(item && item.id);
+        }));
+
+        incomingItems.forEach(function (item) {
+            if (!item || item.id === null || item.id === undefined) return;
+
+            var normalizedId = normalizeId(item.id);
+            if (!normalizedId || existingIdSet.has(normalizedId)) return;
+
+            existingIdSet.add(normalizedId);
+            mergedItems.push(item);
+        });
+
+        return mergedItems;
+    }
+
     /**
-     * Find index of an ID in a list using string matching
+     * Find index of an ID in a list using normalized matching
      * @param {Array} list - Array of IDs
      * @param {string|number} id - ID to find
      * @returns {number} Index or -1
      */
     function findIdIndex(list, id) {
-        var targetId = String(id);
+        var targetId = normalizeId(id);
+        if (!targetId || !Array.isArray(list)) return -1;
+
         return list.findIndex(function (item) {
-            return String(item) === targetId;
+            return normalizeId(item) === targetId;
         });
     }
 
@@ -1468,18 +1527,20 @@ const NewArticlePageUI = (function () {
         if (!Array.isArray(fileIds) || fileIds.length === 0) return;
 
         var imageIdSet = new Set(pageState.allImages.map(function (img) {
-            return String(img.id);
+            return normalizeId(img.id);
         }));
         var fileIdSet = new Set(pageState.allFiles.map(function (file) {
-            return String(file.id);
+            return normalizeId(file.id);
         }));
 
         fileIds.forEach(function (id) {
-            var normalizedId = String(id);
+            var normalizedId = normalizeId(id);
+            if (!normalizedId) return;
+
             if (imageIdSet.has(normalizedId) && findIdIndex(pageState.attachedImages, normalizedId) === -1) {
-                pageState.attachedImages.push(id);
+                pageState.attachedImages.push(getIdValue(id));
             } else if (fileIdSet.has(normalizedId) && findIdIndex(pageState.attachedFiles, normalizedId) === -1) {
-                pageState.attachedFiles.push(id);
+                pageState.attachedFiles.push(getIdValue(id));
             }
         });
     }
@@ -1492,7 +1553,7 @@ const NewArticlePageUI = (function () {
 
         ImageService.getImages(pageState.companyCode)
             .then(function (images) {
-                pageState.allImages = images || [];
+                pageState.allImages = mergeMediaById(pageState.allImages, images || []);
                 resolveFileIdsFromArticleData();
                 updateAvailableImagesDisplay();
                 updateAttachedImagesDisplay();
@@ -1509,7 +1570,7 @@ const NewArticlePageUI = (function () {
 
         FileService.getFiles(pageState.companyCode)
             .then(function (files) {
-                pageState.allFiles = files || [];
+                pageState.allFiles = mergeMediaById(pageState.allFiles, files || []);
                 resolveFileIdsFromArticleData();
                 updateAvailableFilesDisplay();
                 updateAttachedFilesDisplay();
@@ -1522,6 +1583,48 @@ const NewArticlePageUI = (function () {
                     type: 'error',
                     text: 'No se pudieron cargar los archivos disponibles'
                 });
+            });
+
+        if (!pageState.editMode || !pageState.articleId) return;
+
+        var articleId = getIdValue(pageState.articleId);
+        if (!articleId) return;
+
+        var imagesByArticlePromise = typeof ImageService !== 'undefined' && typeof ImageService.getImagesByArticle === 'function'
+            ? ImageService.getImagesByArticle(articleId)
+            : Promise.resolve([]);
+
+        var filesByArticlePromise = typeof FileService !== 'undefined' && typeof FileService.getFilesByArticle === 'function'
+            ? FileService.getFilesByArticle(articleId, false)
+            : Promise.resolve([]);
+
+        Promise.all([imagesByArticlePromise, filesByArticlePromise])
+            .then(function (results) {
+                var articleImages = Array.isArray(results[0]) ? results[0] : [];
+                var articleFiles = Array.isArray(results[1]) ? results[1] : [];
+
+                pageState.allImages = mergeMediaById(pageState.allImages, articleImages);
+                pageState.allFiles = mergeMediaById(pageState.allFiles, articleFiles);
+                pageState.attachedImages = toUniqueIdArray(
+                    pageState.attachedImages.concat(articleImages.map(function (img) {
+                        return img.id;
+                    }))
+                );
+                pageState.attachedFiles = toUniqueIdArray(
+                    pageState.attachedFiles.concat(articleFiles.map(function (file) {
+                        return file.id;
+                    }))
+                );
+
+                resolveFileIdsFromArticleData();
+                updateAvailableImagesDisplay();
+                updateAttachedImagesDisplay();
+                updateAvailableFilesDisplay();
+                updateAttachedFilesDisplay();
+                updateMediaCounts();
+            })
+            .catch(function (error) {
+                console.error('Error loading attached media:', error);
             });
     }
 
@@ -1747,7 +1850,7 @@ const NewArticlePageUI = (function () {
 
         const attachedImageObjects = pageState.attachedImages.map(function (id) {
             return pageState.allImages.find(function (img) {
-                return String(img.id) === String(id);
+                return idsMatch(img.id, id);
             });
         }).filter(function (img) {
             return img;
@@ -1824,7 +1927,7 @@ const NewArticlePageUI = (function () {
 
         var attachedFileObjects = pageState.attachedFiles.map(function (id) {
             return pageState.allFiles.find(function (file) {
-                return String(file.id) === String(id);
+                return idsMatch(file.id, id);
             });
         }).filter(function (file) {
             return file;
@@ -2063,25 +2166,32 @@ const NewArticlePageUI = (function () {
         const multipartData = new FormData();
         const originalArticle = pageState.originalArticleData || {};
 
-        const originalFileIds = Array.isArray(originalArticle.fileIds)
-            ? originalArticle.fileIds.map(function (id) {
-                return String(id);
+        const originalFileIds = toUniqueIdArray(originalArticle.fileIds || []);
+        const currentFileIds = toUniqueIdArray(formDataValues.fileIds || []);
+
+        const originalLookup = new Map(originalFileIds.map(function (id) {
+            return [normalizeId(id), id];
+        }));
+
+        const currentLookup = new Map(currentFileIds.map(function (id) {
+            return [normalizeId(id), id];
+        }));
+
+        const addedExistingFileIds = Array.from(currentLookup.keys())
+            .filter(function (normalizedId) {
+                return !originalLookup.has(normalizedId);
             })
-            : [];
+            .map(function (normalizedId) {
+                return currentLookup.get(normalizedId);
+            });
 
-        const currentFileIds = Array.isArray(formDataValues.fileIds)
-            ? formDataValues.fileIds.map(function (id) {
-                return String(id);
+        const removedFiles = Array.from(originalLookup.keys())
+            .filter(function (normalizedId) {
+                return !currentLookup.has(normalizedId);
             })
-            : [];
-
-        const addedExistingFileIds = currentFileIds.filter(function (currentId) {
-            return originalFileIds.indexOf(currentId) === -1;
-        });
-
-        const removedFiles = originalFileIds.filter(function (originalId) {
-            return currentFileIds.indexOf(originalId) === -1;
-        });
+            .map(function (normalizedId) {
+                return originalLookup.get(normalizedId);
+            });
 
         multipartData.append('Title', formDataValues.title);
         multipartData.append('DescriptionHtml', formDataValues.descriptionHtml);
@@ -2351,13 +2461,8 @@ const NewArticlePageUI = (function () {
             });
         }
 
-        if (articleData.attachedImages && Array.isArray(articleData.attachedImages)) {
-            pageState.attachedImages = articleData.attachedImages.slice();
-        }
-
-        if (articleData.attachedFiles && Array.isArray(articleData.attachedFiles)) {
-            pageState.attachedFiles = articleData.attachedFiles.slice();
-        }
+        pageState.attachedImages = toUniqueIdArray(articleData.attachedImages || []);
+        pageState.attachedFiles = toUniqueIdArray(articleData.attachedFiles || []);
 
         initializePage(layoutCell, articleData.companyCode, companyName, onNavigateBack);
     }

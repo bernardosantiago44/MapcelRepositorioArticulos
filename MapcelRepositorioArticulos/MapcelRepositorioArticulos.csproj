@@ -47,6 +47,14 @@
       <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\caf48ddf-63b7-43a1-b10d-30f6b6fc3c9d\files\29cb5c98-a753-4a25-a783-1513f7388976.xlsx" />
       <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\caf48ddf-63b7-43a1-b10d-30f6b6fc3c9d\images\eca9b63e-2786-453f-befe-a1581f83cd97.jpg" />
       <_ContentIncludedByDefault Remove="wwwroot\articles\5da15590-ec85-4f26-a1fa-f93ff0dca4a9\f8739f01-29f0-4fd9-81ae-84e95a79208d\description.txt" />
+      <_ContentIncludedByDefault Remove="publish\web.config" />
+      <_ContentIncludedByDefault Remove="publish\appsettings.Development.json" />
+      <_ContentIncludedByDefault Remove="publish\appsettings.json" />
+      <_ContentIncludedByDefault Remove="publish\appsettings.production.json" />
+      <_ContentIncludedByDefault Remove="publish\dotnet-tools.json" />
+      <_ContentIncludedByDefault Remove="publish\MapcelRepositorioArticulos.deps.json" />
+      <_ContentIncludedByDefault Remove="publish\MapcelRepositorioArticulos.runtimeconfig.json" />
+      <_ContentIncludedByDefault Remove="publish\MapcelRepositorioArticulos.staticwebassets.endpoints.json" />
     </ItemGroup>
 
 </Project>

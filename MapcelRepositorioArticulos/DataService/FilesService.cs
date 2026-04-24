@@ -429,7 +429,6 @@ public interface IFilesService
 
         var fileId = Guid.NewGuid();
         var isImage = IsImage(file, extension);
-        var thumbnailUrl = string.IsNullOrWhiteSpace(upload.ThumbnailUrl) ? "" : upload.ThumbnailUrl.Trim();
         var hasImageMetadata = upload.Width is not null || upload.Height is not null;
         if (!isImage && hasImageMetadata)
         {
@@ -461,7 +460,7 @@ public interface IFilesService
             await file.CopyToAsync(fs, cancellationToken);
         }
 
-        var thumbnailUri = new Uri(relativePath, UriKind.RelativeOrAbsolute);
+        var thumbnailUri = new Uri(relativePath.TrimStart('/'), UriKind.RelativeOrAbsolute);
         
         try
         {

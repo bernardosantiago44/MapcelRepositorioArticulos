@@ -37,6 +37,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromMinutes(1440);
         options.Cookie.Path="/nuevos/repositorioarticulos/produccion";
         options.LoginPath = "/Account/Login";
+        options.SlidingExpiration = true;
     });
 
 // Add all the needed services

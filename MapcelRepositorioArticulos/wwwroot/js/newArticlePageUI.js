@@ -557,7 +557,7 @@ const NewArticlePageUI = (function () {
     // CKEditor 5 Integration
     // =========================================================================
 
-    var ckEditorAssetsPromise = null;
+    let ckEditorAssetsPromise = null;
 
     function ensureCkEditorAssetsLoaded() {
         if (window.CKEDITOR && window.CKEDITOR.ClassicEditor) {
@@ -570,7 +570,7 @@ const NewArticlePageUI = (function () {
 
         ckEditorAssetsPromise = new Promise(function (resolve, reject) {
             if (!document.querySelector('link[data-ckeditor-style="true"]')) {
-                var styleElement = document.createElement('link');
+                let styleElement = document.createElement('link');
                 styleElement.rel = 'stylesheet';
                 styleElement.href = CKEDITOR_STYLE_URL;
                 styleElement.setAttribute('data-ckeditor-style', 'true');
@@ -917,14 +917,11 @@ const NewArticlePageUI = (function () {
     function insertImageIntoEditor(imageUrl) {
         if (!pageState.editorInstance || !imageUrl) return;
 
-        var safeImageUrl = sanitizeUrl(imageUrl);
-        if (!safeImageUrl) return;
-
         try {
             // Use imageBlock to create a standalone <figure><img/></figure> node in CKEditor output.
             pageState.editorInstance.model.change(function (writer) {
-                var imageElement = writer.createElement('imageBlock', {
-                    src: safeImageUrl
+                const imageElement = writer.createElement('imageBlock', {
+                    src: imageUrl
                 });
 
                 pageState.editorInstance.model.insertContent(
@@ -947,16 +944,6 @@ const NewArticlePageUI = (function () {
             pageState.editorInstance.editing.view.focus();
         }
         markFormDirty();
-    }
-
-    /**
-     * Build the public file URL used by editor images
-     * @param {string} companyCode - Company identifier
-     * @param {string|number} fileId - Uploaded file identifier with extension
-     * @returns {string} Image retrieval URL
-     */
-    function buildEditorImageUrl(companyCode, fileId) {
-        return WEBSITE_BASE_URL + API_FILES_URL + encodeURIComponent(companyCode) + '/' + encodeURIComponent(fileId);
     }
 
     /**
@@ -1465,9 +1452,9 @@ const NewArticlePageUI = (function () {
         if (sizeValue === null || sizeValue === undefined) return '—';
         if (typeof sizeValue === 'string') return sizeValue;
         if (typeof sizeValue !== 'number' || isNaN(sizeValue)) return '—';
-        var KB_IN_BYTES = 1024;
-        var MB_IN_BYTES = KB_IN_BYTES * 1024;
-        var GB_IN_BYTES = MB_IN_BYTES * 1024;
+        const KB_IN_BYTES = 1024;
+        const MB_IN_BYTES = KB_IN_BYTES * 1024;
+        const GB_IN_BYTES = MB_IN_BYTES * 1024;
 
         if (sizeValue < KB_IN_BYTES) return sizeValue + ' B';
         if (sizeValue < MB_IN_BYTES) return Math.round(sizeValue / KB_IN_BYTES) + ' KB';
@@ -1490,51 +1477,23 @@ const NewArticlePageUI = (function () {
     }
 
     /**
-     * Validate that a URL is safe (no JavaScript: protocol)
-     * @param {string} url - URL to validate
-     * @returns {string} Safe URL or empty string
-     */
-    function sanitizeUrl(url) {
-        if (!url) return '';
-        var trimmedUrl = url.trim();
-        var normalizedUrl = trimmedUrl.toLowerCase();
-        var urlWithoutWhitespace = trimmedUrl.replace(/\s+/g, '').toLowerCase();
-        if (urlWithoutWhitespace.indexOf('javascript:') === 0 ||
-            urlWithoutWhitespace.indexOf('data:') === 0 ||
-            urlWithoutWhitespace.indexOf('vbscript:') === 0 ||
-            urlWithoutWhitespace.indexOf('file:') === 0) {
-            return '';
-        }
-
-        var hasProtocol = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmedUrl);
-        if (hasProtocol && normalizedUrl.indexOf('http://') !== 0 && normalizedUrl.indexOf('https://') !== 0) {
-            return '';
-        }
-        if (!hasProtocol && normalizedUrl.indexOf('/') !== 0) {
-            return '';
-        }
-
-        return escapeHtmlAttribute(trimmedUrl);
-    }
-
-    /**
      * Resolve fileIds from original article data into attached media lists
      */
     function resolveFileIdsFromArticleData() {
         if (!pageState.originalArticleData || !pageState.originalArticleData.fileIds) return;
 
-        var fileIds = pageState.originalArticleData.fileIds;
+        const fileIds = pageState.originalArticleData.fileIds;
         if (!Array.isArray(fileIds) || fileIds.length === 0) return;
 
-        var imageIdSet = new Set(pageState.allImages.map(function (img) {
+        const imageIdSet = new Set(pageState.allImages.map(function (img) {
             return normalizeId(img.id);
         }));
-        var fileIdSet = new Set(pageState.allFiles.map(function (file) {
+        const fileIdSet = new Set(pageState.allFiles.map(function (file) {
             return normalizeId(file.id);
         }));
 
         fileIds.forEach(function (id) {
-            var normalizedId = normalizeId(id);
+            const normalizedId = normalizeId(id);
             if (!normalizedId) return;
 
             if (imageIdSet.has(normalizedId) && findIdIndex(pageState.attachedImages, normalizedId) === -1) {
@@ -1667,8 +1626,7 @@ const NewArticlePageUI = (function () {
 
         container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-                const imageUrl = sanitizeUrl(imageIdWithExtension);
+                const imageUrl = btn.getAttribute('data-copy-image-id');
                 insertImageIntoEditor(imageUrl);
             });
         });
@@ -1680,8 +1638,7 @@ const NewArticlePageUI = (function () {
      * @returns {string} HTML string
      */
     function renderAvailableImageItem(img) {
-        const imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
-        const thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
+        const thumbnailUrl = img.thumbnailUrl || img.url;
         const dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
         const sizeLabel = img.size ? escapeHtml(img.size) : '—';
 
@@ -1862,8 +1819,7 @@ const NewArticlePageUI = (function () {
         }
 
         container.innerHTML = attachedImageObjects.map(function (img) {
-            var imageIdAndExtension = escapeHtmlAttribute(img.id + img.extension);
-            var thumbnailUrl = sanitizeUrl(img.thumbnailUrl || img.url || buildEditorImageUrl(pageState.companyCode, imageIdAndExtension));
+            var thumbnailUrl = img.thumbnailUrl || img.url || '';
             var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
             var sizeLabel = img.size ? escapeHtml(img.size) : '—';
 
@@ -1906,8 +1862,7 @@ const NewArticlePageUI = (function () {
 
         container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var imageIdWithExtension = btn.getAttribute('data-copy-image-id');
-                const imageUrl = sanitizeUrl(buildEditorImageUrl(pageState.companyCode, imageIdWithExtension));
+                const imageUrl = btn.getAttribute('data-copy-image-id');
                 insertImageIntoEditor(imageUrl);
             });
         });
@@ -2267,6 +2222,7 @@ const NewArticlePageUI = (function () {
                 }
             })
             .catch(function (error) {
+                if (error.status)
                 console.error('Error saving article:', error);
                 dhtmlx.alert({
                     title: 'Error',
@@ -2292,7 +2248,7 @@ const NewArticlePageUI = (function () {
 
         dhtmlx.confirm({
             title: 'Confirmar eliminación',
-            text: '¿Estás seguro de que deseas eliminar este artículo? Esta acción no se puede deshacer.',
+            text: '¿Estás seguro de que deseas eliminar este artículo? Esto eliminará cualquier imagen o archivo subido durante su creación. Esta acción no se puede deshacer.',
             callback: function (result) {
                 if (!result) return;
 
@@ -2305,6 +2261,13 @@ const NewArticlePageUI = (function () {
                     method: 'DELETE'
                 })
                     .then(function (response) {
+                        if (response.status === 409) {
+                            dhtmlx.alert({
+                                title: 'No se puede eliminar este artículo.',
+                                text: 'Este artículo contiene uno o más archivos referenciados en otro(s) artículo(s).'
+                            });
+                            return;
+                        }
                         if (!response.ok) {
                             throw new Error('Failed to delete article: ' + response.status);
                         }

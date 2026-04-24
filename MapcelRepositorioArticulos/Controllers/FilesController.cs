@@ -25,7 +25,7 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
         }
         catch (ArgumentNullException)
         {
-            return BadRequest("Please provide a companyId using `/api/files?companyId=co-01`");
+            return BadRequest("Please provide a companyId using `/api/files/{companyCode}`");
         }
         catch (ArgumentOutOfRangeException)
         {

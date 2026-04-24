@@ -396,6 +396,9 @@ const ArticleService = (function() {
     return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Tu sesión ha expirado, por favor autentícate de nuevo.');
+        }
         throw new Error("Failed to create article: " + response.status);
       }
       return response.json();

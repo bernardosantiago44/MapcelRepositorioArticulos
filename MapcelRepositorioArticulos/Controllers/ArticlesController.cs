@@ -9,7 +9,7 @@ namespace MapcelRepositorioArticulos.Controllers;
 
 [ApiController]
 [Route("/api/articles/{companyCode:guid}")]
-public class ArticlesController(IArticleAggregateService service, IFilesService filesService, DirectoryBuilder directoryBuilder) : ControllerBase
+public class ArticlesController(IArticleAggregateService service, DirectoryBuilder directoryBuilder) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ArticleDetailsDto>>> GetAll(
@@ -126,7 +126,7 @@ public class ArticlesController(IArticleAggregateService service, IFilesService 
         }
     }
     
-    // [Authorize]
+    [Authorize]
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(200L * 1024 * 1024)]
@@ -164,7 +164,7 @@ public class ArticlesController(IArticleAggregateService service, IFilesService 
     }
 
     
-    // [Authorize]
+    [Authorize]
     [HttpPost("bulk-tags")]
     public async Task<ActionResult<BulkUpdateTagsResponse>> BulkUpdateTags(
         [FromRoute] Guid companyCode,
@@ -205,7 +205,7 @@ public class ArticlesController(IArticleAggregateService service, IFilesService 
     }
 
     
-    // [Authorize]
+    [Authorize]
     [HttpPut("{id:guid}")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(200L * 1024 * 1024)]
@@ -246,7 +246,7 @@ public class ArticlesController(IArticleAggregateService service, IFilesService 
         }
     }
 
-    // [Authorize]
+    [Authorize]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         [FromRoute] Guid id,
@@ -255,9 +255,9 @@ public class ArticlesController(IArticleAggregateService service, IFilesService 
     {
         try
         {
-            directoryBuilder.DeleteArticle(companyCode, id);
             var deleted = await service.DeleteAsync(id, companyCode, cancellationToken);
-            if (!deleted) return NotFound();
+            if (!deleted) return Conflict("Este artículo contiene uno o más archivos referenciados en otro(s) artículo(s).");
+            directoryBuilder.DeleteArticle(companyCode, id);
             return NoContent();
         }
         catch (ArgumentException ex)

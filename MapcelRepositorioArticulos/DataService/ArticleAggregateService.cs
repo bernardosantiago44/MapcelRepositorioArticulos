@@ -421,6 +421,16 @@ public sealed class ArticleAggregateService(IConfiguration configuration, Direct
                     plan,
                     cancellationToken);
             }
+            
+            foreach (var fileId in command.AttachedFiles)
+                await LinkExistingFileAsync(
+                    connection,
+                    transaction,
+                    articleId,
+                    command.CompanyCode,
+                    fileId,
+                    cancellationToken
+                );
 
             foreach (var plan in filePlans)
                 await PersistPhysicalFileAsync(plan, cancellationToken);

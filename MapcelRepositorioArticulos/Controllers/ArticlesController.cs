@@ -297,7 +297,8 @@ public class ArticlesController(IArticleAggregateService service, DirectoryBuild
                 .ToArray()
                 ?? [],
             Files = fileCommands,
-            Images = imageCommands
+            Images = imageCommands,
+            AttachedFiles = [..request.FileIds ?? []]
         };
     }
 

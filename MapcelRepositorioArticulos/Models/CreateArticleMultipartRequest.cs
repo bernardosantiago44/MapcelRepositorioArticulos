@@ -44,6 +44,7 @@ public class CreateArticleMultipartRequest
     /// One manifest item must exist per Images entry.
     /// </summary>
     public string? ImagesManifestJson { get; init; }
+    public Guid[]? FileIds  { get; init; }  
 
     public virtual void Validate()
     {

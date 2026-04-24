@@ -2094,6 +2094,8 @@ const NewArticlePageUI = (function () {
             });
         }
 
+        appendStringArray(formData, 'FileIds', values.fileIds || []);
+
         const filesManifest = [];
         (pageState.stagedFiles || []).forEach(function (f) {
             formData.append('Files', f.file);

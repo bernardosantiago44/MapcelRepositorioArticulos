@@ -1591,13 +1591,13 @@ const NewArticlePageUI = (function () {
      * Update the available images list (company library)
      */
     function updateAvailableImagesDisplay() {
-        var container = document.getElementById('new-article-available-images');
+        const container = document.getElementById('new-article-available-images');
         if (!container) return;
 
-        var filteredImages = pageState.allImages.slice();
+        let filteredImages = pageState.allImages.slice();
 
         if (pageState.imageSearchQuery) {
-            var query = pageState.imageSearchQuery.toLowerCase();
+            const query = pageState.imageSearchQuery.toLowerCase();
             filteredImages = filteredImages.filter(function (img) {
                 return (img.name && img.name.toLowerCase().includes(query)) ||
                     (img.description && img.description.toLowerCase().includes(query));
@@ -1619,7 +1619,7 @@ const NewArticlePageUI = (function () {
 
         container.querySelectorAll('[data-attach-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var imageId = btn.getAttribute('data-attach-image-id');
+                const imageId = btn.getAttribute('data-attach-image-id');
                 attachImage(imageId);
             });
         });
@@ -1627,6 +1627,8 @@ const NewArticlePageUI = (function () {
         container.querySelectorAll('[data-copy-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 const imageUrl = btn.getAttribute('data-copy-image-id');
+                const imageId = btn.getAttribute('data-image-id');
+                attachImage(imageId);
                 insertImageIntoEditor(imageUrl);
             });
         });
@@ -1656,6 +1658,7 @@ const NewArticlePageUI = (function () {
         <button 
           type="button"
           data-copy-image-id="${thumbnailUrl}"
+          data-image-id="${escapeHtml(img.id)}"
           class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
           title="Insertar a la descripción"
         >
@@ -1819,9 +1822,9 @@ const NewArticlePageUI = (function () {
         }
 
         container.innerHTML = attachedImageObjects.map(function (img) {
-            var thumbnailUrl = img.thumbnailUrl || img.url || '';
-            var dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
-            var sizeLabel = img.size ? escapeHtml(img.size) : '—';
+            const thumbnailUrl = img.thumbnailUrl || img.url || '';
+            const dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
+            const sizeLabel = img.size ? escapeHtml(img.size) : '—';
 
             return `
         <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
@@ -1836,7 +1839,7 @@ const NewArticlePageUI = (function () {
           </div>
           <button 
             type="button"
-            data-copy-image-id="${escapeHtmlAttribute(img.id)}"
+            data-copy-image-id="${escapeHtmlAttribute(thumbnailUrl)}"
             class="ml-2 px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-white rounded"
             title="Insertar a la descripción"
           >
@@ -1855,7 +1858,7 @@ const NewArticlePageUI = (function () {
 
         container.querySelectorAll('[data-detach-image-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var imageId = btn.getAttribute('data-detach-image-id');
+                const imageId = btn.getAttribute('data-detach-image-id');
                 detachImage(imageId);
             });
         });

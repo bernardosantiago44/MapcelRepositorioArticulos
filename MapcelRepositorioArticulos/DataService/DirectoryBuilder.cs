@@ -95,7 +95,7 @@ public class DirectoryBuilder(IWebHostEnvironment env)
     /// </summary>
     /// <param name="companyCode"></param>
     /// <param name="articleId"></param>
-    /// <returns>Dictionary {"files": [], "images": []}</returns>
+    /// <returns>Dictionary {"files": string[], "images": string[]}</returns>
     public Dictionary<string, List<string>> GetArticleFiles(Guid companyCode, Guid articleId)
     {
         var filesDirectory = GetArticleFilesDirectoryPath(companyCode, articleId);

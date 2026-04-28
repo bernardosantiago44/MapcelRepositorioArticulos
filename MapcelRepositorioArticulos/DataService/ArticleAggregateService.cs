@@ -9,7 +9,7 @@ using Constants =  MapcelRepositorioArticulos.Utils.Constants;
 
 namespace MapcelRepositorioArticulos.DataService;
 
-public sealed class ArticleAggregateService(IConfiguration configuration, DirectoryBuilder directoryBuilder)
+public sealed class ArticleAggregateService(IConfiguration configuration, DirectoryBuilder directoryBuilder, IFilesService filesService)
     : BaseService(configuration), IArticleAggregateService
 {
     private const string SqlSelectArticlesWithQuery = """
@@ -266,6 +266,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, Direct
     """;
     private const string SqlDeleteFileArticles = """
         DELETE fa
+        OUTPUT DELETED.file_id
         FROM [RepositorioArticulos].[dbo].[file_articles] fa
         INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = fa.article_id
         WHERE fa.article_id = @ArticleId
@@ -997,9 +998,23 @@ public sealed class ArticleAggregateService(IConfiguration configuration, Direct
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
-            await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+            var deletedFileIds = new List<Guid>(); 
+            await using (var reader = await deleteFileArticlesCommand.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    deletedFileIds.Add(reader.GetGuid(0));
+                }
+            }
+            // 2. Delete files uploaded during creation
+            var incorporated = directoryBuilder.GetArticleFiles(companyCode, articleId);
+            var files = incorporated["files"]
+                .Concat(incorporated["images"])
+                .ToList();
 
-            // 2. Delete article_tags rows for this article (tenant-safe via join to articles)
+            await filesService.DeleteMultipleAsync(files, companyCode, cancellationToken);
+            
+            // 3. Delete article_tags rows for this article (tenant-safe via join to articles)
             await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
             deleteArticleTagsCommand.CommandType = CommandType.Text;
 
@@ -1008,7 +1023,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, Direct
 
             await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
 
-            // 3. Delete the article row
+            // 4. Delete the article row
             await using var deleteArticleCommand = new SqlCommand(SqlDeleteArticle, connection);
             deleteArticleCommand.CommandType = CommandType.Text;
 

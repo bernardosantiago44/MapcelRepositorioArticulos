@@ -70,6 +70,16 @@ public interface IFilesService
     /// <exception cref="ArgumentException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     Task<bool> DeleteAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes the files with the given fileIds linked to the company code.
+    /// </summary>
+    /// <param name="fileIds"></param>
+    /// <param name="companyCode"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
+    public Task<bool> DeleteMultipleAsync(List<string> fileIds, Guid companyCode, CancellationToken cancellationToken);
+
     
     /// <summary>
     /// Returns the name and file extension
@@ -214,6 +224,15 @@ public interface IFilesService
         FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id = @FileId
           AND f.company_code = @CompanyCode;
+    """;
+    private const string SqlDeleteMultipleFiles = """
+        DELETE f
+        FROM [RepositorioArticulos].[dbo].[files] f
+        WHERE f.file_id IN (
+            SELECT cast(value as UNIQUEIDENTIFIER) id
+            FROM STRING_SPLIT(@FileIds, ',')
+        )
+        AND f.company_code = @CompanyCode;                                              
     """;
     private const string SqlSelectDownloadInfo = """
         SELECT
@@ -629,43 +648,22 @@ public interface IFilesService
 
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
+        var result = await DeleteMultipleAsync([fileId.ToString()], companyCode, cancellationToken);
+        
+        if (!result) return false;
 
+        // Best-effort physical delete
+        if (string.IsNullOrWhiteSpace(physicalPath)) return true;
         try
         {
-            await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
-            deleteFileArticlesCommand.CommandType = CommandType.Text;
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
-            deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-
-            await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
-
-            await using var deleteFileCommand = new SqlCommand(SqlDeleteFile, connection);
-            deleteFileCommand.CommandType = CommandType.Text;
-            deleteFileCommand.Parameters.Add(new SqlParameter("@FileId", SqlDbType.UniqueIdentifier) { Value = fileId });
-            deleteFileCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
-
-            var deleted = await deleteFileCommand.ExecuteNonQueryAsync(cancellationToken);
-            if (deleted <= 0) return false;
-
-            // Best-effort physical delete
-            if (string.IsNullOrWhiteSpace(physicalPath)) return true;
-            try
-            {
-                if (File.Exists(physicalPath))
-                    File.Delete(physicalPath);
-            }
-            catch (Exception ioEx)
-            {
-                Log.Warning(ioEx, "Failed to delete physical file {PhysicalPath} for fileId={FileId}", physicalPath, fileId);
-            }
-
-            return true;
+            if (File.Exists(physicalPath)) File.Delete(physicalPath);
         }
-        catch (Exception ex)
+        catch (Exception ioEx)
         {
-            Log.Error(ex, "FilesService.DeleteAsync(int:Guid:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyCode);
-            throw;
+            Log.Warning(ioEx, "Failed to delete physical file {PhysicalPath} for fileId={FileId}", physicalPath, fileId);
         }
+
+        return true;
     }
     
     public async Task<string?> GetDownloadInfoAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken)
@@ -695,6 +693,23 @@ public interface IFilesService
             Log.Error(ex, "FilesService.GetDownloadInfoAsync(int:Guid:token) failed for fileId={FileId}, companyCode={CompanyCode}", fileId, companyCode);
             throw;
         }
+    }
+
+    public async Task<bool> DeleteMultipleAsync(List<string> fileIds, Guid companyCode, CancellationToken cancellationToken)
+    {
+        if (fileIds.Count <= 0) return true;
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        
+        await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteMultipleFiles, connection);
+        deleteFileArticlesCommand.CommandType = CommandType.Text;
+        deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@FileIds", SqlDbType.VarChar) 
+            { Value = string.Join(",", fileIds) });
+        deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier)
+            { Value = companyCode });
+        
+        var deleted =  await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+        return deleted > 0;
     }
     
     // ----------- Helper Validation Functions -----------

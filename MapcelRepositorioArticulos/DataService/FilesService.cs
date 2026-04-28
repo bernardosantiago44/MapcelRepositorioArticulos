@@ -1,13 +1,7 @@
 using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using MapcelRepositorioArticulos.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Data.SqlClient;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using Serilog.Core;
 using Constants = MapcelRepositorioArticulos.Utils.Constants;
 
 namespace MapcelRepositorioArticulos.DataService;
@@ -90,17 +84,16 @@ public interface IFilesService
     /// <param name="cancellationToken"></param>
     /// <returns>(Name, Extension)</returns>
     Task<string?> GetDownloadInfoAsync(Guid fileId, Guid companyCode, CancellationToken cancellationToken);
-
-    string BuildPhysicalFilePath(Guid companyCode, Guid fileId, string extension);
 }
 
     public class FilesService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
     : BaseService(configuration), IFilesService
 {
+    private readonly IConfiguration _configuration1 = configuration;
     private const string FilesSubdirectoryName = "files";
     private string GetFilesRootPath()
     {
-        var overridePath = configuration["Files:ArchivosRootPath"];
+        var overridePath = _configuration1["Files:ArchivosRootPath"];
         if (!string.IsNullOrWhiteSpace(overridePath))
             return Path.GetRelativePath(overridePath,  Directory.GetCurrentDirectory());
         
@@ -139,57 +132,36 @@ public interface IFilesService
         WHERE fa.article_id = @articleId
         ORDER BY f.is_image DESC, f.upload_date DESC;
     """;
-    private const string SqlSelectFilesByIdsCsv = """
-        WITH FileBase AS (
-            SELECT f.file_id
-            FROM [RepositorioArticulos].[dbo].[files] f
-            WHERE f.file_id IN (
-                SELECT TRY_CAST(value AS uniqueidentifier)
-                FROM STRING_SPLIT(@idsCsv, ',')
-                WHERE TRY_CAST(value AS uniqueidentifier) IS NOT NULL
-            )
-        )
-        SELECT
-            f.file_id,
-            f.name,
-            f.description,
-            f.thumbnail_url,
-            f.extension,
-            f.is_image,
-            f.upload_date
-        FROM FileBase b
-        INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = b.file_id
-        ORDER BY f.is_image DESC, f.upload_date DESC;
-    """;
+
     private const string SqlInsertFile = """
-        INSERT INTO [RepositorioArticulos].[dbo].[files]
-        (
-            file_id,
-            company_code,
-            name,
-            size_bytes,
-            description,
-            width,
-            height,
-            thumbnail_url,
-            is_image,
-            extension
-        )
-        OUTPUT INSERTED.file_id
-        VALUES
-        (
-            @FileId,
-            @CompanyCode,
-            @Name,
-            @SizeBytes,
-            @Description,
-            @Width,
-            @Height,
-            @ThumbnailUrl,
-            @IsImage,
-            @Extension
-        );
-    """;
+                                             INSERT INTO [RepositorioArticulos].[dbo].[files]
+                                             (
+                                                 file_id,
+                                                 company_code,
+                                                 name,
+                                                 size_bytes,
+                                                 description,
+                                                 width,
+                                                 height,
+                                                 thumbnail_url,
+                                                 is_image,
+                                                 extension
+                                             )
+                                             OUTPUT INSERTED.file_id
+                                             VALUES
+                                             (
+                                                 @FileId,
+                                                 @CompanyCode,
+                                                 @Name,
+                                                 @SizeBytes,
+                                                 @Description,
+                                                 @Width,
+                                                 @Height,
+                                                 @ThumbnailUrl,
+                                                 @IsImage,
+                                                 @Extension
+                                             );
+                                         """;
     private const string SqlUpdateFileReturnDto = """
         UPDATE [RepositorioArticulos].[dbo].[files]
         SET
@@ -206,43 +178,15 @@ public interface IFilesService
         WHERE file_id = @FileId
           AND company_code = @CompanyCode;
     """;
-    private const string SqlUpdateThumbnailUrl = """
-        UPDATE [RepositorioArticulos].[dbo].[files]
-        SET thumbnail_url = @ThumbnailUrl
-        WHERE file_id = @FileId
-          AND company_code = @CompanyCode;
-    """;
-    private const string SqlDeleteFileArticles = """
-        DELETE fa
-        FROM [RepositorioArticulos].[dbo].[file_articles] fa
-        INNER JOIN [RepositorioArticulos].[dbo].[files] f ON f.file_id = fa.file_id
-        WHERE fa.file_id = @FileId
-          AND f.company_code = @CompanyCode;
-    """;
-    private const string SqlDeleteFile = """
-        DELETE f
-        FROM [RepositorioArticulos].[dbo].[files] f
-        WHERE f.file_id = @FileId
-          AND f.company_code = @CompanyCode;
-    """;
     private const string SqlDeleteMultipleFiles = """
         DELETE f
         FROM [RepositorioArticulos].[dbo].[files] f
         WHERE f.file_id IN (
-            SELECT cast(value as UNIQUEIDENTIFIER) id
-            FROM STRING_SPLIT(@FileIds, ',')
+          SELECT cast(value as UNIQUEIDENTIFIER) id
+          FROM STRING_SPLIT(@FileIds, ',')
         )
         AND f.company_code = @CompanyCode;                                              
     """;
-    private const string SqlSelectDownloadInfo = """
-        SELECT
-            f.name,
-            f.extension
-        FROM [RepositorioArticulos].[dbo].[files] f
-        WHERE f.file_id = @FileId
-          AND f.company_code = @CompanyCode;
-    """;
-
     private const string SqlSelectFileUrl = """
         SELECT thumbnail_url
         FROM [RepositorioArticulos].[dbo].[files] f
@@ -351,7 +295,6 @@ public interface IFilesService
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         
         var idPos = reader.GetOrdinal("file_id");
-        var companyCodePos =  reader.GetOrdinal("company_code");
         var namePos =  reader.GetOrdinal("name");
         var sizeBytesPos =  reader.GetOrdinal("size_bytes");
         var descriptionPos =  reader.GetOrdinal("description");
@@ -371,7 +314,7 @@ public interface IFilesService
                 Description = reader.IsDBNull(descriptionPos) ? "" : reader.GetString(descriptionPos),
                 Extension = reader.GetString(extensionsPos),
                 ThumbnailUrl =  reader.IsDBNull(thumbnailUrlPos) ? "" : reader.GetString(thumbnailUrlPos),
-                IsImage = reader.IsDBNull(isImagePos) ? false : reader.GetBoolean(isImagePos),
+                IsImage = !reader.IsDBNull(isImagePos) && reader.GetBoolean(isImagePos), // isImagePos not null and reader[isImage] = true
                 Width = reader.IsDBNull(widthPos) ? null : reader.GetInt32(widthPos),
                 Height = reader.IsDBNull(heightPos) ? null : reader.GetInt32(heightPos),
                 SizeBytes =  reader.IsDBNull(sizeBytesPos) ? null : reader.GetInt64(sizeBytesPos),
@@ -524,8 +467,8 @@ public interface IFilesService
             {
                 try
                 {
-                    if (System.IO.File.Exists(physicalPath))
-                        System.IO.File.Delete(physicalPath);
+                    if (File.Exists(physicalPath))
+                        File.Delete(physicalPath);
                 }
                 catch { /* ignore */ }
             }
@@ -540,13 +483,13 @@ public interface IFilesService
     {
         ValidateGuid(companyCode);
         ValidateGuid(articleId);
-        if (upload.Files.Count == 0) return;
+        if (upload.Files is { Count: 0 }) return;
         
         await using var connection = new SqlConnection(ConnectionString);
         await connection.OpenAsync(cancellationToken);
         await using var transaction = connection.BeginTransaction();
         
-        await using var insertFileCommand = new SqlCommand(SqlInsertFile,  connection, (SqlTransaction)transaction);
+        await using var insertFileCommand = new SqlCommand(SqlInsertFile,  connection, transaction);
         insertFileCommand.CommandType = CommandType.Text;
 
         insertFileCommand.Parameters.Add("@CompanyCode", SqlDbType.UniqueIdentifier);
@@ -726,16 +669,6 @@ public interface IFilesService
     }
 
     /// <summary>
-    /// Throws if the given id is not valid.
-    /// </summary>
-    /// <param name="id">int</param>
-    /// <exception cref="ArgumentOutOfRangeException"></exception>
-    private static void ValidateId(int id)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id, nameof(id));
-    }
-
-    /// <summary>
     /// Validates the given file. Throws if invalid. 
     /// </summary>
     /// <param name="file">IFormFile</param>
@@ -743,7 +676,7 @@ public interface IFilesService
     /// <exception cref="ArgumentException"></exception>
     private static void ValidateFile(IFormFile file)
     {
-        if (file is null) throw new ArgumentNullException(nameof(file));
+        ArgumentNullException.ThrowIfNull(file);
         if (file.Length <= 0) throw new ArgumentException("File is empty.", nameof(file));
         if (string.IsNullOrWhiteSpace(file.FileName)) throw new ArgumentException("FileName is required.", nameof(file));
     }

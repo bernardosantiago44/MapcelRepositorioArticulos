@@ -992,9 +992,12 @@ const NewArticlePageUI = (function () {
             name: stagedFile.name,
             size: stagedFile.size,
             description: descriptionValue,
-            previewUrl: previewUrl
+            previewUrl: previewUrl,
+            dimensions: metadata && metadata.dimensions ? metadata.dimensions : {}
         });
 
+        updateStagedImagesDisplay();
+        updateAttachedImagesDisplay();
         markFormDirty();
 
         return Promise.resolve({
@@ -1175,13 +1178,13 @@ const NewArticlePageUI = (function () {
             return html;
         }
 
-        var normalized = html;
+        let normalized = html;
 
         pageState.stagedImages.forEach(function (image) {
             if (!image.previewUrl || !image.id) return;
 
-            var escapedPreviewUrl = image.previewUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            var tempUrl = 'mapcel-image:' + image.id;
+            const escapedPreviewUrl = image.previewUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const tempUrl = 'mapcel-image:' + image.id;
 
             normalized = normalized.replace(
                 new RegExp(escapedPreviewUrl, 'g'),
@@ -1336,6 +1339,7 @@ const NewArticlePageUI = (function () {
             return img.id !== imageId;
         });
         updateStagedImagesDisplay();
+        updateAttachedImagesDisplay();
     }
 
     // =========================================================================
@@ -1675,6 +1679,31 @@ const NewArticlePageUI = (function () {
     `;
     }
 
+    function formatImageDimensions(dimensions) {
+        if (!dimensions) return '';
+        if (typeof dimensions === 'string') return dimensions;
+
+        var width = dimensions.width || dimensions.Width;
+        var height = dimensions.height || dimensions.Height;
+        if (!width || !height) return '';
+
+        return width + ' × ' + height;
+    }
+
+    function getStagedImageDisplayItems() {
+        return (pageState.stagedImages || []).map(function (imageData) {
+            return {
+                id: imageData.id,
+                name: imageData.name,
+                thumbnailUrl: imageData.previewUrl,
+                url: imageData.previewUrl,
+                dimensions: formatImageDimensions(imageData.dimensions),
+                size: imageData.size,
+                isStaged: true
+            };
+        });
+    }
+
     /**
      * Update the available files list (company library)
      */
@@ -1803,7 +1832,7 @@ const NewArticlePageUI = (function () {
         const container = document.getElementById('new-article-attached-images');
         if (!container) return;
 
-        if (pageState.attachedImages.length === 0) {
+        if (pageState.attachedImages.length === 0 && pageState.stagedImages.length === 0) {
             container.innerHTML = '<div class="text-sm text-gray-400"></div>';
             return;
         }
@@ -1814,7 +1843,7 @@ const NewArticlePageUI = (function () {
             });
         }).filter(function (img) {
             return img;
-        });
+        }).concat(getStagedImageDisplayItems());
 
         if (attachedImageObjects.length === 0) {
             container.innerHTML = '<div class="text-sm text-gray-400">Imágenes adjuntas no disponibles</div>';
@@ -1824,12 +1853,13 @@ const NewArticlePageUI = (function () {
         container.innerHTML = attachedImageObjects.map(function (img) {
             const thumbnailUrl = img.thumbnailUrl || img.url || '';
             const dimensionsLabel = img.dimensions ? escapeHtml(img.dimensions) : '—';
-            const sizeLabel = img.size ? escapeHtml(img.size) : '—';
+            const sizeLabel = img.isStaged ? escapeHtml(formatFileSize(img.size)) : (img.size ? escapeHtml(img.size) : '—');
+            const removeAttribute = img.isStaged ? 'data-remove-staged-image-id' : 'data-detach-image-id';
 
             return `
         <div class="flex items-center p-2 bg-blue-50 rounded-lg border border-blue-100">
           <img 
-            src="${thumbnailUrl}" 
+            src="${escapeHtmlAttribute(thumbnailUrl)}" 
             alt="${escapeHtmlAttribute(img.name)}"
             class="w-10 h-10 object-cover rounded flex-shrink-0"
           />
@@ -1847,7 +1877,7 @@ const NewArticlePageUI = (function () {
           </button>
           <button 
             type="button"
-            data-detach-image-id="${escapeHtmlAttribute(img.id)}"
+            ${removeAttribute}="${escapeHtmlAttribute(img.id)}"
             class="ml-1 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
           >
             Quitar
@@ -1860,6 +1890,13 @@ const NewArticlePageUI = (function () {
             btn.addEventListener('click', function () {
                 const imageId = btn.getAttribute('data-detach-image-id');
                 detachImage(imageId);
+            });
+        });
+
+        container.querySelectorAll('[data-remove-staged-image-id]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const imageId = btn.getAttribute('data-remove-staged-image-id');
+                removeStagedImage(imageId);
             });
         });
 

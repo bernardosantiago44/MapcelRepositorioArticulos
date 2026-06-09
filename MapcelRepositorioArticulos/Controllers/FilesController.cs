@@ -117,7 +117,7 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
         }
     }
 
-    // [Authorize]
+    [Authorize]
     [HttpPost("{companyCode:guid}")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(50L * 1024 * 1024)]
@@ -178,7 +178,7 @@ public class FilesController(IFilesService service, IWebHostEnvironment env) : C
         }
     }
 
-    // [Authorize]
+    [Authorize]
     [HttpDelete("{companyCode:guid}/{id:guid}")]
     public async Task<IActionResult> Delete(
         [FromRoute] Guid id,

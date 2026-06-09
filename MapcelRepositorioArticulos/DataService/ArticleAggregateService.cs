@@ -1,14 +1,15 @@
 using SixLabors.ImageSharp;
 using System.Data;
-using System.Text.RegularExpressions;
+using MapcelRepositorioArticulos.Exceptions;
 using MapcelRepositorioArticulos.Models;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Constants =  MapcelRepositorioArticulos.Utils.Constants;
 
 namespace MapcelRepositorioArticulos.DataService;
 
-public sealed class ArticleAggregateService(IConfiguration configuration, IWebHostEnvironment env, DirectoryBuilder directoryBuilder)
+public sealed class ArticleAggregateService(IConfiguration configuration, DirectoryBuilder directoryBuilder, IFilesService filesService)
     : BaseService(configuration), IArticleAggregateService
 {
     private const string SqlSelectArticlesWithQuery = """
@@ -265,6 +266,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
     """;
     private const string SqlDeleteFileArticles = """
         DELETE fa
+        OUTPUT DELETED.file_id
         FROM [RepositorioArticulos].[dbo].[file_articles] fa
         INNER JOIN [RepositorioArticulos].[dbo].[articles] a ON a.article_id = fa.article_id
         WHERE fa.article_id = @ArticleId
@@ -275,6 +277,17 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         FROM [RepositorioArticulos].[dbo].[articles] a
         WHERE a.article_id = @ArticleId
           AND a.company_code = @CompanyCode;
+    """;
+    
+    // Select all articles that reference the given fileIds
+    private const string SqlSelectFilePresence = """
+        SELECT DISTINCT article_id
+        FROM RepositorioArticulos.dbo.file_articles
+        WHERE file_id IN (
+            SELECT CAST(value AS UNIQUEIDENTIFIER) id
+            FROM STRING_SPLIT(@fileIds, ',')
+        )
+          AND article_id <> @articleId;
     """;
 
     public async Task<PagedResult<ArticleDetailsDto>> GetAsync(ArticleQuery query, CancellationToken cancellationToken)
@@ -409,6 +422,16 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
                     plan,
                     cancellationToken);
             }
+            
+            foreach (var fileId in command.AttachedFiles)
+                await LinkExistingFileAsync(
+                    connection,
+                    transaction,
+                    articleId,
+                    command.CompanyCode,
+                    fileId,
+                    cancellationToken
+                );
 
             foreach (var plan in filePlans)
                 await PersistPhysicalFileAsync(plan, cancellationToken);
@@ -537,7 +560,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             insertFile.Parameters.Add(new SqlParameter("@Height", SqlDbType.Int) { Value = (object?)plan.Height ?? DBNull.Value });
             insertFile.Parameters.Add(new SqlParameter("@ThumbnailUrl", SqlDbType.NVarChar, 500)
             {
-                Value = plan.RelativePath
+                Value = plan.RelativePath.TrimStart('/')
             });
             insertFile.Parameters.Add(new SqlParameter("@IsImage", SqlDbType.Bit) { Value = plan.IsImage });
             insertFile.Parameters.Add(new SqlParameter("@Extension", SqlDbType.VarChar, 20) { Value = plan.Extension });
@@ -588,7 +611,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
 
             rewritten = rewritten.Replace(
                 $"mapcel-image:{tempId}", 
-                image.RelativePath, 
+                image.RelativePath.TrimStart('/'), 
                 StringComparison.OrdinalIgnoreCase);
         }
 
@@ -614,7 +637,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             var physicalDir = isImage ? 
                 directoryBuilder.GetArticleImageFilePath(companyCode, articleId, fileId + extension) : 
                 directoryBuilder.GetArticleFilePath(companyCode, articleId, fileId + extension);
-            var relativePath = $"/articles/{companyCode:D}/{articleId:D}/{folderName}/{fileId:D}{extension}";
+            var relativePath = $"articles/{companyCode:D}/{articleId:D}/{folderName}/{fileId:D}{extension}";
             var name = Path.GetFileNameWithoutExtension(originalFileName).Trim();
             int? width = null, height = null;
 
@@ -692,6 +715,30 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
         Height = plan.Height,
         RelativePath = plan.RelativePath
     };
+
+    private async Task<List<Guid>?> GetArticlesReferencingFilesIn(Guid articleId, Guid companyCode, CancellationToken cancellationToken)
+    {
+        var files = directoryBuilder.GetArticleFiles(companyCode, articleId);
+        if (files["files"].IsNullOrEmpty() && files["images"].IsNullOrEmpty()) return null;
+        var fileIds = string.Join(',', files["files"].Concat(files["images"]));
+
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        
+        await using var command = new SqlCommand(SqlSelectFilePresence, connection);
+        command.CommandType = CommandType.Text;
+        command.Parameters.Add(new SqlParameter("@fileIds", SqlDbType.VarChar) { Value = fileIds });
+        command.Parameters.Add(new SqlParameter("@articleId", SqlDbType.UniqueIdentifier) { Value = articleId });
+        
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        var articleIds = new List<Guid>();
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            articleIds.Add(reader.GetGuid(0));
+        }
+
+        return articleIds;
+    }
 
     private static void ValidateCompany(Guid companyCode)
     {
@@ -939,6 +986,11 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
 
         try
         {
+            // If any other articles are referencing files stored in this article's directory,
+            // prevent deletion
+            var articles = await GetArticlesReferencingFilesIn(articleId, companyCode, cancellationToken);
+            if (!articles.IsNullOrEmpty()) return false;
+            
             // 1. Delete file_articles rows for this article (tenant-safe via join to articles)
             await using var deleteFileArticlesCommand = new SqlCommand(SqlDeleteFileArticles, connection);
             deleteFileArticlesCommand.CommandType = CommandType.Text;
@@ -946,9 +998,23 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@ArticleId", SqlDbType.UniqueIdentifier) { Value = articleId });
             deleteFileArticlesCommand.Parameters.Add(new SqlParameter("@CompanyCode", SqlDbType.UniqueIdentifier) { Value = companyCode });
 
-            await deleteFileArticlesCommand.ExecuteNonQueryAsync(cancellationToken);
+            var deletedFileIds = new List<Guid>(); 
+            await using (var reader = await deleteFileArticlesCommand.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    deletedFileIds.Add(reader.GetGuid(0));
+                }
+            }
+            // 2. Delete files uploaded during creation
+            var incorporated = directoryBuilder.GetArticleFiles(companyCode, articleId);
+            var files = incorporated["files"]
+                .Concat(incorporated["images"])
+                .ToList();
 
-            // 2. Delete article_tags rows for this article (tenant-safe via join to articles)
+            await filesService.DeleteMultipleAsync(files, companyCode, cancellationToken);
+            
+            // 3. Delete article_tags rows for this article (tenant-safe via join to articles)
             await using var deleteArticleTagsCommand = new SqlCommand(SqlDeleteArticleTags, connection);
             deleteArticleTagsCommand.CommandType = CommandType.Text;
 
@@ -957,7 +1023,7 @@ public sealed class ArticleAggregateService(IConfiguration configuration, IWebHo
 
             await deleteArticleTagsCommand.ExecuteNonQueryAsync(cancellationToken);
 
-            // 3. Delete the article row
+            // 4. Delete the article row
             await using var deleteArticleCommand = new SqlCommand(SqlDeleteArticle, connection);
             deleteArticleCommand.CommandType = CommandType.Text;
 

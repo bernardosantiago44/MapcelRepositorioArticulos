@@ -7,8 +7,7 @@ namespace MapcelRepositorioArticulos.DataService;
 
 public class DirectoryBuilder(IWebHostEnvironment env)
 {
-    private readonly string _articlesRootPath = Path.Combine(env.IsDevelopment() ? env.WebRootPath : env.ContentRootPath, 
-        ArticlesSubdirectoryName);
+    private readonly string _articlesRootPath = Path.Combine(env.WebRootPath, ArticlesSubdirectoryName);
     private const string ArticlesSubdirectoryName = "articles";
 
     /// <summary>
@@ -88,6 +87,32 @@ public class DirectoryBuilder(IWebHostEnvironment env)
     {
         var articleDirectoryPath = GetArticleDirectoryPath(companyCode, articleId);
         return Path.Combine(articleDirectoryPath, "description.txt");
+    }
+
+    /// <summary>
+    /// Lists and returns all article's linked files and images in a key-value map of type:name.
+    /// Only those files attached to this article when it was created are returned.
+    /// </summary>
+    /// <param name="companyCode"></param>
+    /// <param name="articleId"></param>
+    /// <returns>Dictionary {"files": string[], "images": string[]}</returns>
+    public Dictionary<string, List<string>> GetArticleFiles(Guid companyCode, Guid articleId)
+    {
+        var filesDirectory = GetArticleFilesDirectoryPath(companyCode, articleId);
+        var imagesDirectory =  GetArticleImagesDirectoryPath(companyCode, articleId);
+        var result = new Dictionary<string, List<string>> { { "files", [] }, { "images", [] } };
+
+        foreach (var file in Directory.EnumerateFiles(filesDirectory).Select(Path.GetFileNameWithoutExtension))
+        {
+            if (file != null) result["files"].Add(file);
+        }
+        
+        foreach (var image in Directory.EnumerateFiles(imagesDirectory).Select(Path.GetFileNameWithoutExtension))
+        {
+            if (image != null) result["images"].Add(image);
+        }
+
+        return result;
     }
 
     /// <summary>

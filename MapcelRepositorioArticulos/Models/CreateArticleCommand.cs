@@ -18,6 +18,7 @@ public class CreateArticleCommand
     public IReadOnlyList<int> TagIds { get; init; } = [];
     public IReadOnlyList<CreateArticleUploadCommand> Files { get; init; } = [];
     public IReadOnlyList<CreateArticleUploadCommand> Images { get; init; } = [];
+    public List<Guid> AttachedFiles { get; init; } = [];
 
     public void Validate()
     {

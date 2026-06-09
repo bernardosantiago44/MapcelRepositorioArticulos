@@ -372,6 +372,9 @@ const ArticleService = (function() {
    */
   function createArticle(data, companyCode) {
     const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const description = data.descriptionHtml ?? data.description;
+    const tagIds = data.tagIds ?? data.tags;
+    const fileIds = data.fileIds ?? [];
     const requestOptions = isMultipartPayload ? {
       method: "POST",
       body: data,
@@ -383,12 +386,12 @@ const ArticleService = (function() {
       },
       body: JSON.stringify({
         title: data.title,
-        description: data.description,
+        description: description,
         externalLink: data.externalLink,
         status: data.status,
         clientComments: data.clientComments,
-        tagIds: data.tags,
-        fileIds: data.fileIds
+        tagIds: tagIds,
+        fileIds: fileIds
       }),
       redirect: "follow"
     };
@@ -396,6 +399,9 @@ const ArticleService = (function() {
     return fetch(`${API_BASE_URL}/articles/${encodeURIComponent(companyCode)}`, requestOptions)
     .then(function (response) {
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Tu sesión ha expirado, por favor autentícate de nuevo.');
+        }
         throw new Error("Failed to create article: " + response.status);
       }
       return response.json();
@@ -419,6 +425,8 @@ const ArticleService = (function() {
    */
   function updateArticle(id, data, companyCode) {
     const isMultipartPayload = typeof FormData !== "undefined" && data instanceof FormData;
+    const description = data.descriptionHtml ?? data.description;
+    const tagIds = data.tagIds ?? data.tags;
     const requestOptions = isMultipartPayload ? {
       method: "PUT",
       body: data,
@@ -430,11 +438,11 @@ const ArticleService = (function() {
       },
       body: JSON.stringify({
         title: data.title || null,
-        description: data.description || null,
+        description: description || null,
         externalLink: data.externalLink || null,
         clientComments: data.clientComments || null,
         status: data.status || null,
-        tagIds: data.tags || null,
+        tagIds: tagIds || null,
         fileIds: data.fileIds || null,
         removedFiles: data.removedFiles || null
       }),

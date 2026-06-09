@@ -46,18 +46,20 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y lftp
           echo "<h1>Sitio en mantenimiento. Actualizando aplicación...</h1>" > app_offline.htm
-          lftp -u "${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }}" ${{ secrets.FTP_SERVER }} -e "
+
+          lftp -u "${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }}" "${{ secrets.FTP_SERVER }}" -e "
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
             put app_offline.htm -o ${{ vars.FTP_DIR }}/app_offline.htm;
-            echo "Waiting ${{ vars.WAIT_SECONDS }} seconds for the server to release file locks..."
-            sleep ${{ vars.WAIT_SECONDS }}
-            quit"
+            quit
+          "
+          echo "Waiting ${{ vars.WAIT_SECONDS }} seconds for the server to release file locks..."
+          sleep ${{ vars.WAIT_SECONDS }}
 
       - name: Sync Files to FTP Server (with TLS)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -67,7 +69,13 @@ jobs:
           protocol: ftps
           port: 21
           security: loose
+          timeout: 120000
+          log-level: verbose
           exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+
             **/app_offline.htm
 
             Archivos/**

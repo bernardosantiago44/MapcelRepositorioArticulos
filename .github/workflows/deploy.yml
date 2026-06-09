@@ -25,6 +25,23 @@ jobs:
         run: |
           dotnet publish -c Release -f net10.0 -r win-x64 --self-contained false -o ./publish
 
+      - name: Block protected storage paths from publish artifact
+        run: |
+          set -e
+
+          PROTECTED_PATHS=(
+            "./publish/Archivos"
+            "./publish/wwwroot/articles"
+          )
+
+          for path in "${PROTECTED_PATHS[@]}"; do
+            if [ -e "$path" ]; then
+              echo "::error::Protected path exists in publish output: $path"
+              echo "Deployment stopped to avoid modifying FTP storage files."
+              exit 1
+            fi
+          done
+
       - name: Take Application Offline
         run: |
           sudo apt-get update && sudo apt-get install -y lftp
@@ -52,6 +69,16 @@ jobs:
           security: loose
           exclude: |
             **/app_offline.htm
+
+            Archivos/**
+            Archivos/**/*
+            **/Archivos/**
+            **/Archivos/**/*
+
+            wwwroot/articles/**
+            wwwroot/articles/**/*
+            **/wwwroot/articles/**
+            **/wwwroot/articles/**/*
 
       - name: Bring Application Online
         if: always()

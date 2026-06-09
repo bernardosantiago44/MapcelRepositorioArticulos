@@ -54,3 +54,8 @@ desktop.ini
 *.swp
 *.log
 **/[Ll]ogs/log-*.txt
+
+## Application FTP storage 
+/Archivos/
+/wwwroot/articles/
+articles/

@@ -5,16 +5,20 @@ on:
     branches:
       - main
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET 10 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
           
@@ -23,11 +27,16 @@ jobs:
 
       - name: Publish Application
         run: |
-          dotnet publish -c Release -f net10.0 -r win-x64 --self-contained false -o ./publish
+          dotnet publish ./MapcelRepositorioArticulos/MapcelRepositorioArticulos.csproj \
+            -c Release \
+            -f net10.0 \
+            -r win-x64 \
+            --self-contained false \
+            -o ./publish
 
-      - name: Block protected storage paths from publish artifact
+      - name: Remove protected storage paths from publish artifact
         run: |
-          set -e
+          set -euo pipefail
 
           PROTECTED_PATHS=(
             "./publish/Archivos"
@@ -35,66 +44,105 @@ jobs:
           )
 
           for path in "${PROTECTED_PATHS[@]}"; do
+            rm -rf "$path"
+
             if [ -e "$path" ]; then
-              echo "::error::Protected path exists in publish output: $path"
-              echo "Deployment stopped to avoid modifying FTP storage files."
+              echo "::error::Could not remove protected path from publish output: $path"
               exit 1
             fi
           done
 
-      - name: Take Application Offline
+      - name: Install FTP Client
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Validate Deployment Configuration
+        env:
+          FTP_DIR: ${{ vars.FTP_DIR }}
+          WAIT_SECONDS: ${{ vars.WAIT_SECONDS }}
         run: |
-          sudo apt-get update && sudo apt-get install -y lftp
+          set -euo pipefail
+
+          FTP_DIR="${FTP_DIR%/}"
+
+          if [[ -z "$FTP_DIR" || "$FTP_DIR" == "/" || "$FTP_DIR" != /* ]]; then
+            echo "::error::FTP_DIR must be a non-root absolute FTP path."
+            exit 1
+          fi
+
+          if [[ ! "$WAIT_SECONDS" =~ ^[0-9]+$ ]]; then
+            echo "::error::WAIT_SECONDS must be a non-negative integer."
+            exit 1
+          fi
+
+      - name: Take Application Offline
+        id: take_offline
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.FTP_DIR }}
+          WAIT_SECONDS: ${{ vars.WAIT_SECONDS }}
+        run: |
+          set -euo pipefail
+
+          FTP_DIR="${FTP_DIR%/}"
           echo "<h1>Sitio en mantenimiento. Actualizando aplicación...</h1>" > app_offline.htm
 
-          lftp -u "${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }}" "${{ secrets.FTP_SERVER }}" -e "
+          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "$FTP_SERVER" -e "
+            set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
-            put app_offline.htm -o ${{ vars.FTP_DIR }}/app_offline.htm;
+            put app_offline.htm -o \"$FTP_DIR/app_offline.htm\";
             quit
           "
-          echo "Waiting ${{ vars.WAIT_SECONDS }} seconds for the server to release file locks..."
-          sleep ${{ vars.WAIT_SECONDS }}
+          echo "Waiting $WAIT_SECONDS seconds for the server to release file locks..."
+          sleep "$WAIT_SECONDS"
 
       - name: Sync Files to FTP Server (with TLS)
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./publish/
-          server-dir: ${{ vars.FTP_DIR }}/
-          protocol: ftps
-          port: 21
-          security: loose
-          timeout: 120000
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-
-            **/app_offline.htm
-
-            Archivos/**
-            Archivos/**/*
-            **/Archivos/**
-            **/Archivos/**/*
-
-            wwwroot/articles/**
-            wwwroot/articles/**/*
-            **/wwwroot/articles/**
-            **/wwwroot/articles/**/*
-
-      - name: Bring Application Online
-        if: always()
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.FTP_DIR }}
         run: |
-          lftp -u "${{ secrets.FTP_USERNAME }},${{ secrets.FTP_PASSWORD }}" ${{ secrets.FTP_SERVER }} -e "
+          set -euo pipefail
+
+          FTP_DIR="${FTP_DIR%/}"
+
+          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "$FTP_SERVER" -e "
+            set cmd:fail-exit true;
             set ftp:ssl-force true;
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
-            rm ${{ vars.FTP_DIR }}/app_offline.htm;
+            set net:max-retries 3;
+            set net:timeout 30;
+            mirror --reverse --delete --verbose=1 --parallel=1 --no-perms --no-symlinks \
+              --exclude-glob app_offline.htm \
+              --exclude-glob Archivos/ \
+              --exclude-glob 'Archivos/**' \
+              --exclude-glob wwwroot/articles/ \
+              --exclude-glob 'wwwroot/articles/**' \
+              ./publish/ \"$FTP_DIR\";
+            quit
+          "
+
+      - name: Bring Application Online
+        if: ${{ always() && steps.take_offline.outcome == 'success' }}
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIR: ${{ vars.FTP_DIR }}
+        run: |
+          FTP_DIR="${FTP_DIR%/}"
+
+          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "$FTP_SERVER" -e "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate no;
+            set ftp:passive-mode true;
+            rm \"$FTP_DIR/app_offline.htm\";
             quit"

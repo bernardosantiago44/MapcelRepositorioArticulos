@@ -94,7 +94,7 @@ jobs:
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
-            put app_offline.htm -o \"$FTP_DIR/app_offline.htm\";
+            put app_offline.htm -o $FTP_DIR/app_offline.htm;
             quit
           "
           echo "Waiting $WAIT_SECONDS seconds for the server to release file locks..."
@@ -125,7 +125,7 @@ jobs:
               --exclude-glob 'Archivos/**' \
               --exclude-glob wwwroot/articles/ \
               --exclude-glob 'wwwroot/articles/**' \
-              ./publish/ \"$FTP_DIR\";
+              ./publish/ $FTP_DIR;
             quit
           "
 
@@ -144,5 +144,5 @@ jobs:
             set ftp:ssl-protect-data true;
             set ssl:verify-certificate no;
             set ftp:passive-mode true;
-            rm \"$FTP_DIR/app_offline.htm\";
+            rm $FTP_DIR/app_offline.htm;
             quit"
